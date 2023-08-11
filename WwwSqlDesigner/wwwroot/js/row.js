@@ -1,0 +1,506 @@
+/* --------------------- table row ( = db column) ------------ */
+SQL.Row = function (owner, title, data) {
+    this.owner = owner;
+    this.relations = [];
+    this.keys = [];
+    this.selected = false;
+    this.expanded = false;
+
+    SQL.Visual.apply(this);
+
+    this.data.type = 0;
+    this.data.size = "";
+    this.data.def = null;
+    this.data.nll = true;
+    this.data.ai = false;
+    this.data.comment = "";
+
+    if (data) {
+        this.update(data);
+    }
+    this.setTitle(title);
+};
+SQL.Row.prototype = Object.create(SQL.Visual.prototype);
+
+SQL.Row.prototype._build = function () {
+    this.dom.container = OZ.DOM.elm("tbody");
+
+    this.dom.content = OZ.DOM.elm("tr");
+    this.dom.selected = OZ.DOM.elm("div", {
+        className: "selected",
+        innerHTML: "&raquo;&nbsp;",
+    });
+    this.dom.title = OZ.DOM.elm("div", { className: "title" });
+    const td1 = OZ.DOM.elm("td");
+    const td2 = OZ.DOM.elm("td", { className: "typehint" });
+    this.dom.typehint = td2;
+
+    OZ.DOM.append(
+        [this.dom.container, this.dom.content],
+        [this.dom.content, td1, td2],
+        [td1, this.dom.selected, this.dom.title]
+    );
+
+    this.enter = this.enter.bind(this);
+    this.changeComment = this.changeComment.bind(this);
+
+    OZ.Event.add(this.dom.container, "click", this.click.bind(this));
+    OZ.Event.add(this.dom.container, "dblclick", this.dblclick.bind(this));
+};
+
+SQL.Row.prototype.select = function () {
+    if (this.selected) {
+        return;
+    }
+    this.selected = true;
+    for (let relation of this.relations) {
+        relation.highlight();
+    }
+    this.redraw();
+};
+
+SQL.Row.prototype.deselect = function () {
+    if (!this.selected) {
+        return;
+    }
+    this.selected = false;
+    for (let relation of this.relations) {
+        relation.dehighlight();
+    }
+    this.redraw();
+    this.collapse();
+};
+
+SQL.Row.prototype.setTitle = function (t) {
+    const old = this.getTitle();
+    for (let relation of this.relations) {
+        if (relation.row1 != this) {
+            continue;
+        }
+        const tt = relation.row2.getTitle().replace(new RegExp(old, "g"), t);
+        if (tt != relation.row2.getTitle()) {
+            relation.row2.setTitle(tt);
+        }
+    }
+
+    SQL.Visual.prototype.setTitle.apply(this, [t]);
+};
+
+SQL.Row.prototype.click = function (e) {
+    /* clicked on row */
+    SQL.publish("rowclick", this);
+    this.owner.owner.rowManager.select(this);
+};
+
+SQL.Row.prototype.dblclick = function (e) {
+    /* dblclicked on row */
+    OZ.Event.prevent(e);
+    OZ.Event.stop(e);
+    this.expand();
+};
+
+SQL.Row.prototype.update = function (data) {
+    /* update subset of row data */
+    const des = SQL.Designer;
+    if (data.nll && data.def && data.def.match(/^null$/i)) {
+        data.def = null;
+    }
+
+    for (let p in data) {
+        this.data[p] = data[p];
+    }
+    if (!this.data.nll && this.data.def === null) {
+        this.data.def = "";
+    }
+
+    for (let relation of this.relations) {
+        if (relation.row1 == this) {
+            relation.row2.update({
+                type: des.getFKTypeFor(this.data.type),
+                size: this.data.size,
+            });
+        }
+    }
+    this.redraw();
+};
+
+SQL.Row.prototype.up = function () {
+    /* shift up */
+    const r = this.owner.rows;
+    const idx = r.indexOf(this);
+    if (!idx) {
+        return;
+    }
+    r[idx - 1].dom.container.parentNode.insertBefore(
+        this.dom.container,
+        r[idx - 1].dom.container
+    );
+    r.splice(idx, 1);
+    r.splice(idx - 1, 0, this);
+    this.redraw();
+};
+
+SQL.Row.prototype.down = function () {
+    /* shift down */
+    const r = this.owner.rows;
+    const idx = r.indexOf(this);
+    if (idx + 1 == this.owner.rows.length) {
+        return;
+    }
+    r[idx].dom.container.parentNode.insertBefore(
+        this.dom.container,
+        r[idx + 1].dom.container.nextSibling
+    );
+    r.splice(idx, 1);
+    r.splice(idx + 1, 0, this);
+    this.redraw();
+};
+
+SQL.Row.prototype.buildEdit = function () {
+    OZ.DOM.clear(this.dom.container);
+
+    const elms = [];
+    this.dom.name = OZ.DOM.elm("input");
+    this.dom.name.type = "text";
+    elms.push(["name", this.dom.name]);
+    OZ.Event.add(this.dom.name, "keypress", this.enter);
+
+    this.dom.type = this.buildTypeSelect(this.data.type);
+    elms.push(["type", this.dom.type]);
+
+    this.dom.size = OZ.DOM.elm("input");
+    this.dom.size.type = "text";
+    elms.push(["size", this.dom.size]);
+
+    this.dom.def = OZ.DOM.elm("input");
+    this.dom.def.type = "text";
+    elms.push(["def", this.dom.def]);
+
+    this.dom.ai = OZ.DOM.elm("input");
+    this.dom.ai.type = "checkbox";
+    elms.push(["ai", this.dom.ai]);
+
+    this.dom.nll = OZ.DOM.elm("input");
+    this.dom.nll.type = "checkbox";
+    elms.push(["null", this.dom.nll]);
+
+    this.dom.comment = OZ.DOM.elm("span", { className: "comment" });
+    this.dom.comment.innerHTML = "";
+    this.dom.comment.appendChild(document.createTextNode(this.data.comment));
+
+    this.dom.commentbtn = OZ.DOM.elm("input");
+    this.dom.commentbtn.type = "button";
+    this.dom.commentbtn.id = "commentbtn";
+    this.dom.commentbtn.value = _("comment");
+
+    OZ.Event.add(this.dom.commentbtn, "click", this.changeComment);
+
+    let tr;
+    let td1;
+    let td2
+    for (let row of elms) {
+        tr = OZ.DOM.elm("tr");
+        td1 = OZ.DOM.elm("td");
+        td2 = OZ.DOM.elm("td");
+        const l = OZ.DOM.text(_(row[0]) + ": ");
+        OZ.DOM.append([tr, td1, td2], [td1, l], [td2, row[1]]);
+        this.dom.container.appendChild(tr);
+    }
+
+    tr = OZ.DOM.elm("tr");
+    td1 = OZ.DOM.elm("td");
+    td2 = OZ.DOM.elm("td");
+    OZ.DOM.append(
+        [tr, td1, td2],
+        [td1, this.dom.comment],
+        [td2, this.dom.commentbtn]
+    );
+    this.dom.container.appendChild(tr);
+};
+
+SQL.Row.prototype.changeComment = function (e) {
+    const c = prompt(_("commenttext"), this.data.comment);
+    if (c === null) {
+        return;
+    }
+    this.data.comment = c;
+    this.dom.comment.innerHTML = "";
+    this.dom.comment.appendChild(document.createTextNode(this.data.comment));
+};
+
+SQL.Row.prototype.expand = function () {
+    if (this.expanded) {
+        return;
+    }
+    this.expanded = true;
+    this.buildEdit();
+    this.load();
+    this.redraw();
+    this.dom.container.classList.add("expanded");
+    this.dom.name.focus();
+    this.dom.name.select();
+};
+
+SQL.Row.prototype.collapse = function () {
+    if (!this.expanded) {
+        return;
+    }
+    this.expanded = false;
+    this.dom.container.classList.remove("expanded");
+
+    const data = {
+        type: this.dom.type.selectedIndex,
+        def: this.dom.def.value,
+        size: this.dom.size.value,
+        nll: this.dom.nll.checked,
+        ai: this.dom.ai.checked,
+    };
+
+    OZ.DOM.clear(this.dom.container);
+    this.dom.container.appendChild(this.dom.content);
+
+    this.update(data);
+    this.setTitle(this.dom.name.value);
+};
+
+SQL.Row.prototype.load = function () {
+    /* put data to expanded form */
+    this.dom.name.value = this.getTitle();
+    let def = this.data.def;
+    if (def === null) {
+        def = "NULL";
+    }
+
+    this.dom.def.value = def;
+    this.dom.size.value = this.data.size;
+    this.dom.nll.checked = this.data.nll;
+    this.dom.ai.checked = this.data.ai;
+};
+
+SQL.Row.prototype.redraw = function () {
+    const color = this.getColor();
+    this.dom.container.style.backgroundColor = color;
+    this.dom.container.style.borderColor = color;
+    OZ.DOM.removeClass(this.dom.title, "primary");
+    OZ.DOM.removeClass(this.dom.title, "key");
+    if (this.isPrimary()) {
+        OZ.DOM.addClass(this.dom.title, "primary");
+    }
+    if (this.isKey()) {
+        OZ.DOM.addClass(this.dom.title, "key");
+    }
+    this.dom.selected.style.display = this.selected ? "" : "none";
+    this.dom.container.title = this.data.comment;
+
+    const typehint = [];
+    if (this.owner.owner.getOption("showtype")) {
+        const elm = this.getDataType();
+        typehint.push(elm.getAttribute("sql"));
+    }
+
+    if (this.owner.owner.getOption("showsize") && this.data.size) {
+        typehint.push("(" + this.data.size + ")");
+    }
+
+    this.dom.typehint.innerHTML = typehint.join(" ");
+    this.owner.redraw();
+    this.owner.owner.rowManager.redraw();
+};
+
+SQL.Row.prototype.addRelation = function (r) {
+    this.relations.push(r);
+};
+
+SQL.Row.prototype.removeRelation = function (r) {
+    const idx = this.relations.indexOf(r);
+    if (idx == -1) {
+        return;
+    }
+    this.relations.splice(idx, 1);
+};
+
+SQL.Row.prototype.addKey = function (k) {
+    this.keys.push(k);
+    this.redraw();
+};
+
+SQL.Row.prototype.removeKey = function (k) {
+    const idx = this.keys.indexOf(k);
+    if (idx == -1) {
+        return;
+    }
+    this.keys.splice(idx, 1);
+    this.redraw();
+};
+
+SQL.Row.prototype.getDataType = function () {
+    const type = this.data.type;
+    const elm = DATATYPES.getElementsByTagName("type")[type];
+    return elm;
+};
+
+SQL.Row.prototype.getColor = function () {
+    const elm = this.getDataType();
+    const g = this.getDataType().parentNode;
+    return elm.getAttribute("color") || g.getAttribute("color") || "#fff";
+};
+
+SQL.Row.prototype.buildTypeSelect = function (id) {
+    /* build selectbox with avail datatypes */
+    const s = OZ.DOM.elm("select");
+    const gs = DATATYPES.getElementsByTagName("group");
+    for (let g of gs) {
+        const og = OZ.DOM.elm("optgroup");
+        og.style.backgroundColor = g.getAttribute("color") || "#fff";
+        og.label = g.getAttribute("label");
+        s.appendChild(og);
+        const ts = g.getElementsByTagName("type");
+        for (let t of ts) {
+            const o = OZ.DOM.elm("option");
+            if (t.getAttribute("color")) {
+                o.style.backgroundColor = t.getAttribute("color");
+            }
+            if (t.getAttribute("note")) {
+                o.title = t.getAttribute("note");
+            }
+            o.innerHTML = t.getAttribute("label");
+            og.appendChild(o);
+        }
+    }
+    s.selectedIndex = id;
+    return s;
+};
+
+SQL.Row.prototype.destroy = function () {
+    SQL.Visual.prototype.destroy.apply(this);
+    while (this.relations.length) {
+        this.owner.owner.removeRelation(this.relations[0]);
+    }
+    for (let key of this.keys) {
+        key.removeRow(this);
+    }
+};
+
+SQL.Row.prototype.toXML = function () {
+    let xml = "";
+
+    let t = this.getTitle().replace(/"/g, "&quot;");
+    const nn = this.data.nll ? "1" : "0";
+    const ai = this.data.ai ? "1" : "0";
+    xml +=
+        '<row name="' + t + '" null="' + nn + '" autoincrement="' + ai + '">\n';
+
+    const elm = this.getDataType();
+    t = elm.getAttribute("sql");
+    if (this.data.size.length) {
+        t += "(" + this.data.size + ")";
+    }
+    xml += "<datatype>" + t + "</datatype>\n";
+
+    if (this.data.def || this.data.def === null) {
+        const q = elm.getAttribute("quote");
+        let d = this.data.def;
+        if (d === null) {
+            d = "NULL";
+        } else if (d != "CURRENT_TIMESTAMP") {
+            d = q + d + q;
+        }
+        xml += "<default>" + SQL.escape(d) + "</default>";
+    }
+
+    for (let relation of this.relations) {
+        if (relation.row2 != this) {
+            continue;
+        }
+        xml +=
+            '<relation table="' +
+            relation.row1.owner.getTitle() +
+            '" row="' +
+            relation.row1.getTitle() +
+            '" />\n';
+    }
+
+    if (this.data.comment) {
+        xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n";
+    }
+
+    xml += "</row>\n";
+    return xml;
+};
+
+SQL.Row.prototype.fromXML = function (node) {
+    const name = node.getAttribute("name");
+
+    const obj = { type: 0, size: "" };
+    obj.nll = node.getAttribute("null") == "1";
+    obj.ai = node.getAttribute("autoincrement") == "1";
+
+    const cs = node.getElementsByTagName("comment");
+    if (cs.length && cs[0].firstChild) {
+        obj.comment = cs[0].firstChild.nodeValue;
+    }
+
+    let d = node.getElementsByTagName("datatype");
+    if (d.length && d[0].firstChild) {
+        const s = d[0].firstChild.nodeValue;
+        const r = s.match(/^([^\(]+)(\((.*)\))?.*$/);
+        const type = r[1];
+        if (r[3]) {
+            obj.size = r[3];
+        }
+        const types = window.DATATYPES.getElementsByTagName("type");
+        for (let i = 0; i < types.length; i++) {
+            const sql = types[i].getAttribute("sql");
+            const re = types[i].getAttribute("re");
+            if (sql == type || (re && new RegExp(re).exec(type))) {
+                obj.type = i;
+            }
+        }
+    }
+
+    const elm = DATATYPES.getElementsByTagName("type")[obj.type];
+    d = node.getElementsByTagName("default");
+    if (d.length && d[0].firstChild) {
+        const def = d[0].firstChild.nodeValue;
+        obj.def = def;
+        const q = elm.getAttribute("quote");
+        if (q) {
+            const re = new RegExp("^" + q + "(.*)" + q + "$");
+            const r = def.match(re);
+            if (r) {
+                obj.def = r[1];
+            }
+        }
+    }
+
+    this.update(obj);
+    this.setTitle(name);
+};
+
+SQL.Row.prototype.isPrimary = function () {
+    for (let key of this.keys) {
+        if (key.getType() == "PRIMARY") {
+            return true;
+        }
+    }
+    return false;
+};
+
+SQL.Row.prototype.isUnique = function () {
+    for (let key of this.keys) {
+        if (key.getType() == "PRIMARY" || key.getType() == "UNIQUE") {
+            return true;
+        }
+    }
+    return false;
+};
+
+SQL.Row.prototype.isKey = function () {
+    return this.keys.length > 0;
+};
+
+SQL.Row.prototype.enter = function (e) {
+    if (e.keyCode == 13) {
+        this.collapse();
+    }
+};
