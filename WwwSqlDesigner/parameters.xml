@@ -1,0 +1,11 @@
+<parameters>
+  <!-- Stdout logging -->
+  <parameter name="StdoutLogEnabled" defaultValue="false">
+    <parameterEntry kind="XmlFile" scope="\\web.config$" match="/configuration/location/system.webServer/aspNetCore/@stdoutLogEnabled" />
+  </parameter>
+  <!-- Environment -->
+  <parameter name="Environment" defaultvalue="Production">
+    <parameterentry kind="XmlFile" scope="\\web.config$" match="/configuration/location/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name='ASPNETCORE_ENVIRONMENT']/@value" />
+  </parameter>
+</parameters>
+
