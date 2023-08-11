@@ -315,7 +315,7 @@ SQL.IO.prototype.serversave = function (e, keyword) {
         bp +
         "backend/" +
         this.dom.backend.value +
-        "/?action=save&keyword=" +
+        "/save/?keyword=" +
         encodeURIComponent(name);
     const h = this.owner.getXhrHeaders();
     h["Content-type"] = "application/xml";
@@ -344,7 +344,7 @@ SQL.IO.prototype.serverload = function (e, keyword) {
         bp +
         "backend/" +
         this.dom.backend.value +
-        "/?action=load&keyword=" +
+        "/load/?keyword=" +
         encodeURIComponent(name);
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
@@ -354,7 +354,7 @@ SQL.IO.prototype.serverload = function (e, keyword) {
 
 SQL.IO.prototype.serverlist = function (e) {
     const bp = this.owner.getOption("xhrpath");
-    const url = bp + "backend/" + this.dom.backend.value + "/?action=list";
+    const url = bp + "backend/" + this.dom.backend.value + "/list";
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     OZ.Request(url, this.listresponse, { headers: h });
@@ -370,7 +370,7 @@ SQL.IO.prototype.serverimport = function (e) {
         bp +
         "backend/" +
         this.dom.backend.value +
-        "/?action=import&database=" +
+        "/import/?database=" +
         name;
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
