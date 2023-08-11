@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text;
 
 namespace WwwSqlDesigner.Controllers.Tests
 {
@@ -71,6 +73,42 @@ namespace WwwSqlDesigner.Controllers.Tests
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
             Assert.AreEqual(content, FooBarModelXml);
+        }
+
+        [TestMethod()]
+        public async Task SaveTestNew()
+        {
+            var httpContext = new DefaultHttpContext();
+            using MemoryStream stream = new(Encoding.UTF8.GetBytes(FooBarModelXml));
+            httpContext.Request.Body = stream;
+            httpContext.Request.ContentLength = stream.Length;
+            _controller.ControllerContext = new ControllerContext()
+            {
+                HttpContext = httpContext
+            };
+            var result = await _controller.Save("Test3").ConfigureAwait(true);
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            var dbContent = _dbContext.DataModels.FirstOrDefault(x => x.Keyword == "Test3");
+            Assert.IsNotNull(dbContent);
+        }
+
+        [TestMethod()]
+        public async Task SaveTestUpdate()
+        {
+            DateTime oldDate = _dbContext.DataModels.First(x => x.Keyword == "Test1").CreatedAt;
+            var httpContext = new DefaultHttpContext();
+            using MemoryStream stream = new(Encoding.UTF8.GetBytes(FooBarModelXml));
+            httpContext.Request.Body = stream;
+            httpContext.Request.ContentLength = stream.Length;
+            _controller.ControllerContext = new ControllerContext()
+            {
+                HttpContext = httpContext
+            };
+            var result = await _controller.Save("Test1").ConfigureAwait(true);
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            var dbContent = _dbContext.DataModels.FirstOrDefault(x => x.Keyword == "Test1");
+            Assert.IsNotNull(dbContent);
+            Assert.AreNotEqual(oldDate, dbContent.CreatedAt);
         }
     }
 }
