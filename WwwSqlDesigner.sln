@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.6.33829.357
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WwwSqlDesigner", "WwwSqlDesigner\WwwSqlDesigner.csproj", "{0C3BFD7C-B97B-498C-8A84-C52C7E2B769E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WwwSqlDesigner", "WwwSqlDesigner\WwwSqlDesigner.csproj", "{0C3BFD7C-B97B-498C-8A84-C52C7E2B769E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WwwSqlDesigner.Tests", "WwwSqlDesigner.Tests\WwwSqlDesigner.Tests.csproj", "{2181F210-E641-4E48-9FA2-C022AE2D25D6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{0C3BFD7C-B97B-498C-8A84-C52C7E2B769E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C3BFD7C-B97B-498C-8A84-C52C7E2B769E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C3BFD7C-B97B-498C-8A84-C52C7E2B769E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2181F210-E641-4E48-9FA2-C022AE2D25D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2181F210-E641-4E48-9FA2-C022AE2D25D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2181F210-E641-4E48-9FA2-C022AE2D25D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2181F210-E641-4E48-9FA2-C022AE2D25D6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
