@@ -11,6 +11,8 @@ This repository replaces the backend with a .NET 6 / EF Core version and expands
 1. Open the solution in Visual Studio
 1. Run it. By default, it will create a LocalDB instance and deploy the DB schema via Entity Framework
 
+Note that the auto-creation of a database and schema only works with LocalDB in a Development environment. When you're setting up a CI/CD pipeline for Test and Production environments, please include a [dotnet ef migrations bundle](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/applying?tabs=dotnet-core-cli#bundles) step to hanlde DB migrations.
+
 # Current Features
 1. Full-feature ER diagrams
 1. Comments per table and column
