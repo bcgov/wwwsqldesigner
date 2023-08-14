@@ -210,7 +210,7 @@ SQL.Designer.prototype.setCookie = function (obj) {
         arr.push(p + ":'" + obj[p] + "'");
     }
     const str = "{" + arr.join(",") + "}";
-    document.cookie = "wwwsqldesigner=" + str + "; path=/";
+    document.cookie = "wwwsqldesigner=" + str + ";samesite=strict;secure";
 };
 
 SQL.Designer.prototype.getOption = function (name) {
