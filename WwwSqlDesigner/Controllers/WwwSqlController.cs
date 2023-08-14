@@ -36,7 +36,7 @@ namespace WwwSqlDesigner.Controllers
             if (null == load)
             {
                 _logger.LogWarning("Keyword not found: {keyword:0}", keyword);
-                return NotFound(keyword);
+                return NotFound();
             }
             return Content(load.Data, "text/xml");
         }
