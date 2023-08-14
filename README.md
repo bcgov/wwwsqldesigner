@@ -24,3 +24,4 @@ This repository replaces the backend with a .NET 6 / EF Core version and expands
 1. Capture of data classifications per column
 1. Capture of records retention schedule per column
 1. Expanding the SQL import feature to support more than an import from a local MySQL DB
+1. User roles and permissions
