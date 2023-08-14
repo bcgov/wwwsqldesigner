@@ -4,14 +4,9 @@ namespace WwwSqlDesigner.Data
 {
     public class ApplicationDbContext : DbContext
     {
-        public ApplicationDbContext()
-        {
-        }
+        public ApplicationDbContext() { }
 
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
         public virtual DbSet<DataModel> DataModels { get; set; } = null!;
 

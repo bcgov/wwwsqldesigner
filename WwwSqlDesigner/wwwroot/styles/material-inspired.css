@@ -98,7 +98,7 @@ select {
     border-radius: 0;
     box-shadow: none;
     background-color: transparent;
-    background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGhlaWdodD0iNiIgd2lkdGg9IjEwIj48cG9seWdvbiBwb2ludHM9IjAsMCAxMCwwIDUsNiIgc3R5bGU9ImZpbGw6cmdiYSgwLDAsMCwuMjQpOyIvPjwvc3ZnPg==);
+    background-image: url(../images/select.svg);
     background-repeat: no-repeat;
     background-position: right center;
     cursor: pointer;
