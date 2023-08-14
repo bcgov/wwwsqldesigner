@@ -56,12 +56,18 @@ namespace WwwSqlDesigner.Controllers.Tests
             StringAssert.Contains(content, "Test1");
             StringAssert.Contains(content, "Test2");
         }
-        #endregion
 
         [TestMethod()]
         public async Task LoadTestNoKeyword()
         {
             var result = await _controller.Load(null).ConfigureAwait(true);
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+
+        [TestMethod()]
+        public async Task LoadTestInvalidKeyword()
+        {
+            var result = await _controller.Load("DoesNotExist").ConfigureAwait(true);
             Assert.IsInstanceOfType(result, typeof(NotFoundResult));
         }
 
@@ -73,6 +79,13 @@ namespace WwwSqlDesigner.Controllers.Tests
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
             Assert.AreEqual(content, FooBarModelXml);
+        }
+
+        [TestMethod()]
+        public async Task SaveTestNoKeyword()
+        {
+            var result = await _controller.Save(null).ConfigureAwait(true);
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
         }
 
         [TestMethod()]
@@ -110,5 +123,13 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.IsNotNull(dbContent);
             Assert.AreNotEqual(oldDate, dbContent.CreatedAt);
         }
+
+        [TestMethod()]
+        public void ImportTest()
+        {
+            var result = _controller.Import();
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+        #endregion
     }
 }

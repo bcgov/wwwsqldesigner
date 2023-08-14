@@ -83,60 +83,18 @@ const OZ = {
             return e.target || e.srcElement;
         },
     },
-    Class: function () {
-        const c = function () {
-            const init = arguments.callee.prototype.init;
-            if (init) {
-                init.apply(this, arguments);
-            }
-        };
-        c.implement = function (parent) {
-            for (let p in parent.prototype) {
-                this.prototype[p] = parent.prototype[p];
-            }
-            return this;
-        };
-        c.extend = function (parent) {
-            const tmp = function () { };
-            tmp.prototype = parent.prototype;
-            this.prototype = new tmp();
-            this.prototype.constructor = this;
-            return this;
-        };
-        c.prototype.bind = function (fnc) {
-            return fnc.bind(this);
-        };
-        c.prototype.dispatch = function (type, data) {
-            const obj = {
-                type: type,
-                target: this,
-                timeStamp: new Date().getTime(),
-                data: data,
-            };
-            const tocall = [];
-            const list = OZ.Event._byName[type];
-            for (let id in list) {
-                const item = list[id];
-                if (!item[0] || item[0] == this) {
-                    tocall.push(item[2]);
-                }
-            }
-            const len = tocall.length;
-            for (let i = 0; i < len; i++) {
-                tocall[i](obj);
-            }
-        };
-        return c;
-    },
     DOM: {
         elm: function (name, opts) {
             const elm = document.createElement(name);
             for (let p in opts) {
                 const val = opts[p];
                 if (p == "class") {
-                    p = "className";
+                    const p2 = "className";
+                    if (p2 in elm) {
+                        elm[p2] = val;
+                    }
                 }
-                if (p in elm) {
+                else if (p in elm) {
                     elm[p] = val;
                 }
             }
@@ -265,13 +223,19 @@ const OZ = {
             for (let p in obj) {
                 let val = obj[p];
                 if (p == "opacity" && OZ.ie) {
-                    p = "filter";
                     val = "alpha(opacity=" + Math.round(100 * val) + ")";
                     elm.style.zoom = 1;
+                    const p2 = "filter";
+                    if (p2 in elm.style) {
+                        elm.style[p2] = val;
+                    }
                 } else if (p == "float") {
-                    p = OZ.ie ? "styleFloat" : "cssFloat";
+                    const p2 = OZ.ie ? "styleFloat" : "cssFloat";
+                    if (p2 in elm.style) {
+                        elm.style[p2] = val;
+                    }
                 }
-                if (p in elm.style) {
+                else if (p in elm.style) {
                     elm.style[p] = val;
                 }
             }

@@ -190,9 +190,15 @@ SQL.Designer.prototype.getCookie = function () {
     let obj = {};
     const parts = c.split(";");
     for (let part of parts) {
-        const r = part.match(/wwwsqldesigner=({.*?})/);
+        const r = part.match(/wwwsqldesigner={(.*?)}/);
         if (r) {
-            obj = eval("(" + r[1] + ")");
+            const options = r[1].split(",");
+            for (let option of options) {
+                const opt = option.match(/(.*):'(.*)'/);
+                if (opt) {
+                    obj[opt[1]] = opt[2];
+                }
+            }
         }
     }
     return obj;
@@ -204,7 +210,7 @@ SQL.Designer.prototype.setCookie = function (obj) {
         arr.push(p + ":'" + obj[p] + "'");
     }
     const str = "{" + arr.join(",") + "}";
-    document.cookie = "wwwsqldesigner=" + str + "; path=/";
+    document.cookie = "wwwsqldesigner=" + str + ";samesite=strict;secure";
 };
 
 SQL.Designer.prototype.getOption = function (name) {
