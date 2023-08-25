@@ -130,9 +130,14 @@ SQL.Designer.prototype.init2 = function () {
     OZ.$("docs").value = _("docs");
 
     const url = window.location.href;
-    const r = url.match(/keyword=([^&]+)/);
-    if (r) {
-        const keyword = r[1];
+    const regexKeyword = url.match(/keyword=([^&]+)/);
+    const regexVersion = url.match(/version=([^&]+)/);
+    if (regexKeyword && regexVersion) {
+        const keyword = regexKeyword[1];
+        const version = regexVersion[1];
+        this.io.serverload(false, keyword, version);
+    } else if (regexKeyword) {
+        const keyword = regexKeyword[1];
         this.io.serverload(false, keyword);
     }
     document.body.style.visibility = "visible";

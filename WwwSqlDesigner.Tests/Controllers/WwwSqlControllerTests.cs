@@ -34,12 +34,21 @@ namespace WwwSqlDesigner.Controllers.Tests
                 CreatedAt = new DateTime(2023, 02, 12, 12, 23, 34),
                 Keyword = "Test1",
                 Data = FooBarModelXml,
+                Version = 0,
+            });
+            _dbContext.DataModels.Add(new Data.DataModel()
+            {
+                CreatedAt = new DateTime(2023, 02, 14, 12, 23, 34),
+                Keyword = "Test1",
+                Data = FooBarModelXml,
+                Version = 1,
             });
             _dbContext.DataModels.Add(new Data.DataModel()
             {
                 CreatedAt = new DateTime(2023, 05, 15, 12, 23, 34),
                 Keyword = "Test2",
                 Data = FooBarModelXml,
+                Version = 0,
             });
             _dbContext.SaveChanges();
         }
@@ -60,21 +69,38 @@ namespace WwwSqlDesigner.Controllers.Tests
         [TestMethod()]
         public async Task LoadTestNoKeyword()
         {
-            var result = await _controller.Load(null).ConfigureAwait(true);
+            var result = await _controller.Load(null, null).ConfigureAwait(true);
             Assert.IsInstanceOfType(result, typeof(NotFoundResult));
         }
 
         [TestMethod()]
         public async Task LoadTestInvalidKeyword()
         {
-            var result = await _controller.Load("DoesNotExist").ConfigureAwait(true);
+            var result = await _controller.Load("DoesNotExist", null).ConfigureAwait(true);
             Assert.IsInstanceOfType(result, typeof(NotFoundResult));
         }
 
         [TestMethod()]
-        public async Task LoadTest()
+        public async Task LoadTestInvalidVersion()
         {
-            var result = await _controller.Load("Test1").ConfigureAwait(true);
+            var result = await _controller.Load("Test1", 99).ConfigureAwait(true);
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+
+        [TestMethod()]
+        public async Task LoadTestLatest()
+        {
+            var result = await _controller.Load("Test1", null).ConfigureAwait(true);
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            string? content = ((ContentResult)result).Content;
+            Assert.IsNotNull(content);
+            Assert.AreEqual(content, FooBarModelXml);
+        }
+
+        [TestMethod()]
+        public async Task LoadTestVersion()
+        {
+            var result = await _controller.Load("Test1", 1).ConfigureAwait(true);
             Assert.IsInstanceOfType(result, typeof(ContentResult));
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
@@ -108,7 +134,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         [TestMethod()]
         public async Task SaveTestUpdate()
         {
-            DateTime oldDate = _dbContext.DataModels.First(x => x.Keyword == "Test1").CreatedAt;
+            int oldVersion = _dbContext.DataModels.OrderByDescending(x => x.CreatedAt).First(x => x.Keyword == "Test1").Version;
             var httpContext = new DefaultHttpContext();
             using MemoryStream stream = new(Encoding.UTF8.GetBytes(FooBarModelXml));
             httpContext.Request.Body = stream;
@@ -119,9 +145,9 @@ namespace WwwSqlDesigner.Controllers.Tests
             };
             var result = await _controller.Save("Test1").ConfigureAwait(true);
             Assert.IsInstanceOfType(result, typeof(ContentResult));
-            var dbContent = _dbContext.DataModels.FirstOrDefault(x => x.Keyword == "Test1");
+            var dbContent = _dbContext.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefault(x => x.Keyword == "Test1");
             Assert.IsNotNull(dbContent);
-            Assert.AreNotEqual(oldDate, dbContent.CreatedAt);
+            Assert.AreNotEqual(oldVersion, dbContent.Version);
         }
 
         [TestMethod()]

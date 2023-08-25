@@ -20,25 +20,37 @@ namespace WwwSqlDesigner.Controllers
         [Route("backend/netcore-ef/list")]
         public async Task<IActionResult> List()
         {
-            var list = await _context.DataModels.OrderByDescending(x => x.CreatedAt).Select(x => x.Keyword).ToListAsync();
+            var list = await _context.DataModels
+                .OrderBy(x => x.Keyword)
+                .OrderByDescending(x => x.Version)
+                .Select(x => x.Keyword + " v" + x.Version + " - /?keyword=" + x.Keyword + "&version=" + x.Version)
+                .ToListAsync();
             return Content(string.Join("\n", list));
         }
 
         [HttpGet]
         [Route("backend/netcore-ef/load")]
-        public async Task<IActionResult> Load(string? keyword)
+        public async Task<IActionResult> Load(string? keyword, int? version)
         {
             if (string.IsNullOrEmpty(keyword))
             {
                 return NotFound();
             }
-            var load = await _context.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(x => x.Keyword == keyword);
-            if (null == load)
+            DataModel? model;
+            if (!version.HasValue)
+            {
+                model = await _context.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(x => x.Keyword == keyword);
+            }
+            else
+            {
+                model = await _context.DataModels.FirstOrDefaultAsync(x => x.Keyword == keyword && x.Version == version);
+            }
+            if (null == model)
             {
                 _logger.LogWarning("Keyword not found: {keyword:0}", keyword);
                 return NotFound();
             }
-            return Content(load.Data, "text/xml");
+            return Content(model.Data, "text/xml");
         }
 
         [HttpPost]
@@ -65,15 +77,22 @@ namespace WwwSqlDesigner.Controllers
                     Keyword = keyword,
                     Data = xmlData,
                     CreatedAt = DateTime.Now,
+                    Version = 0,
                 };
                 _context.DataModels.Add(newModel);
                 _logger.LogInformation("New data model created: {keyword:0}", keyword);
             }
             else
             {
-                save.Data = xmlData;
-                save.CreatedAt = DateTime.Now;
-                _logger.LogInformation("Data model updated: {keyword:0}", keyword);
+                var newModel = new DataModel()
+                {
+                    Keyword = keyword,
+                    Data = xmlData,
+                    CreatedAt = DateTime.Now,
+                    Version = save.Version + 1,  //This does not need to be thread-safe as a unique (key/version) key exists in the DB.
+                };
+                _context.DataModels.Add(newModel);
+                _logger.LogInformation("New Data model version: {keyword:0}", keyword);
             }
             _context.SaveChanges();
             return Content(string.Empty);

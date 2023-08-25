@@ -333,19 +333,22 @@ SQL.IO.prototype.quicksave = function (e) {
     this.serversave(e, this._name);
 };
 
-SQL.IO.prototype.serverload = function (e, keyword) {
+SQL.IO.prototype.serverload = function (e, keyword, version) {
     const name = keyword || prompt(_("serverloadprompt"), this._name);
     if (!name) {
         return;
     }
     this._name = name;
     const bp = this.owner.getOption("xhrpath");
-    const url =
+    let url =
         bp +
         "backend/" +
         this.dom.backend.value +
         "/load/?keyword=" +
         encodeURIComponent(name);
+    if (version) {
+        url += "&version=" + encodeURIComponent(version);
+    }
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     this.name = name;

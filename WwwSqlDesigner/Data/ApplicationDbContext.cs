@@ -14,6 +14,8 @@ namespace WwwSqlDesigner.Data
         {
             modelBuilder.UseCollation("Latin1_General_CI_AS");
 
+            modelBuilder.Entity<DataModel>().HasKey(x => new { x.Keyword, x.Version });
+
             modelBuilder.Entity<DataModel>(entity =>
             {
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
