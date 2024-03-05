@@ -1,0 +1,10 @@
+﻿<?xml version="1.0"?>
+<datatypes db="entityframework">
+	<table name="Person">
+		<row name="Id" datatype="int" null="false" autoincrement="true" />
+		<row name="FirstName" datatype="string" null="false" />
+		<row name="LastName" datatype="string" null="false" />
+		<row name="Age" datatype="int" null="true" />
+	</table>
+	<!-- Add more tables dynamically using XML for each -->
+</datatypes>
