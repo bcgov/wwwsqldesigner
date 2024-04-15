@@ -1,10 +1,27 @@
 ﻿<?xml version="1.0"?>
-<datatypes db="entityframework">
-	<table name="Person">
-		<row name="Id" datatype="int" null="false" autoincrement="true" />
-		<row name="FirstName" datatype="string" null="false" />
-		<row name="LastName" datatype="string" null="false" />
-		<row name="Age" datatype="int" null="true" />
-	</table>
-	<!-- Add more tables dynamically using XML for each -->
+<!--
+	C# XML Datatypes for WWW SQL Designer v 2.x
+	Version: 1.0
+	Author: OpenAI
+-->
+<datatypes db="ef">
+	<group label="EntityFramework">
+		<type label="String" default="" length="0" sql="string" quote="" color="rgb(255,255,255)" />
+		<type label="int" default="0" length="0" sql="int" quote="" color="rgb(255,255,255)" />
+		<type label="DateTime" default="" length="0" sql="DateTime" quote="" color="rgb(255,255,255)" />
+		<type label="decimal" default="0" length="0" sql="decimal" quote="" color="rgb(255,255,255)" />
+		<type label="bool" default="false" length="0" sql="bool" quote="" color="rgb(255,255,255)" />
+		<type label="byte" default="0" length="0" sql="byte" quote="" color="rgb(255,255,255)" />
+		<type label="sbyte" default="0" length="0" sql="sbyte" quote="" color="rgb(255,255,255)" />
+		<type label="short" default="0" length="0" sql="short" quote="" color="rgb(255,255,255)" />
+		<type label="ushort" default="0" length="0" sql="ushort" quote="" color="rgb(255,255,255)" />
+		<type label="uint" default="0" length="0" sql="uint" quote="" color="rgb(255,255,255)" />
+		<type label="long" default="0" length="0" sql="long" quote="" color="rgb(255,255,255)" />
+		<type label="ulong" default="0" length="0" sql="ulong" quote="" color="rgb(255,255,255)" />
+		<type label="float" default="0" length="0" sql="float" quote="" color="rgb(255,255,255)" />
+		<type label="double" default="0" length="0" sql="double" quote="" color="rgb(255,255,255)" />
+		<type label="Guid" default="00000000-0000-0000-0000-000000000000" length="0" sql="Guid" quote="" color="rgb(255,255,255)" />
+		<type label="TimeSpan" default="00:00:00" length="0" sql="TimeSpan" quote="" color="rgb(255,255,255)" />
+		<type label="byte[]" default="" length="0" sql="byte[]" quote="" color="rgb(255,255,255)" />
+	</group>
 </datatypes>

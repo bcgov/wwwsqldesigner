@@ -15,6 +15,7 @@ SQL.IO = function (owner) {
         "clientlocallist",
         "clientload",
         "clientsql",
+        "clientef",
         "quicksave",
         "serversave",
         "serverload",
@@ -65,6 +66,7 @@ SQL.IO = function (owner) {
     );
     OZ.Event.add(this.dom.clientload, "click", this.clientload.bind(this));
     OZ.Event.add(this.dom.clientsql, "click", this.clientsql.bind(this));
+    OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
     OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
@@ -273,26 +275,66 @@ SQL.IO.prototype.clientsql = function () {
     const bp = this.owner.getOption("staticpath");
     const path = bp + "db/" + window.DATATYPES.getAttribute("db") + "/output.xsl";
     const h = this.owner.getXhrHeaders();
+    h['transformation'] = 'mssql';
     this.owner.window.showThrobber();
     OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
 };
 
-SQL.IO.prototype.finish = function (xslDoc) {
-    this.owner.window.hideThrobber();
-    const xml = this.owner.toXML();
-    let sql = "";
+SQL.IO.prototype.clientef = function () {
+    const bp = this.owner.getOption("staticpath");
+    const path = bp + "db/" + "ef" + "/output.xsl";
+    const h = this.owner.getXhrHeaders();
+    h['transformation'] = 'ef';
+    this.owner.window.showThrobber();
+    OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
+};
+
+SQL.IO.prototype.getXSL = function (xslPath, cb) {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", xslPath, true);
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+            xslDoc = xhr.responseText;
+            cb(null, xslDoc);
+        }
+    };
+    xhr.send();
+}
+
+SQL.IO.prototype.finish = function () {
+    const transformationType = this.owner.getXhrHeaders().transformation;
+    let xslPath = '';
+
+    xslPath = this.owner.getOption("staticpath") + "db/" + transformationType + "/output.xsl";
+
+    // Get XSL content and invoke transformation
+    this.getXSL(xslPath, (err, doc) => {
+        if (err) {
+            console.error(err.message);
+            return;
+        }
+        this.performTransformation(doc, this.owner.toXML());
+        this.owner.window.hideThrobber();
+    });
+}
+
+SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
+    let result = "";
     try {
         if (window.XSLTProcessor && window.DOMParser) {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xml, "text/xml");
+            if (typeof xslDoc === 'string') {
+                xslDoc = parser.parseFromString(xslDoc, 'text/xml');
+            }
             const xsl = new XSLTProcessor();
             xsl.importStylesheet(xslDoc);
-            const result = xsl.transformToDocument(xmlDoc);
-            sql = result.documentElement.textContent;
+            const transformedDocument = xsl.transformToDocument(xmlDoc);
+            result = transformedDocument.documentElement.textContent;
         } else if (window.ActiveXObject || "ActiveXObject" in window) {
             const xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
             xmlDoc.loadXML(xml);
-            sql = xmlDoc.transformNode(xslDoc);
+            result = xmlDoc.transformNode(xslDoc);
         } else {
             throw new Error("No XSLT processor available");
         }
@@ -300,7 +342,7 @@ SQL.IO.prototype.finish = function (xslDoc) {
         alert(_("xmlerror") + ": " + e.message);
         return;
     }
-    this.dom.ta.value = sql.trim();
+    this.dom.ta.value = result.trim();
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {

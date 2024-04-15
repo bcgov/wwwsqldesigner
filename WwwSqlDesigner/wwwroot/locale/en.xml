@@ -80,6 +80,7 @@
     <string name="clientlocalload">Load from Browser</string>
     <string name="clientlocallist">List from Browser</string>
     <string name="clientsql">Generate SQL</string>
+    <string name="clientef">Generate EF</string>
     <string name="backendlabel">Server backend:</string>
     <string name="serversave">Save</string>
     <string name="quicksave">Quicksave</string>
