@@ -10,6 +10,7 @@ const CONFIG = {
         "vfp9",
         "cubrid",
         "web2py",
+        "ef"
     ],
     DEFAULT_DB: "mssql",
 
