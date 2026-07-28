@@ -103,9 +103,13 @@ test("renders imported model names as text instead of markup", async ({ page }) 
     await page.goto("/");
 
     const title = '<img src=x data-xss="model-name">';
-    const result = await page.evaluate((name) => {
-        const xml = `<sql><table name="${name.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")}"><row name="${name.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")}" null="0"><datatype>int</datatype></row></table></sql>`;
-        d.fromXML(new DOMParser().parseFromString(xml, "text/xml").documentElement);
+    const escapedTitle = title.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    const xml = `<sql><table name="${escapedTitle}"><row name="${escapedTitle}" null="0"><datatype>int</datatype></row></table></sql>`;
+    await page.locator("#saveload").click();
+    await page.locator("#textarea").fill(xml);
+    await page.locator("#clientload").click();
+
+    const result = await page.evaluate(() => {
         const tableTitle = document.querySelector(".table .title");
         const rowTitle = document.querySelector(".table tbody .title");
         return {
