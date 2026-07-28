@@ -151,4 +151,39 @@ public class EfExportTests
         StringAssert.Contains(options, "CONFIG.CSHARP_KEYWORDS.includes");
         StringAssert.Contains(window, "this.callback() !== false");
     }
+
+    [TestMethod]
+    public void EfZipExportAssetsAreIncludedAndConfiguredForClientSideDownload()
+    {
+        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        var jsZip = Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "jszip-3.10.1.min.js");
+        var index = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "index.html"));
+        var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
+
+        Assert.IsTrue(File.Exists(jsZip));
+        StringAssert.Contains(File.ReadAllText(jsZip), "JSZip v3.10.1");
+        StringAssert.Contains(index, "js/jszip-3.10.1.min.js");
+        StringAssert.Contains(index, "id=\"clientefzip\"");
+        StringAssert.Contains(io, "zip.generateAsync({ type: \"blob\", compression: \"DEFLATE\" })");
+        StringAssert.Contains(io, "link.download = name");
+        Assert.IsTrue(io.IndexOf("xhr.onerror", StringComparison.Ordinal) < io.IndexOf("xhr.send()", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void EfZipExportStringsAreAvailableInEverySupportedLocale()
+    {
+        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        var localeDirectory = Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "locale");
+        var requiredKeys = new[] { "clientefzip", "efzipexportempty", "efzipexporterror" };
+
+        foreach (var localeFile in Directory.GetFiles(localeDirectory, "*.xml"))
+        {
+            var locale = new XmlDocument();
+            locale.Load(localeFile);
+            foreach (var key in requiredKeys)
+            {
+                Assert.IsNotNull(locale.SelectSingleNode($"/locale/string[@name='{key}']"));
+            }
+        }
+    }
 }

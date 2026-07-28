@@ -100,4 +100,7 @@
     <string name="xmlerror">XML 에러</string>
     <string name="docs">문서</string>
 
+    <string name="clientefzip">EF ZIP 생성</string>
+    <string name="efzipexportempty">EF ZIP을 내보내기 전에 테이블을 하나 이상 추가하세요.</string>
+    <string name="efzipexporterror">EF ZIP 내보내기를 생성할 수 없습니다.</string>
 </locale>

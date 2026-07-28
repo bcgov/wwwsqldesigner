@@ -99,4 +99,7 @@
     <string name="xmlerror">XML fout</string>
     <string name="docs">Documentatie</string>
 
+    <string name="clientefzip">EF-ZIP genereren</string>
+    <string name="efzipexportempty">Voeg ten minste één tabel toe voordat u de EF-ZIP exporteert.</string>
+    <string name="efzipexporterror">De EF-ZIP-export kan niet worden gegenereerd.</string>
 </locale>

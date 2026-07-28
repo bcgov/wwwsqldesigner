@@ -16,6 +16,7 @@ SQL.IO = function (owner) {
         "clientload",
         "clientsql",
         "clientef",
+        "clientefzip",
         "quicksave",
         "serversave",
         "serverload",
@@ -67,6 +68,7 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.clientload, "click", this.clientload.bind(this));
     OZ.Event.add(this.dom.clientsql, "click", this.clientsql.bind(this));
     OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
+    OZ.Event.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
     OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
@@ -289,17 +291,79 @@ SQL.IO.prototype.clientef = function () {
     OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
 };
 
+SQL.IO.prototype.clientefzip = function () {
+    if (typeof JSZip === "undefined") {
+        alert(_("efzipexporterror"));
+        return;
+    }
+
+    const xml = this.owner.toXML();
+    const tableCount = this.getModelTableCount(xml);
+    if (!tableCount) {
+        alert(_("efzipexportempty"));
+        return;
+    }
+
+    const path = this.owner.getOption("staticpath") + "db/ef/output.xsl";
+    this.owner.window.showThrobber();
+    this.getXSL(path, (err, xslDoc) => {
+        if (err) {
+            this.owner.window.hideThrobber();
+            alert(_("efzipexporterror"));
+            return;
+        }
+
+        try {
+            const source = this.transformEf(xslDoc, xml);
+            const files = this.createEfZipFiles(source, this.getEfSettings().context, tableCount);
+            const zip = new JSZip();
+            for (const file of files) {
+                zip.file(file.name, file.contents);
+            }
+            zip.generateAsync({ type: "blob", compression: "DEFLATE" })
+                .then((archive) => this.downloadEfZip(archive, files.contextName))
+                .catch(() => alert(_("efzipexporterror")))
+                .finally(() => this.owner.window.hideThrobber());
+        } catch (e) {
+            this.owner.window.hideThrobber();
+            alert(_("efzipexporterror"));
+        }
+    });
+};
+
 SQL.IO.prototype.getXSL = function (xslPath, cb) {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", xslPath, true);
     xhr.onreadystatechange = function () {
-        if (xhr.readyState == 4 && xhr.status == 200) {
-            const xslDoc = xhr.responseText;
-            cb(null, xslDoc);
+        if (xhr.readyState == 4) {
+            if (xhr.status == 200) {
+                cb(null, xhr.responseText);
+            } else {
+                cb(new Error("Unable to load export stylesheet."));
+            }
         }
+    };
+    xhr.onerror = function () {
+        cb(new Error("Unable to load export stylesheet."));
     };
     xhr.send();
 }
+
+SQL.IO.prototype.getEfSettings = function () {
+    const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    const namespace = (this.owner.getOption("efnamespace") || "").trim();
+    const context = (this.owner.getOption("efcontext") || "").trim();
+    const namespaceParts = namespace.split(".");
+    const validNamespace = namespace.length > 0 && namespaceParts.every(
+        (part) => identifier.test(part) && !CONFIG.CSHARP_KEYWORDS.includes(part)
+    );
+    const validContext = identifier.test(context) && !CONFIG.CSHARP_KEYWORDS.includes(context);
+
+    return {
+        namespace: validNamespace ? namespace : CONFIG.EF_DEFAULT_NAMESPACE,
+        context: validContext ? context : CONFIG.EF_DEFAULT_CONTEXT,
+    };
+};
 
 SQL.IO.prototype.finish = function () {
     const transformationType = this.owner.getXhrHeaders().transformation;
@@ -319,52 +383,126 @@ SQL.IO.prototype.finish = function () {
 }
 
 SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
-    let result = "";
     try {
-        if (window.XSLTProcessor && window.DOMParser) {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xml, "text/xml");
-            if (typeof xslDoc === 'string') {
-                xslDoc = parser.parseFromString(xslDoc, 'text/xml');
-            }
-            const xsl = new XSLTProcessor();
-            xsl.importStylesheet(xslDoc);
-            if (this.owner.getXhrHeaders().transformation === "ef") {
-                const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
-                const namespace = (this.owner.getOption("efnamespace") || "").trim();
-                const context = (this.owner.getOption("efcontext") || "").trim();
-                const namespaceParts = namespace.split(".");
-                const validNamespace = namespace.length > 0 && namespaceParts.every(
-                    (part) => identifier.test(part) && !CONFIG.CSHARP_KEYWORDS.includes(part)
-                );
-                const validContext = identifier.test(context) && !CONFIG.CSHARP_KEYWORDS.includes(context);
-                xsl.setParameter(
-                    null,
-                    "namespace",
-                    validNamespace ? namespace : CONFIG.EF_DEFAULT_NAMESPACE
-                );
-                xsl.setParameter(
-                    null,
-                    "context",
-                    validContext ? context : CONFIG.EF_DEFAULT_CONTEXT
-                );
-            }
-            const transformedDocument = xsl.transformToDocument(xmlDoc);
-            result = transformedDocument.documentElement
-                ? transformedDocument.documentElement.textContent
-                : transformedDocument.textContent;
-        } else if (window.ActiveXObject || "ActiveXObject" in window) {
-            const xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
-            xmlDoc.loadXML(xml);
-            result = xmlDoc.transformNode(xslDoc);
-        } else {
-            throw new Error("No XSLT processor available");
-        }
+        this.dom.ta.value = this.transformEf(xslDoc, xml, this.owner.getXhrHeaders().transformation === "ef");
     } catch (e) {
         alert(_("xmlerror") + ": " + e.message);
-        return;
     }
-    this.dom.ta.value = result.trim();
+};
+
+SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
+    if (window.XSLTProcessor && window.DOMParser) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xml, "text/xml");
+        if (xmlDoc.querySelector("parsererror")) {
+            throw new Error("Invalid database model.");
+        }
+        if (typeof xslDoc === "string") {
+            xslDoc = parser.parseFromString(xslDoc, "text/xml");
+        }
+        const xsl = new XSLTProcessor();
+        xsl.importStylesheet(xslDoc);
+        if (applyEfSettings) {
+            const settings = this.getEfSettings();
+            xsl.setParameter(null, "namespace", settings.namespace);
+            xsl.setParameter(null, "context", settings.context);
+        }
+        const transformedDocument = xsl.transformToDocument(xmlDoc);
+        const result = transformedDocument.documentElement
+            ? transformedDocument.documentElement.textContent
+            : transformedDocument.textContent;
+        return result.trim();
+    }
+    if (window.ActiveXObject || "ActiveXObject" in window) {
+        const xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+        xmlDoc.loadXML(xml);
+        if (typeof xslDoc === "string") {
+            const xsl = new ActiveXObject("Microsoft.XMLDOM");
+            xsl.loadXML(xslDoc);
+            xslDoc = xsl;
+        }
+        return xmlDoc.transformNode(xslDoc).trim();
+    }
+    throw new Error("No XSLT processor available");
+};
+
+SQL.IO.prototype.getModelTableCount = function (xml) {
+    if (!window.DOMParser) {
+        return 0;
+    }
+    const xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
+    return xmlDoc.querySelector("parsererror") ? 0 : xmlDoc.querySelectorAll("sql > table").length;
+};
+
+SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
+    const classes = [];
+    const classPattern = /public class\s+(@?[A-Za-z_][A-Za-z0-9_]*)\b[^\{]*\{/g;
+    let match;
+    while ((match = classPattern.exec(source))) {
+        let depth = 0;
+        let end = match.index + match[0].length - 1;
+        for (; end < source.length; end++) {
+            if (source[end] === "{") { depth++; }
+            if (source[end] === "}" && --depth === 0) { break; }
+        }
+        if (depth !== 0) {
+            throw new Error("Unable to separate generated classes.");
+        }
+        classes.push({ name: match[1], source: source.slice(match.index, end + 1) });
+        classPattern.lastIndex = end + 1;
+    }
+    if (classes.length !== tableCount + 1) {
+        throw new Error("The model does not contain an exportable table.");
+    }
+
+    const namespaceMatch = source.match(/^namespace\s+([^\r\n]+)/m);
+    if (!namespaceMatch) {
+        throw new Error("Unable to determine the generated namespace.");
+    }
+
+    const usedNames = new Set();
+    const files = [];
+    const createFile = (classInfo) => {
+        const filename = this.createUniqueCsFilename(classInfo.name, usedNames);
+        const body = classInfo.source.split("\n").map((line) => line.replace(/^    /, "")).join("\n");
+        files.push({
+            name: filename,
+            contents: "using System;\nusing Microsoft.EntityFrameworkCore;\n\nnamespace " + namespaceMatch[1].trim() + "\n{\n" +
+                body.split("\n").map((line) => "    " + line).join("\n") + "\n}\n",
+        });
+    };
+
+    createFile(classes[classes.length - 1]);
+    for (const entity of classes.slice(0, -1)) {
+        createFile(entity);
+    }
+    files.contextName = contextName;
+    return files;
+};
+
+SQL.IO.prototype.createUniqueCsFilename = function (className, usedNames) {
+    let baseName = className.replace(/^@/, "").replace(/[^A-Za-z0-9_-]/g, "_") || "Entity";
+    if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(baseName)) {
+        baseName = "_" + baseName;
+    }
+    let filename = baseName + ".cs";
+    let suffix = 2;
+    while (usedNames.has(filename.toLowerCase())) {
+        filename = baseName + "-" + suffix++ + ".cs";
+    }
+    usedNames.add(filename.toLowerCase());
+    return filename;
+};
+
+SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
+    const name = this.createUniqueCsFilename(contextName, new Set()).replace(/\.cs$/, ".zip");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(archive);
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {

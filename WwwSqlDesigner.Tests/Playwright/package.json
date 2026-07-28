@@ -1,0 +1,12 @@
+{
+  "name": "wwwsqldesigner-browser-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node run-local.mjs test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.0"
+  }
+}

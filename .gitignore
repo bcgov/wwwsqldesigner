@@ -6,7 +6,15 @@
 [Oo]bj/
 TestResults/
 
+# Local Playwright dependencies, browsers, and test artifacts
+WwwSqlDesigner.Tests/Playwright/node_modules/
+WwwSqlDesigner.Tests/Playwright/test-results/
+WwwSqlDesigner.Tests/Playwright/playwright-report/
+
 # Local SpecKit tooling and generated workflow files
 .specify/
 .speckitcommands/
 specs/
+
+# Local, untracked follow-up notes
+.local/

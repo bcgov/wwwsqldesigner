@@ -97,4 +97,7 @@
     <string name="xmlerror">XML-eraro</string>
     <string name="docs">Dokumentaro</string>
 
+    <string name="clientefzip">Krei EF ZIP</string>
+    <string name="efzipexportempty">Aldonu almenaŭ unu tabelon antaŭ eksporti EF ZIP.</string>
+    <string name="efzipexporterror">Ne eblis krei la EF-ZIP-eksporton.</string>
 </locale>
