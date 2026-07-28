@@ -170,6 +170,32 @@ public class EfExportTests
     }
 
     [TestMethod]
+    public void XmlParsingRejectsDtdsAndDisablesLegacyExternalResolution()
+    {
+        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
+
+        StringAssert.Contains(io, "DTD and entity declarations are not allowed.");
+        StringAssert.Contains(io, "Msxml2.DOMDocument.6.0");
+        StringAssert.Contains(io, "xmlDoc.resolveExternals = false;");
+        StringAssert.Contains(io, "xmlDoc.setProperty(\"ProhibitDTD\", true);");
+        Assert.IsTrue(io.IndexOf("SQL.IO.prototype.parseXml", StringComparison.Ordinal) < io.IndexOf("SQL.IO.prototype.transformEf", StringComparison.Ordinal));
+        StringAssert.Contains(io, "const xmlDoc = this.parseXml(xml, true);");
+        StringAssert.Contains(io, "xslDoc = this.parseXml(xslDoc, true);");
+    }
+
+    [TestMethod]
+    public void StylesheetLoadCompletesOnceAndClearsTheThrobberOnFailure()
+    {
+        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
+
+        StringAssert.Contains(io, "let completed = false;");
+        StringAssert.Contains(io, "const complete = (err, xslDoc) => {");
+        StringAssert.Contains(io, "this.owner.window.hideThrobber();\n            return;");
+    }
+
+    [TestMethod]
     public void EfZipExportStringsAreAvailableInEverySupportedLocale()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));

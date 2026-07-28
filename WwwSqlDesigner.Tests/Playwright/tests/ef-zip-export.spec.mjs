@@ -72,3 +72,29 @@ test("downloads an EF ZIP with the configured context and table sources", async 
     await expect(await archive.file("ExampleContext.cs").async("string")).toContain("using System;");
     await expect(await archive.file("ExampleContext.cs").async("string")).toContain("HasOne<Order>().WithMany().HasForeignKey(e => e.Order_Id)");
 });
+
+test("rejects DTD-bearing XML before EF ZIP export", async ({ page }) => {
+    await page.goto("/");
+
+    const result = await page.evaluate(() => {
+        const xml = '<!DOCTYPE sql [<!ENTITY expansion "blocked">]><sql><table name="&expansion;" /></sql>';
+        try {
+            d.io.transformEf("", xml);
+            return "accepted";
+        } catch (error) {
+            return error.message;
+        }
+    });
+
+    expect(result).toBe("DTD and entity declarations are not allowed.");
+    expect(await page.evaluate(() => d.io.getModelTableCount("<!DOCTYPE sql><sql><table name=\"Item\" /></sql>"))).toBe(0);
+});
+
+test("clears the export throbber when the stylesheet cannot be loaded", async ({ page }) => {
+    await page.route("**/db/ef/output.xsl", (route) => route.abort());
+    await page.goto("/");
+    await page.locator("#saveload").click();
+
+    await page.locator("#clientef").click();
+    await expect(page.locator("#throbber")).toBeHidden();
+});

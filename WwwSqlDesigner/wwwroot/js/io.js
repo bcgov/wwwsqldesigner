@@ -110,23 +110,55 @@ SQL.IO.prototype.click = function () {
     this.owner.window.open(_("saveload"), this.dom.container);
 };
 
-SQL.IO.prototype.fromXMLText = function (xml) {
+SQL.IO.prototype.parseXml = function (xml, useActiveX = false) {
+    if (typeof xml !== "string") {
+        throw new Error("Invalid XML input.");
+    }
+
+    /* The designer model and bundled XSLT do not use DTDs. Reject them before
+     * parsing so entity expansion and external entity resolution are unavailable. */
+    if (/<\s*!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml)) {
+        throw new Error("DTD and entity declarations are not allowed.");
+    }
+
     let xmlDoc;
-    try {
-        if (window.DOMParser) {
-            const parser = new DOMParser();
-            xmlDoc = parser.parseFromString(xml, "text/xml");
-        } else if (window.ActiveXObject || "ActiveXObject" in window) {
-            xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
-            xmlDoc.loadXML(xml);
-        } else {
-            throw new Error("No XML parser available.");
+    if (useActiveX && (window.ActiveXObject || "ActiveXObject" in window)) {
+        xmlDoc = new ActiveXObject("Msxml2.DOMDocument.6.0");
+        xmlDoc.async = false;
+        xmlDoc.validateOnParse = false;
+        xmlDoc.resolveExternals = false;
+        xmlDoc.setProperty("ProhibitDTD", true);
+        if (!xmlDoc.loadXML(xml)) {
+            throw new Error(xmlDoc.parseError.reason || "Invalid XML.");
         }
+    } else if (window.DOMParser) {
+        xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
+        if (xmlDoc.querySelector("parsererror")) {
+            throw new Error("Invalid XML.");
+        }
+    } else if (window.ActiveXObject || "ActiveXObject" in window) {
+        xmlDoc = new ActiveXObject("Msxml2.DOMDocument.6.0");
+        xmlDoc.async = false;
+        xmlDoc.validateOnParse = false;
+        xmlDoc.resolveExternals = false;
+        xmlDoc.setProperty("ProhibitDTD", true);
+        if (!xmlDoc.loadXML(xml)) {
+            throw new Error(xmlDoc.parseError.reason || "Invalid XML.");
+        }
+    } else {
+        throw new Error("No XML parser available.");
+    }
+
+    return xmlDoc;
+};
+
+SQL.IO.prototype.fromXMLText = function (xml) {
+    try {
+        const xmlDoc = this.parseXml(xml);
+        this.fromXML(xmlDoc);
     } catch (e) {
         alert(_("xmlerror") + ": " + e.message);
-        return;
     }
-    this.fromXML(xmlDoc);
 };
 
 SQL.IO.prototype.fromXML = function (xmlDoc) {
@@ -333,21 +365,30 @@ SQL.IO.prototype.clientefzip = function () {
 
 SQL.IO.prototype.getXSL = function (xslPath, cb) {
     const xhr = new XMLHttpRequest();
+    let completed = false;
+    const complete = (err, xslDoc) => {
+        if (completed) {
+            return;
+        }
+        completed = true;
+        cb(err, xslDoc);
+    };
+
     xhr.open("GET", xslPath, true);
     xhr.onreadystatechange = function () {
         if (xhr.readyState == 4) {
             if (xhr.status == 200) {
-                cb(null, xhr.responseText);
+                complete(null, xhr.responseText);
             } else {
-                cb(new Error("Unable to load export stylesheet."));
+                complete(new Error("Unable to load export stylesheet."));
             }
         }
     };
     xhr.onerror = function () {
-        cb(new Error("Unable to load export stylesheet."));
+        complete(new Error("Unable to load export stylesheet."));
     };
     xhr.send();
-}
+};
 
 SQL.IO.prototype.getEfSettings = function () {
     const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -375,12 +416,13 @@ SQL.IO.prototype.finish = function () {
     this.getXSL(xslPath, (err, doc) => {
         if (err) {
             console.error(err.message);
+            this.owner.window.hideThrobber();
             return;
         }
         this.performTransformation(doc, this.owner.toXML());
         this.owner.window.hideThrobber();
     });
-}
+};
 
 SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
     try {
@@ -392,13 +434,9 @@ SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
 
 SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
     if (window.XSLTProcessor && window.DOMParser) {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xml, "text/xml");
-        if (xmlDoc.querySelector("parsererror")) {
-            throw new Error("Invalid database model.");
-        }
+        const xmlDoc = this.parseXml(xml);
         if (typeof xslDoc === "string") {
-            xslDoc = parser.parseFromString(xslDoc, "text/xml");
+            xslDoc = this.parseXml(xslDoc);
         }
         const xsl = new XSLTProcessor();
         xsl.importStylesheet(xslDoc);
@@ -414,12 +452,9 @@ SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
         return result.trim();
     }
     if (window.ActiveXObject || "ActiveXObject" in window) {
-        const xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
-        xmlDoc.loadXML(xml);
+        const xmlDoc = this.parseXml(xml, true);
         if (typeof xslDoc === "string") {
-            const xsl = new ActiveXObject("Microsoft.XMLDOM");
-            xsl.loadXML(xslDoc);
-            xslDoc = xsl;
+            xslDoc = this.parseXml(xslDoc, true);
         }
         return xmlDoc.transformNode(xslDoc).trim();
     }
@@ -427,11 +462,12 @@ SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
 };
 
 SQL.IO.prototype.getModelTableCount = function (xml) {
-    if (!window.DOMParser) {
+    try {
+        const xmlDoc = this.parseXml(xml);
+        return xmlDoc.querySelectorAll ? xmlDoc.querySelectorAll("sql > table").length : xmlDoc.selectNodes("/sql/table").length;
+    } catch (e) {
         return 0;
     }
-    const xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
-    return xmlDoc.querySelector("parsererror") ? 0 : xmlDoc.querySelectorAll("sql > table").length;
 };
 
 SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
