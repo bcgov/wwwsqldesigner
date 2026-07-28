@@ -229,6 +229,10 @@ SQL.Designer.prototype.getOption = function (name) {
             return CONFIG.DEFAULT_LOCALE;
         case "db":
             return CONFIG.DEFAULT_DB;
+        case "efnamespace":
+            return CONFIG.EF_DEFAULT_NAMESPACE;
+        case "efcontext":
+            return CONFIG.EF_DEFAULT_CONTEXT;
         case "staticpath":
             return CONFIG.STATIC_PATH || "";
         case "xhrpath":

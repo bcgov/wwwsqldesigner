@@ -14,6 +14,8 @@ SQL.Options = function (owner) {
 SQL.Options.prototype.build = function () {
     this.dom.optionlocale = OZ.$("optionlocale");
     this.dom.optiondb = OZ.$("optiondb");
+    this.dom.optionefnamespace = OZ.$("optionefnamespace");
+    this.dom.optionefcontext = OZ.$("optionefcontext");
     this.dom.optionsnap = OZ.$("optionsnap");
     this.dom.optionpattern = OZ.$("optionpattern");
     this.dom.optionstyle = OZ.$("optionstyle");
@@ -25,6 +27,8 @@ SQL.Options.prototype.build = function () {
     let ids = [
         "language",
         "db",
+        "efnamespace",
+        "efcontext",
         "snap",
         "pattern",
         "style",
@@ -83,8 +87,46 @@ SQL.Options.prototype.build = function () {
 };
 
 SQL.Options.prototype.save = function () {
+    const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    const namespace = this.dom.optionefnamespace.value.trim();
+    const context = this.dom.optionefcontext.value.trim();
+    const namespaceParts = namespace.split(".");
+    const validNamespace = !namespace || namespaceParts.every(
+        (part) => identifier.test(part) && !CONFIG.CSHARP_KEYWORDS.includes(part)
+    );
+    const validContext = !context || (
+        identifier.test(context) && !CONFIG.CSHARP_KEYWORDS.includes(context)
+    );
+
+    this.dom.optionefnamespace.setCustomValidity("");
+    this.dom.optionefcontext.setCustomValidity("");
+    if (!validNamespace) {
+        this.dom.optionefnamespace.setCustomValidity(
+            "Enter dot-separated C# identifiers for the EF namespace."
+        );
+        this.dom.optionefnamespace.reportValidity();
+        this.dom.optionefnamespace.focus();
+        return false;
+    }
+    if (!validContext) {
+        this.dom.optionefcontext.setCustomValidity(
+            "Enter a non-keyword C# identifier for the EF context name."
+        );
+        this.dom.optionefcontext.reportValidity();
+        this.dom.optionefcontext.focus();
+        return false;
+    }
+
     this.owner.setOption("locale", this.dom.optionlocale.value);
     this.owner.setOption("db", this.dom.optiondb.value);
+    this.owner.setOption(
+        "efnamespace",
+        namespace || CONFIG.EF_DEFAULT_NAMESPACE
+    );
+    this.owner.setOption(
+        "efcontext",
+        context || CONFIG.EF_DEFAULT_CONTEXT
+    );
     this.owner.setOption("snap", this.dom.optionsnap.value);
     this.owner.setOption("pattern", this.dom.optionpattern.value);
     this.owner.setOption("style", this.dom.optionstyle.value);
@@ -103,6 +145,8 @@ SQL.Options.prototype.save = function () {
 SQL.Options.prototype.click = function () {
     this.owner.window.open(_("options"), this.dom.container, this.save);
     this.dom.optionsnap.value = this.owner.getOption("snap");
+    this.dom.optionefnamespace.value = this.owner.getOption("efnamespace");
+    this.dom.optionefcontext.value = this.owner.getOption("efcontext");
     this.dom.optionpattern.value = this.owner.getOption("pattern");
     this.dom.optionhide.checked = this.owner.getOption("hide");
     this.dom.optionvector.checked = this.owner.getOption("vector");

@@ -18,4 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\WwwSqlDesigner\WwwSqlDesigner.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\WwwSqlDesigner\wwwroot\db\ef\output.xsl" Link="TestData\ef-output.xsl" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
