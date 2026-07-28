@@ -209,6 +209,16 @@ public class EfExportTests
     }
 
     [TestMethod]
+    public void ModelXmlDoesNotEmbedTheActiveUrl()
+    {
+        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        var designer = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "wwwsqldesigner.js"));
+
+        Assert.IsFalse(designer.Contains("<!-- Active URL:", StringComparison.Ordinal));
+        Assert.IsFalse(designer.Contains("location.href + \" -->", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void EfZipExportStringsAreAvailableInEverySupportedLocale()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));

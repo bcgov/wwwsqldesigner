@@ -335,7 +335,6 @@ SQL.Designer.prototype.findNamedTable = function (name) {
 SQL.Designer.prototype.toXML = function () {
     let xml = '<?xml version="1.0" encoding="utf-8" ?>\n';
     xml += "<!-- SQL XML created by WWW SQL Designer, https://github.com/ondras/wwwsqldesigner/ -->\n";
-    xml += "<!-- Active URL: " + location.href + " -->\n";
     xml += "<sql>\n";
 
     /* serialize datatypes */
