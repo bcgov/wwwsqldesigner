@@ -103,7 +103,7 @@ SQL.KeyManager.prototype.purge = function () {
 SQL.KeyManager.prototype.sync = function (table) {
     /* sync content with given table */
     this.table = table;
-    this.dom.listlabel.innerHTML = _("keyslistlabel").replace(
+    this.dom.listlabel.textContent = _("keyslistlabel").replace(
         /%s/,
         table.getTitle()
     );
@@ -114,7 +114,7 @@ SQL.KeyManager.prototype.sync = function (table) {
         const o = OZ.DOM.elm("option");
         this.dom.list.appendChild(o);
         const str = i + 1 + ": " + k.getLabel();
-        o.innerHTML = str;
+        o.textContent = str;
     }
     if (table.keys.length) {
         this.switchTo(0);
@@ -125,7 +125,7 @@ SQL.KeyManager.prototype.sync = function (table) {
 
 SQL.KeyManager.prototype.redrawListItem = function () {
     const index = this.table.keys.indexOf(this.key);
-    this.option.innerHTML = index + 1 + ": " + this.key.getLabel();
+    this.option.textContent = index + 1 + ": " + this.key.getLabel();
 };
 
 SQL.KeyManager.prototype.switchTo = function (index) {
@@ -148,8 +148,8 @@ SQL.KeyManager.prototype.switchTo = function (index) {
     OZ.DOM.clear(this.dom.fields);
     for (let row of k.rows) {
         const o = OZ.DOM.elm("option");
-        o.innerHTML = row.getTitle();
-        o.value = o.innerHTML;
+        o.textContent = row.getTitle();
+        o.value = row.getTitle();
         this.dom.fields.appendChild(o);
     }
 
@@ -159,8 +159,8 @@ SQL.KeyManager.prototype.switchTo = function (index) {
             continue;
         }
         const o = OZ.DOM.elm("option");
-        o.innerHTML = row.getTitle();
-        o.value = o.innerHTML;
+        o.textContent = row.getTitle();
+        o.value = row.getTitle();
         this.dom.avail.appendChild(o);
     }
 };

@@ -196,6 +196,19 @@ public class EfExportTests
     }
 
     [TestMethod]
+    public void ModelControlledNamesAreRenderedAsText()
+    {
+        var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        var visual = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "visual.js"));
+        var keyManager = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "keymanager.js"));
+
+        StringAssert.Contains(visual, "this.dom.title.textContent = text;");
+        Assert.IsFalse(visual.Contains("this.dom.title.innerHTML = text;", StringComparison.Ordinal));
+        StringAssert.Contains(keyManager, "this.dom.listlabel.textContent");
+        StringAssert.Contains(keyManager, "o.textContent = row.getTitle();");
+    }
+
+    [TestMethod]
     public void EfZipExportStringsAreAvailableInEverySupportedLocale()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));

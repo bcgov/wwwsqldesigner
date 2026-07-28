@@ -98,3 +98,22 @@ test("clears the export throbber when the stylesheet cannot be loaded", async ({
     await page.locator("#clientef").click();
     await expect(page.locator("#throbber")).toBeHidden();
 });
+
+test("renders imported model names as text instead of markup", async ({ page }) => {
+    await page.goto("/");
+
+    const title = '<img src=x data-xss="model-name">';
+    const result = await page.evaluate((name) => {
+        const xml = `<sql><table name="${name.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")}"><row name="${name.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")}" null="0"><datatype>int</datatype></row></table></sql>`;
+        d.fromXML(new DOMParser().parseFromString(xml, "text/xml").documentElement);
+        const tableTitle = document.querySelector(".table .title");
+        const rowTitle = document.querySelector(".table tbody .title");
+        return {
+            tableText: tableTitle.textContent,
+            rowText: rowTitle.textContent,
+            injectedElements: tableTitle.querySelectorAll("img").length + rowTitle.querySelectorAll("img").length,
+        };
+    }, title);
+
+    expect(result).toEqual({ tableText: title, rowText: title, injectedElements: 0 });
+});
