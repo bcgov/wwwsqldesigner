@@ -5,3 +5,8 @@
 [Bb]in/
 [Oo]bj/
 TestResults/
+
+# Local SpecKit tooling and generated workflow files
+.specify/
+.speckitcommands/
+specs/

@@ -84,10 +84,9 @@ SQL.Window.prototype.key = function (e) {
 };
 
 SQL.Window.prototype.ok = function (e) {
-    if (this.callback) {
-        this.callback();
+    if (!this.callback || this.callback() !== false) {
+        this.close();
     }
-    this.close();
 };
 
 SQL.Window.prototype.close = function () {

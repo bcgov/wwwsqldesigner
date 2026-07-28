@@ -294,7 +294,7 @@ SQL.IO.prototype.getXSL = function (xslPath, cb) {
     xhr.open("GET", xslPath, true);
     xhr.onreadystatechange = function () {
         if (xhr.readyState == 4 && xhr.status == 200) {
-            xslDoc = xhr.responseText;
+            const xslDoc = xhr.responseText;
             cb(null, xslDoc);
         }
     };
@@ -329,8 +329,30 @@ SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
             }
             const xsl = new XSLTProcessor();
             xsl.importStylesheet(xslDoc);
+            if (this.owner.getXhrHeaders().transformation === "ef") {
+                const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+                const namespace = (this.owner.getOption("efnamespace") || "").trim();
+                const context = (this.owner.getOption("efcontext") || "").trim();
+                const namespaceParts = namespace.split(".");
+                const validNamespace = namespace.length > 0 && namespaceParts.every(
+                    (part) => identifier.test(part) && !CONFIG.CSHARP_KEYWORDS.includes(part)
+                );
+                const validContext = identifier.test(context) && !CONFIG.CSHARP_KEYWORDS.includes(context);
+                xsl.setParameter(
+                    null,
+                    "namespace",
+                    validNamespace ? namespace : CONFIG.EF_DEFAULT_NAMESPACE
+                );
+                xsl.setParameter(
+                    null,
+                    "context",
+                    validContext ? context : CONFIG.EF_DEFAULT_CONTEXT
+                );
+            }
             const transformedDocument = xsl.transformToDocument(xmlDoc);
-            result = transformedDocument.documentElement.textContent;
+            result = transformedDocument.documentElement
+                ? transformedDocument.documentElement.textContent
+                : transformedDocument.textContent;
         } else if (window.ActiveXObject || "ActiveXObject" in window) {
             const xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
             xmlDoc.loadXML(xml);
