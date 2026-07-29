@@ -94,4 +94,7 @@
     <string name="xmlerror">XML error</string>
     <string name="docs">Dokumentation</string>
 
+    <string name="clientefzip">Generera EF-ZIP</string>
+    <string name="efzipexportempty">Lägg till minst en tabell innan du exporterar EF-ZIP.</string>
+    <string name="efzipexporterror">Det gick inte att skapa EF-ZIP-exporten.</string>
 </locale>

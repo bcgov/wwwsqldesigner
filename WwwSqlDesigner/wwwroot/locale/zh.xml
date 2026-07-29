@@ -98,4 +98,7 @@
     <string name="xmlerror">XML 错误</string>
     <string name="docs">文档</string>
 
+    <string name="clientefzip">生成 EF ZIP</string>
+    <string name="efzipexportempty">导出 EF ZIP 前请至少添加一个表。</string>
+    <string name="efzipexporterror">无法生成 EF ZIP 导出文件。</string>
 </locale>

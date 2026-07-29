@@ -95,4 +95,7 @@
     <string name="xmlerror">XML hiba</string>
     <string name="docs">Dokumentáció</string>
 
+    <string name="clientefzip">EF ZIP létrehozása</string>
+    <string name="efzipexportempty">Adjon hozzá legalább egy táblát az EF ZIP exportálása előtt.</string>
+    <string name="efzipexporterror">Nem sikerült létrehozni az EF ZIP exportot.</string>
 </locale>

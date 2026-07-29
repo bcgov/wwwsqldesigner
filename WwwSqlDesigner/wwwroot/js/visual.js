@@ -33,7 +33,7 @@ SQL.Visual.prototype.setTitle = function (text) {
         return;
     }
     this.data.title = text;
-    this.dom.title.innerHTML = text;
+    this.dom.title.textContent = text;
 };
 
 SQL.Visual.prototype.getTitle = function () {

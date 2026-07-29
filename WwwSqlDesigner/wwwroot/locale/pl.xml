@@ -97,4 +97,7 @@
     <string name="xmlerror">Błąd XML</string>
     <string name="docs">Dokumentacja</string>
 
+    <string name="clientefzip">Generuj ZIP EF</string>
+    <string name="efzipexportempty">Dodaj co najmniej jedną tabelę przed eksportem ZIP EF.</string>
+    <string name="efzipexporterror">Nie można wygenerować eksportu ZIP EF.</string>
 </locale>
