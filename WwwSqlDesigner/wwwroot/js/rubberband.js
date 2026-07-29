@@ -9,7 +9,8 @@ SQL.Rubberband = function (owner) {
 SQL.Rubberband.prototype = Object.create(SQL.Visual.prototype);
 
 SQL.Rubberband.prototype.down = function (e) {
-    if (e.target && e.target.closest && e.target.closest(".diagram-legend")) {
+    const target = OZ.Event.target(e);
+    if (target && ((target.closest && target.closest(".diagram-legend")) || target.matches("input.relation-name-input"))) {
         return;
     }
     OZ.Event.prevent(e);

@@ -99,7 +99,8 @@ SQL.Relation = function (owner, row1, row2) {
     this.dom.input.readOnly = true;
     this.owner.dom.container.appendChild(this.dom.input);
 
-    this.dom.input.addEventListener("click", this.editName.bind(this));
+    this.dom.input.addEventListener("focus", this.editName.bind(this));
+    this.dom.input.addEventListener("dblclick", this.selectName.bind(this));
     this.dom.input.addEventListener("blur", this.finishName.bind(this, false));
     this.dom.input.addEventListener("input", this.resizeName.bind(this));
     this.dom.input.addEventListener("keydown", this.keydownName.bind(this));
@@ -155,8 +156,6 @@ SQL.Relation.prototype.hide = function () {
 };
 
 SQL.Relation.prototype.editName = function (e) {
-    OZ.Event.prevent(e);
-    OZ.Event.stop(e);
     if (this.editing) {
         return;
     }
@@ -169,8 +168,13 @@ SQL.Relation.prototype.editName = function (e) {
     document.addEventListener("pointerdown", this.outsideClick, true);
     this.dom.input.value = this.name;
     this.redraw();
-    this.dom.input.focus();
     this.dom.input.select();
+};
+
+SQL.Relation.prototype.selectName = function () {
+    if (this.editing) {
+        this.dom.input.select();
+    }
 };
 
 SQL.Relation.prototype.keydownName = function (e) {
