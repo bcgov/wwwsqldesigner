@@ -170,18 +170,17 @@ public class EfExportTests
     }
 
     [TestMethod]
-    public void XmlParsingRejectsDtdsAndDisablesLegacyExternalResolution()
+    public void XmlParsingRejectsDtdsAndRequiresModernBrowserApis()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
         var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
 
         StringAssert.Contains(io, "DTD and entity declarations are not allowed.");
-        StringAssert.Contains(io, "Msxml2.DOMDocument.6.0");
-        StringAssert.Contains(io, "xmlDoc.resolveExternals = false;");
-        StringAssert.Contains(io, "xmlDoc.setProperty(\"ProhibitDTD\", true);");
+        StringAssert.Contains(io, "if (!window.DOMParser)");
+        StringAssert.Contains(io, "if (!window.XSLTProcessor || !window.DOMParser)");
         Assert.IsTrue(io.IndexOf("SQL.IO.prototype.parseXml", StringComparison.Ordinal) < io.IndexOf("SQL.IO.prototype.transformEf", StringComparison.Ordinal));
-        StringAssert.Contains(io, "const xmlDoc = this.parseXml(xml, true);");
-        StringAssert.Contains(io, "xslDoc = this.parseXml(xslDoc, true);");
+        Assert.IsFalse(io.Contains("ActiveXObject", StringComparison.Ordinal));
+        Assert.IsFalse(io.Contains("Msxml2.DOMDocument", StringComparison.Ordinal));
     }
 
     [TestMethod]

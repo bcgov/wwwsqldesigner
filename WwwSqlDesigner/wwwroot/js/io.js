@@ -110,7 +110,7 @@ SQL.IO.prototype.click = function () {
     this.owner.window.open(_("saveload"), this.dom.container);
 };
 
-SQL.IO.prototype.parseXml = function (xml, useActiveX = false) {
+SQL.IO.prototype.parseXml = function (xml) {
     if (typeof xml !== "string") {
         throw new Error("Invalid XML input.");
     }
@@ -121,32 +121,13 @@ SQL.IO.prototype.parseXml = function (xml, useActiveX = false) {
         throw new Error("DTD and entity declarations are not allowed.");
     }
 
-    let xmlDoc;
-    if (useActiveX && (window.ActiveXObject || "ActiveXObject" in window)) {
-        xmlDoc = new ActiveXObject("Msxml2.DOMDocument.6.0");
-        xmlDoc.async = false;
-        xmlDoc.validateOnParse = false;
-        xmlDoc.resolveExternals = false;
-        xmlDoc.setProperty("ProhibitDTD", true);
-        if (!xmlDoc.loadXML(xml)) {
-            throw new Error(xmlDoc.parseError.reason || "Invalid XML.");
-        }
-    } else if (window.DOMParser) {
-        xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
-        if (xmlDoc.querySelector("parsererror")) {
-            throw new Error("Invalid XML.");
-        }
-    } else if (window.ActiveXObject || "ActiveXObject" in window) {
-        xmlDoc = new ActiveXObject("Msxml2.DOMDocument.6.0");
-        xmlDoc.async = false;
-        xmlDoc.validateOnParse = false;
-        xmlDoc.resolveExternals = false;
-        xmlDoc.setProperty("ProhibitDTD", true);
-        if (!xmlDoc.loadXML(xml)) {
-            throw new Error(xmlDoc.parseError.reason || "Invalid XML.");
-        }
-    } else {
+    if (!window.DOMParser) {
         throw new Error("No XML parser available.");
+    }
+
+    const xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
+    if (xmlDoc.querySelector("parsererror")) {
+        throw new Error("Invalid XML.");
     }
 
     return xmlDoc;
@@ -433,38 +414,32 @@ SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
 };
 
 SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
-    if (window.XSLTProcessor && window.DOMParser) {
-        const xmlDoc = this.parseXml(xml);
-        if (typeof xslDoc === "string") {
-            xslDoc = this.parseXml(xslDoc);
-        }
-        const xsl = new XSLTProcessor();
-        xsl.importStylesheet(xslDoc);
-        if (applyEfSettings) {
-            const settings = this.getEfSettings();
-            xsl.setParameter(null, "namespace", settings.namespace);
-            xsl.setParameter(null, "context", settings.context);
-        }
-        const transformedDocument = xsl.transformToDocument(xmlDoc);
-        const result = transformedDocument.documentElement
-            ? transformedDocument.documentElement.textContent
-            : transformedDocument.textContent;
-        return result.trim();
+    if (!window.XSLTProcessor || !window.DOMParser) {
+        throw new Error("No XSLT processor available");
     }
-    if (window.ActiveXObject || "ActiveXObject" in window) {
-        const xmlDoc = this.parseXml(xml, true);
-        if (typeof xslDoc === "string") {
-            xslDoc = this.parseXml(xslDoc, true);
-        }
-        return xmlDoc.transformNode(xslDoc).trim();
+
+    const xmlDoc = this.parseXml(xml);
+    if (typeof xslDoc === "string") {
+        xslDoc = this.parseXml(xslDoc);
     }
-    throw new Error("No XSLT processor available");
+    const xsl = new XSLTProcessor();
+    xsl.importStylesheet(xslDoc);
+    if (applyEfSettings) {
+        const settings = this.getEfSettings();
+        xsl.setParameter(null, "namespace", settings.namespace);
+        xsl.setParameter(null, "context", settings.context);
+    }
+    const transformedDocument = xsl.transformToDocument(xmlDoc);
+    const result = transformedDocument.documentElement
+        ? transformedDocument.documentElement.textContent
+        : transformedDocument.textContent;
+    return result.trim();
 };
 
 SQL.IO.prototype.getModelTableCount = function (xml) {
     try {
         const xmlDoc = this.parseXml(xml);
-        return xmlDoc.querySelectorAll ? xmlDoc.querySelectorAll("sql > table").length : xmlDoc.selectNodes("/sql/table").length;
+        return xmlDoc.querySelectorAll("sql > table").length;
     } catch (e) {
         return 0;
     }
