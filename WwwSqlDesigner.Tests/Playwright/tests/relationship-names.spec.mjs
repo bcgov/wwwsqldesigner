@@ -43,6 +43,18 @@ test("names, persists, clears, and safely renders a relationship label", async (
 
     await input.click();
     await expect(input).toHaveValue("has <img src=x>");
+    await input.press("Enter");
+    await expect(input).not.toBeFocused();
+    await expect(input).toHaveAttribute("readonly", "");
+    expect(await input.evaluate((element) => element.selectionStart === element.selectionEnd)).toBe(true);
+
+    await input.click();
+    await page.locator("svg").click({ position: { x: 900, y: 900 } });
+    await expect(input).not.toBeFocused();
+    await expect(input).toHaveAttribute("readonly", "");
+    expect(await input.evaluate((element) => element.selectionStart === element.selectionEnd)).toBe(true);
+
+    await input.click();
     await input.press("Escape");
     await expect(input).toHaveValue("has <img src=x>");
 

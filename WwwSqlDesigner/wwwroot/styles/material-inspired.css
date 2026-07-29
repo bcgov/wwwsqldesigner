@@ -724,7 +724,7 @@ label, input, select {
     fill: #fff;
 }
 
-.relation-handle-transitioning {
+.relation-handle.relation-control-transitioning {
     transition: x 120ms ease-out, y 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
 }
 
@@ -744,6 +744,10 @@ input.relation-name-input {
     line-height: 24px;
     text-align: center;
     cursor: pointer;
+}
+
+input.relation-name-input.relation-control-transitioning {
+    transition: left 120ms ease-out, top 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
 }
 
 input.relation-name-input:focus {

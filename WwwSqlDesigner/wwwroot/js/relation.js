@@ -99,13 +99,11 @@ SQL.Relation = function (owner, row1, row2) {
     this.dom.input.readOnly = true;
     this.owner.dom.container.appendChild(this.dom.input);
 
-    OZ.Event.add(this.dom.handle, "click", this.editName.bind(this));
     this.dom.input.addEventListener("click", this.editName.bind(this));
     this.dom.input.addEventListener("blur", this.finishName.bind(this, false));
     this.dom.input.addEventListener("input", this.resizeName.bind(this));
     this.dom.input.addEventListener("keydown", this.keydownName.bind(this));
     this.outsideClick = this.clickAway.bind(this);
-    document.addEventListener("pointerdown", this.outsideClick, true);
     this.redraw();
 };
 SQL.Relation._counter = 0;
@@ -166,10 +164,9 @@ SQL.Relation.prototype.editName = function (e) {
         ? this.dom.handle.getBBox()
         : { width: this.dom.handle.offsetWidth };
     this.editingWidth = Math.max(24, handleBounds.width);
-    if (!this.name) {
-        this.transitionControl();
-    }
+    this.transitionControl();
     this.editing = true;
+    document.addEventListener("pointerdown", this.outsideClick, true);
     this.dom.input.value = this.name;
     this.redraw();
     this.dom.input.focus();
@@ -201,34 +198,38 @@ SQL.Relation.prototype.finishName = function (cancel) {
     }
     this.editing = false;
     this.editingWidth = 0;
+    document.removeEventListener("pointerdown", this.outsideClick, true);
     if (!cancel) {
         this.name = this.dom.input.value.trim();
     }
-    if (!this.name) {
-        this.transitionControl();
-    }
+    this.transitionControl();
     this.redraw();
+    this.dom.input.setSelectionRange(0, 0);
     if (document.activeElement === this.dom.input) {
         this.dom.input.blur();
     }
 };
 
 SQL.Relation.prototype.transitionControl = function () {
-    const handle = this.dom.handle;
     clearTimeout(this.transitionTimeout);
-    handle.classList.add("relation-handle-transitioning");
-    this.transitionTimeout = setTimeout(function () {
-        handle.classList.remove("relation-handle-transitioning");
-    }, 120);
+    this.dom.handle.classList.add("relation-control-transitioning");
+    this.dom.input.classList.add("relation-control-transitioning");
+    this.transitionTimeout = setTimeout(this.clearControlTransition.bind(this), 120);
+};
+
+SQL.Relation.prototype.clearControlTransition = function () {
+    this.dom.handle.classList.remove("relation-control-transitioning");
+    this.dom.input.classList.remove("relation-control-transitioning");
 };
 
 SQL.Relation.prototype.resizeName = function () {
     if (this.editing) {
+        this.clearControlTransition();
         this.editingWidth = Math.max(
             24,
             this.measureNameWidth(this.dom.input.value) + 16
         );
-        this.redrawLabel(this.labelPosition[0], this.labelPosition[1]);
+        this.redrawControl(this.labelPosition[0], this.labelPosition[1]);
     }
 };
 
@@ -239,7 +240,7 @@ SQL.Relation.prototype.measureNameWidth = function (name) {
     return Math.ceil(context.measureText(name).width);
 };
 
-SQL.Relation.prototype.redrawLabel = function (x, y) {
+SQL.Relation.prototype.redrawControl = function (x, y) {
     this.labelPosition = [x, y];
     const hasName = !!this.name;
     const editing = this.editing;
@@ -265,9 +266,9 @@ SQL.Relation.prototype.redrawLabel = function (x, y) {
     }
     this.dom.input.readOnly = !editing;
     this.dom.input.style.left = pointX - controlWidth / 2 + "px";
-    this.dom.input.style.top = pointY - 12 + "px";
+    this.dom.input.style.top = pointY - handleSize / 2 + "px";
     this.dom.input.style.width = controlWidth + "px";
-    this.dom.input.style.height = "24px";
+    this.dom.input.style.height = handleSize + "px";
     this.dom.input.style.visibility = "";
 };
 
@@ -299,7 +300,7 @@ SQL.Relation.prototype.redrawNormal = function (p1, p2, half) {
         this.dom[2].style.top = p2[1] + "px";
         this.dom[2].style.width = half + "px";
     }
-    this.redrawLabel(p1[0] + half, (p1[1] + p2[1]) / 2);
+    this.redrawControl(p1[0] + half, (p1[1] + p2[1]) / 2);
 };
 
 SQL.Relation.prototype.redrawSide = function (p1, p2, x) {
@@ -321,7 +322,7 @@ SQL.Relation.prototype.redrawSide = function (p1, p2, x) {
         this.dom[2].style.top = p2[1] + "px";
         this.dom[2].style.width = Math.abs(p2[0] - x) + "px";
     }
-    this.redrawLabel(x, (p1[1] + p2[1]) / 2);
+    this.redrawControl(x, (p1[1] + p2[1]) / 2);
 };
 
 SQL.Relation.prototype.redraw = function () {
