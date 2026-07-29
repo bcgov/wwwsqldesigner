@@ -381,4 +381,21 @@ label, input, select {
 .diagram-legend-timestamp > span.empty {
     opacity: .7;
     font-style: italic;
+.relation-handle {
+    background-color: #fff;
+    border-radius: 3px;
+    box-shadow: 2px 2px 4px #888;
+    font-family: verdana, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #000;
+    fill: #fff;
+}
+
+.relation-label {
+    font-family: verdana, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #000;
+    fill: #000;
 }

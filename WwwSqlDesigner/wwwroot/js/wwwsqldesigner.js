@@ -410,7 +410,9 @@ SQL.Designer.prototype.fromXML = function (node) {
             continue;
         }
 
-        this.addRelation(r1, r2);
+        const relation = this.addRelation(r1, r2);
+        relation.name = rel.getAttribute("name") || "";
+        relation.redraw();
     }
 
     this.sync();

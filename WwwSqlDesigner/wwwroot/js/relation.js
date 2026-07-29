@@ -8,6 +8,7 @@ SQL.Relation = function (owner, row1, row2) {
     this.hidden = false;
     this.relationColors = CONFIG.RELATION_COLORS;
     this.highlighted = null;
+    this.name = "";
     SQL.Visual.apply(this);
 
     this.style = SQL.Designer.getOption("style");
@@ -43,6 +44,19 @@ SQL.Relation = function (owner, row1, row2) {
         path.setAttribute("fill", "none");
         this.owner.dom.svg.appendChild(path);
         this.dom.push(path);
+        this.dom.handle = document.createElementNS(this.owner.svgNS, "rect");
+        this.dom.handle.setAttribute("class", "relation-handle");
+        this.dom.handle.setAttribute("rx", "6");
+        this.dom.handle.setAttribute("ry", "6");
+        this.dom.handle.setAttribute("fill", "#fff");
+        this.dom.handle.setAttribute("stroke", this.color);
+        this.dom.handle.setAttribute("stroke-width", "2");
+        this.dom.handle.style.cursor = "pointer";
+        this.owner.dom.svg.appendChild(this.dom.handle);
+        this.dom.label = document.createElementNS(this.owner.svgNS, "text");
+        this.dom.label.setAttribute("class", "relation-label");
+        this.dom.label.style.pointerEvents = "none";
+        this.owner.dom.svg.appendChild(this.dom.label);
     } else {
         for (let i = 0; i < 3; i++) {
             const div = OZ.DOM.elm("div", {
@@ -60,8 +74,28 @@ SQL.Relation = function (owner, row1, row2) {
             }
             this.owner.dom.container.appendChild(div);
         }
+        this.dom.handle = OZ.DOM.elm("div", {
+            position: "absolute",
+            className: "relation-handle",
+        });
+        OZ.Style.set(this.dom.handle, {
+            border: "2px solid " + this.color,
+            borderRadius: "6px",
+            backgroundColor: "#fff",
+            boxSizing: "border-box",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 8px",
+        });
+        this.dom.label = OZ.DOM.elm("div", { className: "relation-label" });
+        this.dom.label.style.pointerEvents = "none";
+        this.dom.handle.appendChild(this.dom.label);
+        this.owner.dom.container.appendChild(this.dom.handle);
     }
 
+    OZ.Event.add(this.dom.handle, "click", this.editName.bind(this));
     this.redraw();
 };
 SQL.Relation._counter = 0;
@@ -99,12 +133,55 @@ SQL.Relation.prototype.show = function () {
     for (let elm of this.dom) {
         elm.style.visibility = "";
     }
+    this.dom.label.style.visibility = "";
+    this.dom.handle.style.visibility = "";
 };
 
 SQL.Relation.prototype.hide = function () {
     this.hidden = true;
     for (let elm of this.dom) {
         elm.style.visibility = "hidden";
+    }
+    this.dom.label.style.visibility = "hidden";
+    this.dom.handle.style.visibility = "hidden";
+};
+
+SQL.Relation.prototype.editName = function (e) {
+    OZ.Event.prevent(e);
+    OZ.Event.stop(e);
+    const name = prompt(_("relationname"), this.name);
+    if (name === null) {
+        return;
+    }
+    this.name = name.trim();
+    this.redraw();
+};
+
+SQL.Relation.prototype.redrawLabel = function (x, y) {
+    const label = this.dom.label;
+    label.textContent = this.name || "+";
+    label.style.display = "";
+    const pointX = x;
+    const pointY = y;
+    const anchorRatio = 0.5;
+    const width = this.owner.vector
+        ? label.getComputedTextLength()
+        : label.offsetWidth;
+    const labelX = pointX - width * anchorRatio;
+    if (this.owner.vector) {
+        label.setAttribute("x", labelX);
+        label.setAttribute("y", pointY + 4);
+        label.setAttribute("text-anchor", "start");
+        label.removeAttribute("transform");
+        this.dom.handle.setAttribute("x", labelX - 8);
+        this.dom.handle.setAttribute("y", pointY - 12);
+        this.dom.handle.setAttribute("width", width + 16);
+        this.dom.handle.setAttribute("height", "24");
+    } else {
+        this.dom.handle.style.left = labelX - 8 + "px";
+        this.dom.handle.style.top = pointY - 12 + "px";
+        this.dom.handle.style.width = width + 16 + "px";
+        this.dom.handle.style.height = "24px";
     }
 };
 
@@ -136,6 +213,7 @@ SQL.Relation.prototype.redrawNormal = function (p1, p2, half) {
         this.dom[2].style.top = p2[1] + "px";
         this.dom[2].style.width = half + "px";
     }
+    this.redrawLabel(p1[0] + half, (p1[1] + p2[1]) / 2);
 };
 
 SQL.Relation.prototype.redrawSide = function (p1, p2, x) {
@@ -157,6 +235,7 @@ SQL.Relation.prototype.redrawSide = function (p1, p2, x) {
         this.dom[2].style.top = p2[1] + "px";
         this.dom[2].style.width = Math.abs(p2[0] - x) + "px";
     }
+    this.redrawLabel(x, (p1[1] + p2[1]) / 2);
 };
 
 SQL.Relation.prototype.redraw = function () {
@@ -227,6 +306,10 @@ SQL.Relation.prototype.destroy = function () {
     this.row1.removeRelation(this);
     this.row2.removeRelation(this);
     for (let elm of this.dom) {
-        elm.parentNode.removeChild(this.dom[i]);
+        elm.parentNode.removeChild(elm);
     }
+    if (this.owner.vector) {
+        this.dom.label.parentNode.removeChild(this.dom.label);
+    }
+    this.dom.handle.parentNode.removeChild(this.dom.handle);
 };

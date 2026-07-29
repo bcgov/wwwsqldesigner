@@ -713,4 +713,21 @@ label, input, select {
 .diagram-legend-timestamp > span.empty {
     opacity: .7;
     font-style: italic;
+.relation-handle {
+    background-color: #fff;
+    border-radius: 2px;
+    box-shadow: rgba(0, 0, 0, 0.16) 0px 2px 4px 0px;
+    font-family: verdana, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, .87);
+    fill: #fff;
+}
+
+.relation-label {
+    font-family: verdana, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, .87);
+    fill: rgba(0, 0, 0, .87);
 }
