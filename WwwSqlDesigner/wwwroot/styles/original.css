@@ -392,10 +392,35 @@ label, input, select {
     fill: #fff;
 }
 
-.relation-label {
-    font-family: verdana, sans-serif;
-    font-size: 12px;
-    font-weight: bold;
+.relation-handle-transitioning {
+    transition: x 120ms ease-out, y 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
+}
+
+input.relation-name-input {
+    position: absolute;
+    z-index: 2;
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 3px;
+    outline: none;
+    padding: 0;
+    background: transparent;
     color: #000;
-    fill: #000;
+    font: bold 12px verdana, sans-serif;
+    line-height: 24px;
+    text-align: center;
+    cursor: pointer;
+}
+
+input.relation-name-input:focus {
+    border: 0;
+    border-bottom: 0;
+    box-shadow: none;
+    outline: none;
+}
+
+input.relation-name-input:not([readonly]) {
+    cursor: text;
 }

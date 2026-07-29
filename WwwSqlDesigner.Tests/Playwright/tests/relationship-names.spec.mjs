@@ -17,41 +17,56 @@ test("names, persists, clears, and safely renders a relationship label", async (
     await page.goto("/");
     await loadModel(page, unnamedModel);
 
-    page.once("dialog", (dialog) => dialog.accept("  has <img src=x>  "));
-    await page.locator("svg .relation-handle").click();
+    const input = page.locator("input.relation-name-input");
+    await expect(input).toBeVisible();
+    await expect(input).toHaveValue("");
+    await expect(page.locator("svg .relation-handle")).toHaveCSS("width", "16px");
+    await expect(page.locator("svg .relation-handle")).toHaveCSS("height", "16px");
 
-    const label = page.locator("svg .relation-label");
-    await expect(label).toHaveText("has <img src=x>");
+    await input.click();
+    await expect(input).toBeVisible();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveCSS("width", "24px");
+    await input.fill("  has <img src=x>  ");
+    await input.press("Enter");
+    await expect(input).not.toBeFocused();
+
+    await expect(input).toHaveValue("has <img src=x>");
     await expect(page.locator("svg rect.relation-handle")).toHaveCount(1);
-    await expect(label.locator("img")).toHaveCount(0);
-    await expect(page.locator("#area")).toContainText("has <img src=x>");
-    expect(await label.getAttribute("transform")).toBeNull();
-    expect(await page.evaluate(() => {
-        const labelY = Number(document.querySelector("svg .relation-label").getAttribute("y"));
-        const handleY = Number(document.querySelector("svg .relation-handle").getAttribute("y")) + 12;
-        return labelY === handleY + 4;
-    })).toBe(true);
+    await expect(page.locator(".relation-name-input img")).toHaveCount(0);
 
     const saved = await page.evaluate(() => d.toXML());
     expect(saved).toContain('name="has &lt;img src=x&gt;"');
 
     await loadModel(page, saved);
-    await expect(page.locator("svg .relation-label")).toHaveText("has <img src=x>");
+    await expect(input).toHaveValue("has <img src=x>");
 
-    page.once("dialog", (dialog) => dialog.dismiss());
-    await page.locator("svg .relation-handle").click();
-    await expect(page.locator("svg .relation-label")).toHaveText("has <img src=x>");
+    await input.click();
+    await expect(input).toHaveValue("has <img src=x>");
+    await input.press("Escape");
+    await expect(input).toHaveValue("has <img src=x>");
 
-    page.once("dialog", (dialog) => dialog.accept("   "));
-    await page.locator("svg .relation-handle").click();
-    await expect(page.locator("svg .relation-label")).toHaveText("+");
+    await input.click();
+    await input.fill("saved on click away");
+    await page.locator("svg").click({ position: { x: 900, y: 900 } });
+    await expect(input).not.toBeFocused();
+    await expect(input).toHaveValue("saved on click away");
+
+    await input.click();
+    await input.fill("   ");
+    await input.press("Enter");
+    await expect(input).toHaveValue("");
+    await expect(page.locator("svg .relation-handle")).toHaveCSS("width", "16px");
+    await expect(page.locator("svg .relation-handle")).toHaveCSS("height", "16px");
 
     await page.evaluate(() => d.relations[0].hide());
     await expect(page.locator("svg .relation-handle")).toBeHidden();
+    await expect(input).toBeHidden();
     await page.evaluate(() => d.relations[0].show());
     await expect(page.locator("svg .relation-handle")).toBeVisible();
+    await expect(input).toBeVisible();
     await page.evaluate(() => d.removeRelation(d.relations[0]));
-    await expect(page.locator("svg .relation-handle, svg .relation-label")).toHaveCount(0);
+    await expect(page.locator("svg .relation-handle, input.relation-name-input")).toHaveCount(0);
 });
 
 test("relationship labels render in non-SVG mode and do not affect exports", async ({ page }) => {
@@ -86,7 +101,7 @@ test("relationship labels render in non-SVG mode and do not affect exports", asy
     await page.reload();
     await loadModel(page, unnamedModel.replace('row="Id" />', 'row="Id" name="has" />'));
     await expect(page.locator("#area .relation-handle")).toBeVisible();
-    await expect(page.locator("#area .relation-label")).toHaveText("has");
+    await expect(page.locator("#area input.relation-name-input")).toHaveValue("has");
 });
 
 test("each relationship handle edits only its own relationship", async ({ page }) => {
@@ -98,20 +113,18 @@ test("each relationship handle edits only its own relationship", async ({ page }
     </sql>`);
 
     const handles = page.locator("svg .relation-handle");
+    const inputs = page.locator("input.relation-name-input");
+    const activeInput = page.locator("input.relation-name-input:not([readonly])");
     await expect(handles).toHaveCount(2);
-    page.once("dialog", (dialog) => dialog.accept("left relationship"));
-    await handles.nth(0).click();
-    page.once("dialog", (dialog) => dialog.accept("right relationship"));
-    await handles.nth(1).click();
+    await inputs.nth(0).click();
+    await activeInput.fill("left relationship");
+    await activeInput.press("Enter");
+    await inputs.nth(1).click();
+    await activeInput.fill("right relationship");
+    await activeInput.press("Enter");
 
     expect(await page.evaluate(() => d.relations.map((relation) => relation.name))).toEqual([
         "left relationship",
         "right relationship",
     ]);
-    const labelPositions = await page.evaluate(() => d.relations.map((relation) => ({
-        labelY: Number(relation.dom.label.getAttribute("y")),
-        handleY: Number(relation.dom.handle.getAttribute("y")) + 12,
-    })));
-    expect(labelPositions[0].labelY).toBe(labelPositions[0].handleY + 4);
-    expect(labelPositions[1].labelY).toBe(labelPositions[1].handleY + 4);
 });
