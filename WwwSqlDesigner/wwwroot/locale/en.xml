@@ -105,5 +105,13 @@
     <!-- misc -->
     <string name="xmlerror">XML error</string>
     <string name="docs">Documentation</string>
+    <string name="diagramsummary">Diagram summary</string>
+    <string name="legendname">Diagram name</string>
+    <string name="legendtitle">Title</string>
+    <string name="legendauthor">Author</string>
+    <string name="legendapplication">Application name</string>
+    <string name="legendcreated">Created</string>
+    <string name="legendmodified">Last modified</string>
+    <string name="legendnotsaved">Not yet saved</string>
 
 </locale>

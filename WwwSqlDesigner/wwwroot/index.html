@@ -24,6 +24,8 @@
     <script src="js/key.js"></script>
     <script src="js/rubberband.js"></script>
     <script src="js/map.js"></script>
+    <script src="js/maptools.js"></script>
+    <script src="js/legend.js"></script>
     <script src="js/toggle.js"></script>
     <script src="js/io.js"></script>
     <script src="js/tablemanager.js"></script>
@@ -70,7 +72,13 @@
 
         <div id="rubberband"></div>
 
-        <div id="minimap"></div>
+        <div id="maptools">
+            <div id="minimap"></div>
+            <details id="legendtools">
+                <summary id="maptoggle" aria-label="Diagram details"></summary>
+                <div id="maptoolcontent"></div>
+            </details>
+        </div>
 
         <div id="background"></div>
 

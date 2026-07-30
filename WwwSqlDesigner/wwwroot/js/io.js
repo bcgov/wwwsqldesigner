@@ -153,7 +153,7 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
 };
 
 SQL.IO.prototype.clientsave = function () {
-    const xml = this.owner.toXML();
+    const xml = this.owner.toXML(true);
     this.dom.ta.value = xml;
 };
 
@@ -188,17 +188,17 @@ SQL.IO.prototype.clientlocalsave = function () {
         return;
     }
 
-    const xml = this.owner.toXML();
+    let key = this.promptName("serversaveprompt");
+    if (!key) {
+        return;
+    }
+
+    const xml = this.owner.toXML(true);
     if (xml.length >= (5 * 1024 * 1024) / 2) {
         /* this is a very big db structure... */
         alert(
             "Warning: your database structure is above 5 megabytes in size, this is above the localStorage single key limit allowed by some browsers, example Mozilla Firefox 10"
         );
-        return;
-    }
-
-    let key = this.promptName("serversaveprompt");
-    if (!key) {
         return;
     }
 
@@ -522,7 +522,7 @@ SQL.IO.prototype.serversave = function (e, keyword) {
         return;
     }
     this._name = name;
-    const xml = this.owner.toXML();
+    const xml = this.owner.toXML(true);
     const bp = this.owner.getOption("xhrpath");
     const url =
         bp +

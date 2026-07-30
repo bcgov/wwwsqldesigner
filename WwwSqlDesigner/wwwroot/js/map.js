@@ -28,8 +28,8 @@ SQL.Map.prototype.down = function (e) {
     this.dom.container.style.cursor = "move";
     const pos = OZ.DOM.pos(this.dom.container);
 
-    this.x = Math.round(pos[0] + this.l + this.w / 2);
-    this.y = Math.round(pos[1] + this.t + this.h / 2);
+    this.x = Math.round(pos[0] + this.offsetX + this.l + this.w / 2);
+    this.y = Math.round(pos[1] + this.offsetY + this.t + this.h / 2);
     this.move(e);
 
     let eventMove = "";
@@ -72,11 +72,11 @@ SQL.Map.prototype.move = function (e) {
     if (this.t + dy < 0) {
         dy = -this.t;
     }
-    if (this.l + this.w + 4 + dx > this.width) {
-        dx = this.width - 4 - this.l - this.w;
+    if (this.l + this.w + 4 + dx > this.mapWidth) {
+        dx = this.mapWidth - 4 - this.l - this.w;
     }
-    if (this.t + this.h + 4 + dy > this.height) {
-        dy = this.height - 4 - this.t - this.h;
+    if (this.t + this.h + 4 + dy > this.mapHeight) {
+        dy = this.mapHeight - 4 - this.t - this.h;
     }
 
     this.x += dx;
@@ -85,10 +85,8 @@ SQL.Map.prototype.move = function (e) {
     this.l += dx;
     this.t += dy;
 
-    let coefX = this.width / this.owner.width;
-    let coefY = this.height / this.owner.height;
-    let left = this.l / coefX;
-    let top = this.t / coefY;
+    let left = this.l / this.scale;
+    let top = this.t / this.scale;
 
     document.documentElement.scrollLeft = Math.round(left);
     document.documentElement.scrollTop = Math.round(top);
@@ -106,15 +104,20 @@ SQL.Map.prototype.up = function (e) {
 
 SQL.Map.prototype.sync = function () {
     /* when window changes, adjust map */
+    this.width = this.dom.container.offsetWidth - 2;
+    this.height = this.dom.container.offsetHeight - 2;
     const dims = OZ.DOM.win();
     const scroll = OZ.DOM.scroll();
-    const scaleX = this.width / this.owner.width;
-    const scaleY = this.height / this.owner.height;
+    this.scale = Math.min(this.width / this.owner.width, this.height / this.owner.height);
+    this.mapWidth = this.owner.width * this.scale;
+    this.mapHeight = this.owner.height * this.scale;
+    this.offsetX = (this.width - this.mapWidth) / 2;
+    this.offsetY = (this.height - this.mapHeight) / 2;
 
-    const w = dims[0] * scaleX - 4 - 0;
-    const h = dims[1] * scaleY - 4 - 0;
-    const x = scroll[0] * scaleX;
-    const y = scroll[1] * scaleY;
+    const w = dims[0] * this.scale - 4;
+    const h = dims[1] * this.scale - 4;
+    const x = scroll[0] * this.scale;
+    const y = scroll[1] * this.scale;
 
     this.w = Math.round(w);
     this.h = Math.round(h);
@@ -127,6 +130,6 @@ SQL.Map.prototype.sync = function () {
 SQL.Map.prototype.redraw = function () {
     this.dom.port.style.width = this.w + "px";
     this.dom.port.style.height = this.h + "px";
-    this.dom.port.style.left = this.l + "px";
-    this.dom.port.style.top = this.t + "px";
+    this.dom.port.style.left = this.offsetX + this.l + "px";
+    this.dom.port.style.top = this.offsetY + this.t + "px";
 };
