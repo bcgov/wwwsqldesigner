@@ -69,3 +69,12 @@ test("normalizes unlimited strings and avoids invalid binary facets", async ({ p
     expect(postgres.diagnostics.join(" ")).toContain("not enforced");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "binary", facets: "16" }, "mssql").type)).toBe("varbinary(16)");
 });
+
+test("maps MySQL and SQLite adapters with precision diagnostics", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><datatypes db="mysql" /><table name="Entry"><row name="Name" null="0"><datatype>varchar(64)</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>string(64)</datatype>");
+    await load(page, `<sql><datatypes db="sqlite" /><table name="Entry"><row name="Amount" null="0"><datatype>numeric(10,2)</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>decimal(10,2)</datatype>");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "decimal", facets: "10,2" }, "sqlite").diagnostics.join(" "))).toContain("Precision and scale");
+});
