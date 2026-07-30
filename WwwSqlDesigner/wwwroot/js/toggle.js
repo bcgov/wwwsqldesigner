@@ -20,6 +20,10 @@ SQL.Toggle.prototype._switch = function (state) {
     this._state = state;
     if (this._state) {
         OZ.$("bar").style.maxHeight = "";
+        OZ.$("bar").style.overflow = "";
+        if (SQL.Designer.mapTools) {
+            SQL.Designer.mapTools.close();
+        }
     } else {
         OZ.$("bar").style.overflow = "hidden";
         OZ.$("bar").style.maxHeight = this._elm.offsetHeight + "px";

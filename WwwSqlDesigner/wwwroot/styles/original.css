@@ -33,6 +33,8 @@ body {
     right: 0px;
     width: 150px;
     padding: 0px 5px 5px;
+    overflow-x: hidden;
+    overflow-y: auto;
     -moz-box-shadow: -4px 4px 8px #888;
     /* FF 3.5+ */
     -webkit-box-shadow: -4px 4px 8px #888;
@@ -279,4 +281,104 @@ label, input, select {
     background: #888;
     opacity: 0.5;
     visibility: hidden;
+}
+
+#maptools {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    width: 150px;
+    height: 165px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #000;
+}
+
+#legendtools {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+#maptoggle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    pointer-events: auto;
+    list-style: none;
+    width: 100%;
+    height: 15px;
+    cursor: pointer;
+    background-position: 50% 5px;
+    background-repeat: no-repeat;
+}
+
+#maptoggle:hover { background-color: #bbb; }
+#maptoggle::-webkit-details-marker { display: none; }
+#maptoggle { background-image: url(../images/up.gif); }
+#legendtools[open] #maptoggle { background-image: url(../images/down.gif); }
+
+#maptools #minimap {
+    position: absolute;
+    right: 0;
+    bottom: 15px;
+    width: 100%;
+    height: 150px;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+#maptoolcontent {
+    position: absolute;
+    right: 0;
+    bottom: 165px;
+    left: 0;
+    box-sizing: border-box;
+    pointer-events: auto;
+}
+
+.diagram-legend {
+    width: 100%;
+    margin: 0 auto;
+    padding: 8px;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+    user-select: text;
+}
+
+.diagram-legend-row {
+    display: block;
+    margin: 4px 0;
+    font-size: 11px;
+}
+
+.diagram-legend-row > span:first-child,
+.diagram-legend-timestamp > span:last-child {
+    display: block;
+}
+
+.diagram-legend-row > span:first-child {
+    margin-bottom: 1px;
+}
+
+.diagram-legend-timestamp > span:last-child {
+    min-height: 22px;
+    padding: 2px 0;
+    box-sizing: border-box;
+}
+
+.diagram-legend input[type=text] {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+}
+
+.diagram-legend-timestamp > span.empty {
+    opacity: .7;
+    font-style: italic;
 }

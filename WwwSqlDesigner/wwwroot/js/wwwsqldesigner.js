@@ -7,7 +7,7 @@ SQL.Designer = function () {
     this.title = document.title;
 
     SQL.Visual.apply(this);
-    new SQL.Toggle(OZ.$("toggle"));
+    this.toolbarToggle = new SQL.Toggle(OZ.$("toggle"));
 
     this.dom.container = OZ.$("area");
     this.minSize = [
@@ -116,7 +116,10 @@ SQL.Designer.prototype.applyStyle = function () {
 
 SQL.Designer.prototype.init2 = function () {
     /* secondary init, after locale & datatypes were retrieved */
+    this.mapTools = new SQL.MapTools(this);
+    this.legend = new SQL.Legend(this);
     this.map = new SQL.Map(this);
+    this.mapTools.sync();
     this.rubberband = new SQL.Rubberband(this);
     this.tableManager = new SQL.TableManager(this);
     this.rowManager = new SQL.RowManager(this);
@@ -332,10 +335,14 @@ SQL.Designer.prototype.findNamedTable = function (name) {
     }
 };
 
-SQL.Designer.prototype.toXML = function () {
+SQL.Designer.prototype.toXML = function (recordSave) {
+    if (recordSave) {
+        this.legend.prepareForSave();
+    }
     let xml = '<?xml version="1.0" encoding="utf-8" ?>\n';
     xml += "<!-- SQL XML created by WWW SQL Designer, https://github.com/ondras/wwwsqldesigner/ -->\n";
     xml += "<sql>\n";
+    xml += this.legend.toXML();
 
     /* serialize datatypes */
     if (window.XMLSerializer) {
@@ -351,11 +358,16 @@ SQL.Designer.prototype.toXML = function () {
         xml += table.toXML();
     }
     xml += "</sql>\n";
+    if (recordSave) {
+        this.legend.rememberSaved(xml);
+    }
     return xml;
 };
 
 SQL.Designer.prototype.fromXML = function (node) {
     this.clearTables();
+    const legends = node.getElementsByTagName("legend");
+    this.legend.fromXML(legends.length ? legends[0] : null);
     const types = node.getElementsByTagName("datatypes");
     if (types.length) {
         window.DATATYPES = types[0];
@@ -402,6 +414,7 @@ SQL.Designer.prototype.fromXML = function (node) {
     }
 
     this.sync();
+    this.legend.rememberSaved(this.toXML());
 };
 
 SQL.Designer.prototype.setTitle = function (t) {

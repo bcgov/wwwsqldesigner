@@ -9,6 +9,9 @@ SQL.Rubberband = function (owner) {
 SQL.Rubberband.prototype = Object.create(SQL.Visual.prototype);
 
 SQL.Rubberband.prototype.down = function (e) {
+    if (e.target && e.target.closest && e.target.closest(".diagram-legend")) {
+        return;
+    }
     OZ.Event.prevent(e);
     const scroll = OZ.DOM.scroll();
     this.x = this.x0 = e.clientX + scroll[0];
