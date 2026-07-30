@@ -382,104 +382,38 @@ SQL.Row.prototype.destroy = function () {
 };
 
 SQL.Row.prototype.toXML = function () {
-    let xml = "";
-
-    let t = this.getTitle().replace(/"/g, "&quot;");
-    const nn = this.data.nll ? "1" : "0";
-    const ai = this.data.ai ? "1" : "0";
-    xml +=
-        '<row name="' + t + '" null="' + nn + '" autoincrement="' + ai + '">\n';
-
-    const elm = this.getDataType();
-    t = elm.getAttribute("sql");
-    if (this.data.size.length) {
-        t += "(" + this.data.size + ")";
-    }
-    xml += "<datatype>" + t + "</datatype>\n";
-
-    if (this.data.def || this.data.def === null) {
-        const q = elm.getAttribute("quote");
-        let d = this.data.def;
-        if (d === null) {
-            d = "NULL";
-        } else if (d != "CURRENT_TIMESTAMP") {
-            d = q + d + q;
-        }
-        xml += "<default>" + SQL.escape(d) + "</default>";
-    }
-
+    let xml = '';
+    const name = this.getTitle().replace(/"/g, "&quot;");
+    xml += '<row name="' + name + '" null="' + (this.data.nll ? "1" : "0") + '" autoincrement="' + (this.data.ai ? "1" : "0") + '">\n';
+    const type = this.getDataType().getAttribute("sql");
+    xml += "<datatype>" + type + (this.data.size ? "(" + this.data.size + ")" : "") + "</datatype>\n";
+    if (this.data.def || this.data.def === null) { xml += "<default>" + SQL.escape(this.data.def === null ? "NULL" : this.data.def) + "</default>"; }
     for (let relation of this.relations) {
-        if (relation.row2 != this) {
-            continue;
-        }
-        xml +=
-            '<relation table="' +
-            relation.row1.owner.getTitle() +
-            '" row="' +
-            relation.row1.getTitle() +
-            (relation.name
-                ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;")
-                : "") +
-            '" />\n';
+        if (relation.row2 !== this) { continue; }
+        xml += '<relation table="' + relation.row1.owner.getTitle() + '" row="' + relation.row1.getTitle() + (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
     }
-
-    if (this.data.comment) {
-        xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n";
-    }
-
-    xml += "</row>\n";
-    return xml;
+    if (this.data.comment) { xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n"; }
+    return xml + "</row>\n";
 };
 
 SQL.Row.prototype.fromXML = function (node) {
-    const name = node.getAttribute("name");
-
-    const obj = { type: 0, size: "" };
-    obj.nll = node.getAttribute("null") == "1";
-    obj.ai = node.getAttribute("autoincrement") == "1";
-
-    const cs = node.getElementsByTagName("comment");
-    if (cs.length && cs[0].firstChild) {
-        obj.comment = cs[0].firstChild.nodeValue;
-    }
-
-    let d = node.getElementsByTagName("datatype");
-    if (d.length && d[0].firstChild) {
-        const s = d[0].firstChild.nodeValue;
-        const r = s.match(/^([^\(]+)(\((.*)\))?.*$/);
-        const type = r[1];
-        if (r[3]) {
-            obj.size = r[3];
-        }
-        const types = window.DATATYPES.getElementsByTagName("type");
-        for (let i = 0; i < types.length; i++) {
-            const sql = types[i].getAttribute("sql");
-            const re = types[i].getAttribute("re");
-            if (sql == type || (re && new RegExp(re).exec(type))) {
-                obj.type = i;
-            }
+    const obj = { type: 0, size: "", nll: node.getAttribute("null") === "1", ai: node.getAttribute("autoincrement") === "1" };
+    const comment = node.getElementsByTagName("comment")[0];
+    if (comment && comment.firstChild) { obj.comment = comment.firstChild.nodeValue; }
+    const datatype = node.getElementsByTagName("datatype")[0];
+    if (datatype) {
+        const portable = SQL.PortableTypes.canonical(datatype.textContent);
+        if (portable) {
+            obj.size = portable.facets;
+            const types = window.DATATYPES.getElementsByTagName("type");
+            for (let i = 0; i < types.length; i++) { if (types[i].getAttribute("sql") === portable.kind) { obj.type = i; break; } }
         }
     }
-
-    const elm = DATATYPES.getElementsByTagName("type")[obj.type];
-    d = node.getElementsByTagName("default");
-    if (d.length && d[0].firstChild) {
-        const def = d[0].firstChild.nodeValue;
-        obj.def = def;
-        const q = elm.getAttribute("quote");
-        if (q) {
-            const re = new RegExp("^" + q + "(.*)" + q + "$");
-            const r = def.match(re);
-            if (r) {
-                obj.def = r[1];
-            }
-        }
-    }
-
+    const defaultValue = node.getElementsByTagName("default")[0];
+    if (defaultValue && defaultValue.firstChild) { obj.def = defaultValue.firstChild.nodeValue; }
     this.update(obj);
-    this.setTitle(name);
+    this.setTitle(node.getAttribute("name"));
 };
-
 SQL.Row.prototype.isPrimary = function () {
     for (let key of this.keys) {
         if (key.getType() == "PRIMARY") {

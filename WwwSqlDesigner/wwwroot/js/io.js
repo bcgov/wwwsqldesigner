@@ -147,7 +147,7 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
         alert(_("xmlerror") + ": Null document");
         return false;
     }
-    this.owner.fromXML(xmlDoc.documentElement);
+    if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
     this.owner.window.close();
     return true;
 };
