@@ -19,10 +19,12 @@ test("round-trips every canonical portable token and facet", async ({ page }) =>
 
 test("imports specialized and unknown legacy types without a prompt", async ({ page }) => {
     await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
     await page.evaluate(() => { window.prompt = () => { throw new Error("Import must not prompt"); }; });
-    await load(page, `<sql><datatypes db="mssql" /><table name="Location"><row name="Shape" null="1"><datatype>geography</datatype></row><row name="Mystery" null="1"><datatype>future_type</datatype></row></table></sql>`);
-    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>text</datatype>");
     await page.locator("#saveload").click();
+    const imported = await page.evaluate(() => d.io.fromXML(new DOMParser().parseFromString("<sql><datatypes db=\"mssql\" /><table name=\"Location\"><row name=\"Shape\" null=\"1\"><datatype>geography</datatype></row><row name=\"Mystery\" null=\"1\"><datatype>future_type</datatype></row></table></sql>", "text/xml")));
+    expect(imported).toBe(true);
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>text</datatype>");
     await expect(page.locator("#iostatus")).toBeVisible();
     await expect(page.locator("#iostatus")).toContainText("Import completed with");
     await page.locator("#iostatusdismiss").click();
@@ -62,4 +64,37 @@ test("export warnings use the compact status line", async ({ page }) => {
     await expect(page.locator("#iostatus")).toBeVisible();
     await expect(page.locator("#iostatus")).toContainText("exported as text");
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("maps every bundled datatype registry entry to a portable token", async ({ page }) => {
+    await page.goto("/");
+    const dialects = ["mssql", "postgresql", "mysql", "sqlite", "oracle", "cubrid", "vfp9", "sqlalchemy", "web2py"];
+    const expected = ["integer", "decimal", "float", "string", "text", "boolean", "date", "time", "datetime", "datetime-with-time-zone", "binary", "uuid", "json", "xml"];
+    const registryTypes = await page.evaluate(async (values) => {
+        const result = {};
+        for (const dialect of values) {
+            const text = await (await fetch("db/" + dialect + "/datatypes.xml")).text();
+            const doc = new DOMParser().parseFromString(text, "text/xml");
+            result[dialect] = Array.from(doc.querySelectorAll("type"), (type) => type.getAttribute("sql"));
+        }
+        return result;
+    }, dialects);
+    for (const dialect of dialects) {
+        for (const nativeType of registryTypes[dialect]) {
+            expect(expected).toContain(await page.evaluate(([db, type]) => SQL.PortableTypes.source(db, type).kind, [dialect, nativeType]));
+        }
+    }
+});
+
+test("preserves defaults and selected target UI behavior", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Entry"><row name="Text" null="0"><datatype>string(20)</datatype><default>hello</default></row><row name="Amount" null="0"><datatype>decimal(10,2)</datatype><default>12.50</default></row></table></sql>');
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<default>'hello'</default>");
+    expect(saved).toContain("<default>12.50</default>");
+    await page.locator("#saveload").click();
+    await page.locator("#exporttarget").selectOption("postgresql");
+    await expect(page.locator("#clientsql")).toContainText("postgresql");
+    expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
 });

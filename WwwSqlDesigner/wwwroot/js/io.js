@@ -184,7 +184,8 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
         return false;
     }
     if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
-    this.owner.window.close();
+    /* Keep the pane open when conversion warnings need to be read. */
+    if (this.dom.status.style.display === "none") { this.owner.window.close(); }
     return true;
 };
 
