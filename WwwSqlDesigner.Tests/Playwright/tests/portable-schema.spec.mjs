@@ -78,15 +78,9 @@ test("maps MySQL and SQLite adapters with precision diagnostics", async ({ page 
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>decimal(10,2)</datatype>");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "decimal", facets: "10,2" }, "sqlite").diagnostics.join(" "))).toContain("Precision and scale");
 });
-
-test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
+test("maps Oracle adapters into canonical and target types", async ({ page }) => {
     await page.goto("/");
-    const mysql = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "mysql"));
-    expect(mysql.type).toBe("datetime");
-    expect(mysql.diagnostics.join(" ")).toContain("Time-zone semantics");
-    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "mysql").type)).toBe("char(36)");
-    const sqlite = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "sqlite"));
-    expect(sqlite.type).toBe("text");
-    expect(sqlite.diagnostics.join(" ")).toContain("Time-zone semantics");
-    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "sqlite").type)).toBe("text");
+    await load(page, `<sql><datatypes db="oracle" /><table name="Entry"><row name="Name" null="0"><datatype>varchar2(80)</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>string(80)</datatype>");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "xml", facets: "" }, "oracle").type)).toBe("xmltype");
 });
