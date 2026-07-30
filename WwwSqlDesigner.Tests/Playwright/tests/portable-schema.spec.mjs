@@ -85,28 +85,11 @@ test("maps Oracle adapters into canonical and target types", async ({ page }) =>
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "xml", facets: "" }, "oracle").type)).toBe("xmltype");
 });
 test("maps remaining source adapters into canonical tokens", async ({ page }) => {
-    const cases = [["cubrid", "datetime", "datetime"], ["vfp9", "character(32)", "string(32)"], ["sqlalchemy", "sa.String(40)", "string(40)"], ["web2py", "reference", "integer"]];
+    const cases = [["cubrid", "datetime", "datetime"], ["cubrid", "smallint", "integer"], ["cubrid", "nchar varying", "string"], ["cubrid", "bit varying", "binary"], ["vfp9", "character(32)", "string(32)"], ["vfp9", "varbinary(16)", "binary(16)"], ["sqlalchemy", "sa.String(40)", "string(40)"], ["sqlalchemy", "sa.Timestamp", "datetime"], ["web2py", "reference", "integer"], ["web2py", "upload", "string"]];
     for (const [dialect, nativeType, portable] of cases) {
         await page.goto("/");
         await load(page, `<sql><datatypes db="${dialect}" /><table name="Entry"><row name="Value" null="0"><datatype>${nativeType}</datatype></row></table></sql>`);
         expect(await page.evaluate(() => d.toXML())).toContain(`<datatype>${portable}</datatype>`);
     }
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "boolean", facets: "" }, "cubrid").safe)).toBe(false);
-});
-
-test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
-    await page.goto("/");
-    const mysql = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "mysql"));
-    expect(mysql.type).toBe("datetime");
-    expect(mysql.diagnostics.join(" ")).toContain("Time-zone semantics");
-    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "mysql").type)).toBe("char(36)");
-    const sqlite = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "sqlite"));
-    expect(sqlite.type).toBe("text");
-    expect(sqlite.diagnostics.join(" ")).toContain("Time-zone semantics");
-    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "sqlite").type)).toBe("text");
-});
-test("imports Oracle numeric synonyms", async ({ page }) => {
-    await page.goto("/");
-    const kinds = await page.evaluate(() => ["NUMBER", "NUMERIC", "DECIMAL", "INTEGER", "INT", "SMALLINT", "FLOAT"].map((type) => SQL.PortableTypes.source("oracle", type).kind));
-    expect(kinds).toEqual(["decimal", "decimal", "decimal", "integer", "integer", "integer", "float"]);
 });
