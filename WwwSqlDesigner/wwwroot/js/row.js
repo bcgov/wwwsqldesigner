@@ -417,6 +417,9 @@ SQL.Row.prototype.toXML = function () {
             relation.row1.owner.getTitle() +
             '" row="' +
             relation.row1.getTitle() +
+            (relation.name
+                ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;")
+                : "") +
             '" />\n';
     }
 
