@@ -96,6 +96,7 @@ SQL.Relation = function (owner, row1, row2) {
     this.dom.input.setAttribute("class", "relation-name-input");
     this.dom.input.setAttribute("aria-label", _("relationname"));
     this.dom.input.setAttribute("autocomplete", "off");
+    this.dom.input.setAttribute("placeholder", "+");
     this.dom.input.readOnly = true;
     this.owner.dom.container.appendChild(this.dom.input);
 
@@ -255,10 +256,10 @@ SQL.Relation.prototype.redrawControl = function (x, y) {
         ? this.editingWidth
         : (hasName ? this.measureNameWidth(this.name) + 16 : 16);
     if (this.owner.vector) {
-        this.dom.handle.style.x = pointX - controlWidth / 2 + "px";
-        this.dom.handle.style.y = pointY - handleSize / 2 + "px";
-        this.dom.handle.style.width = controlWidth + "px";
-        this.dom.handle.style.height = handleSize + "px";
+        this.dom.handle.setAttribute("x", pointX - controlWidth / 2);
+        this.dom.handle.setAttribute("y", pointY - handleSize / 2);
+        this.dom.handle.setAttribute("width", controlWidth);
+        this.dom.handle.setAttribute("height", handleSize);
     } else {
         this.dom.handle.style.left = pointX - controlWidth / 2 + "px";
         this.dom.handle.style.top = pointY - handleSize / 2 + "px";

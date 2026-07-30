@@ -20,8 +20,11 @@ test("names, persists, clears, and safely renders a relationship label", async (
     const input = page.locator("input.relation-name-input");
     await expect(input).toBeVisible();
     await expect(input).toHaveValue("");
+    await expect(input).toHaveAttribute("placeholder", "+");
     await expect(page.locator("svg .relation-handle")).toHaveCSS("width", "16px");
     await expect(page.locator("svg .relation-handle")).toHaveCSS("height", "16px");
+    await expect(page.locator("svg .relation-handle")).toHaveAttribute("x");
+    await expect(page.locator("svg .relation-handle")).toHaveAttribute("y");
 
     await input.click();
     await expect(input).toBeVisible();

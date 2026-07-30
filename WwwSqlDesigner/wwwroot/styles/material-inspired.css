@@ -725,7 +725,7 @@ label, input, select {
 }
 
 .relation-handle.relation-control-transitioning {
-    transition: x 120ms ease-out, y 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
+    transition: left 120ms ease-out, top 120ms ease-out, x 120ms ease-out, y 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
 }
 
 input.relation-name-input {
@@ -759,4 +759,9 @@ input.relation-name-input:focus {
 
 input.relation-name-input:not([readonly]) {
     cursor: text;
+}
+
+input.relation-name-input::placeholder {
+    color: inherit;
+    opacity: 1;
 }
