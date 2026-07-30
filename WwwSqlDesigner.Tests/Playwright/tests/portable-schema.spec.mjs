@@ -27,7 +27,17 @@ test("blocks unsupported input until a portable replacement is selected", async 
     await load(page, `<sql><datatypes db="mssql" /><table name="Location"><row name="Shape" null="1"><datatype>geography</datatype></row></table></sql>`);
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>json</datatype>");
 });
-test("serializes portable defaults with type-aware quoting", async ({ page }) => {
+test("imports initial dialect adapters into canonical tokens", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><datatypes db="mssql" /><table name="Entry"><row name="Name" null="0"><datatype>nvarchar(42)</datatype></row><row name="Id" null="0"><datatype>uniqueidentifier</datatype></row></table></sql>`);
+    let saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<datatype>string(42)</datatype>");
+    expect(saved).toContain("<datatype>uuid</datatype>");
+    await load(page, `<sql><datatypes db="postgresql" /><table name="Event"><row name="At" null="0"><datatype>timestamp with time zone</datatype></row></table></sql>`);
+    saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<datatype>datetime-with-time-zone</datatype>");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "ef").type)).toBe("datetimeoffset");
+});test("serializes portable defaults with type-aware quoting", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="Text" null="0"><datatype>string(20)</datatype><default>hello</default></row><row name="Amount" null="0"><datatype>decimal(10,2)</datatype><default>12.50</default></row><row name="Empty" null="1"><datatype>string(20)</datatype><default>NULL</default></row><row name="Created" null="0"><datatype>datetime</datatype><default>CURRENT_TIMESTAMP</default></row></table></sql>`);
     const saved = await page.evaluate(() => d.toXML());

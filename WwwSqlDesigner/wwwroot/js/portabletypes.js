@@ -2,9 +2,15 @@
 SQL.PortableTypes = {
     format: "portable-v1",
     tokens: ["integer", "decimal", "float", "string", "text", "boolean", "date", "time", "datetime", "datetime-with-time-zone", "binary", "uuid", "json", "xml"],
-    sourceAdapters: {},
-    targetAdapters: {},
-    registry: function () {
+    sourceAdapters: {
+        mssql: { tinyint:"integer", smallint:"integer", int:"integer", bigint:"integer", money:"decimal", smallmoney:"decimal", decimal:"decimal", numeric:"decimal", real:"float", float:"float", char:"string", varchar:"string", nchar:"string", nvarchar:"string", text:"text", ntext:"text", bit:"boolean", date:"date", time:"time", datetime:"datetime", datetime2:"datetime", smalldatetime:"datetime", datetimeoffset:"datetime-with-time-zone", binary:"binary", varbinary:"binary", image:"binary", uniqueidentifier:"uuid", xml:"xml", json:"json" },
+        postgresql: { smallint:"integer", integer:"integer", bigint:"integer", serial:"integer", bigserial:"integer", decimal:"decimal", numeric:"decimal", real:"float", float:"float", "double precision":"float", char:"string", varchar:"string", text:"text", boolean:"boolean", date:"date", time:"time", "time without time zone":"time", timestamp:"datetime", "timestamp without time zone":"datetime", "timestamp with time zone":"datetime-with-time-zone", bytea:"binary", uuid:"uuid", json:"json", jsonb:"json", xml:"xml" }
+    },
+    targetAdapters: {
+        mssql: { integer:"int", decimal:"decimal", float:"float", string:"nvarchar", text:"nvarchar(max)", boolean:"bit", date:"date", time:"time", datetime:"datetime2", "datetime-with-time-zone":"datetimeoffset", binary:"varbinary", uuid:"uniqueidentifier", json:"nvarchar(max)", xml:"xml" },
+        postgresql: { integer:"integer", decimal:"numeric", float:"double precision", string:"varchar", text:"text", boolean:"boolean", date:"date", time:"time", datetime:"timestamp", "datetime-with-time-zone":"timestamp with time zone", binary:"bytea", uuid:"uuid", json:"jsonb", xml:"xml" },
+        ef: { integer:"int", decimal:"decimal", float:"double", string:"string", text:"string", boolean:"bool", date:"date", time:"time", datetime:"datetime", "datetime-with-time-zone":"datetimeoffset", binary:"binary", uuid:"uuid", json:"string", xml:"string" }
+    },    registry: function () {
         const groups = [["Numeric", "integer decimal float"], ["Text", "string text json xml"], ["Date and Time", "date time datetime datetime-with-time-zone"], ["Other", "boolean binary uuid"]];
         let xml = '<datatypes db="portable">';
         groups.forEach(function (group) { xml += '<group label="' + group[0] + '" color="#eeeeaa">'; group[1].split(" ").forEach(function (token) { xml += '<type label="' + token + '" length="' + (/^(decimal|string|binary)$/.test(token) ? "1" : "0") + '" sql="' + token + '" quote="' + (/^(string|text|json|xml|binary)$/.test(token) ? "&apos;" : "") + '" />'; }); xml += "</group>"; });
