@@ -12,8 +12,8 @@ SQL.PortableTypes = {
     targetAdapters: {
         mssql: { integer:"int", decimal:"decimal", float:"float", string:"nvarchar", text:"nvarchar(max)", boolean:"bit", date:"date", time:"time", datetime:"datetime2", "datetime-with-time-zone":"datetimeoffset", binary:"varbinary", uuid:"uniqueidentifier", json:"nvarchar(max)", xml:"xml" },
         postgresql: { integer:"integer", decimal:"numeric", float:"double precision", string:"varchar", text:"text", boolean:"boolean", date:"date", time:"time", datetime:"timestamp", "datetime-with-time-zone":"timestamp with time zone", binary:"bytea", uuid:"uuid", json:"jsonb", xml:"xml" },
-        mysql: { integer:"int", decimal:"decimal", float:"double", string:"varchar", text:"text", boolean:"boolean", date:"date", time:"time", datetime:"datetime", "datetime-with-time-zone":"datetime", binary:"blob", uuid:"char(36)", json:"json", xml:"text" },
-        sqlite: { integer:"integer", decimal:"numeric", float:"real", string:"text", text:"text", boolean:"integer", date:"text", time:"text", datetime:"text", "datetime-with-time-zone":"text", binary:"blob", uuid:"text", json:"text", xml:"text" },
+        mysql: { integer:"int", decimal:"decimal", float:"double", string:"varchar", text:"text", boolean:"boolean", date:"date", time:"time", datetime:"datetime", binary:"blob", json:"json", xml:"text" },
+        sqlite: { integer:"integer", decimal:"numeric", float:"real", string:"text", text:"text", boolean:"integer", date:"text", time:"text", datetime:"text", binary:"blob", json:"text", xml:"text" },
         oracle: { integer:"number", decimal:"number", float:"binary_double", string:"varchar2", text:"clob", boolean:"number(1)", date:"date", time:"timestamp", datetime:"timestamp", "datetime-with-time-zone":"timestamp with time zone", binary:"blob", json:"clob", xml:"xmltype" },
         ef: { integer:"int", decimal:"decimal", float:"double", string:"string", text:"string", boolean:"bool", date:"date", time:"time", datetime:"datetime", "datetime-with-time-zone":"datetimeoffset", binary:"binary", uuid:"uuid", json:"string", xml:"string" }
     },

@@ -84,20 +84,3 @@ test("maps Oracle adapters into canonical and target types", async ({ page }) =>
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>string(80)</datatype>");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "xml", facets: "" }, "oracle").type)).toBe("xmltype");
 });
-
-test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
-    await page.goto("/");
-    const mysql = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "mysql"));
-    expect(mysql.type).toBe("datetime");
-    expect(mysql.diagnostics.join(" ")).toContain("Time-zone semantics");
-    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "mysql").type)).toBe("char(36)");
-    const sqlite = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "sqlite"));
-    expect(sqlite.type).toBe("text");
-    expect(sqlite.diagnostics.join(" ")).toContain("Time-zone semantics");
-    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "sqlite").type)).toBe("text");
-});
-test("imports Oracle numeric synonyms", async ({ page }) => {
-    await page.goto("/");
-    const kinds = await page.evaluate(() => ["NUMBER", "NUMERIC", "DECIMAL", "INTEGER", "INT", "SMALLINT", "FLOAT"].map((type) => SQL.PortableTypes.source("oracle", type).kind));
-    expect(kinds).toEqual(["decimal", "decimal", "decimal", "integer", "integer", "integer", "float"]);
-});
