@@ -93,3 +93,27 @@ test("maps remaining source adapters into canonical tokens", async ({ page }) =>
     }
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "boolean", facets: "" }, "cubrid").safe)).toBe(false);
 });
+test("maps a cloned portable model to the selected export target", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await load(page, `<sql format="portable-v1"><datatypes db="portable" /><table name="Entry"><row name="Name" null="0"><datatype>string(42)</datatype></row><row name="Enabled" null="0"><datatype>boolean</datatype></row></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    const mapped = await page.evaluate(() => d.io.getExportXml("cubrid"));
+    expect(mapped.safe).toBe(false);
+    expect(mapped.xml).toContain("varchar(42)");
+    expect(mapped.diagnostics.join(" ")).toContain("boolean");
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("uses an independent export target while the editor remains portable", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await load(page, `<sql format="portable-v1"><datatypes db="portable" /><table name="Entry"><row name="Name" null="0"><datatype>string(20)</datatype></row></table></sql>`);
+    await page.locator("#saveload").click();
+    await page.locator("#exporttarget").selectOption("postgresql");
+    await expect(page.locator("#clientsql")).toContainText("postgresql");
+    const mapped = await page.evaluate(() => d.io.getExportXml("postgresql"));
+    expect(mapped.safe).toBe(true);
+    expect(mapped.xml).toContain("varchar(20)");
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>string(20)</datatype>");
+});

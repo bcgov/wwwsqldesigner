@@ -39,6 +39,9 @@ SQL.IO = function (owner) {
 
     this.dom.ta = OZ.$("textarea");
     this.dom.backend = OZ.$("backend");
+    this.dom.exporttarget = OZ.$("exporttarget");
+    this.dom.exporttargetlabel = OZ.$("exporttargetlabel");
+    this.dom.exporttargetlabel.innerHTML = window.LOCALE.exporttarget || "Export target:";
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -67,6 +70,7 @@ SQL.IO = function (owner) {
     );
     OZ.Event.add(this.dom.clientload, "click", this.clientload.bind(this));
     OZ.Event.add(this.dom.clientsql, "click", this.clientsql.bind(this));
+    OZ.Event.add(this.dom.exporttarget, "change", this.refreshExportTargetLabel.bind(this));
     OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
     OZ.Event.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
     OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
@@ -99,15 +103,28 @@ SQL.IO.prototype.build = function () {
             this.dom.backend.selectedIndex = i;
         }
     }
+
+    const selectedTarget = this.dom.exporttarget.value || this.owner.getOption("db");
+    OZ.DOM.clear(this.dom.exporttarget);
+    for (const target of CONFIG.AVAILABLE_DBS.filter((value, index, values) => values.indexOf(value) === index)) {
+        const option = OZ.DOM.elm("option");
+        option.value = target;
+        option.innerHTML = target;
+        option.selected = target === selectedTarget;
+        this.dom.exporttarget.appendChild(option);
+    }
 };
 
 SQL.IO.prototype.click = function () {
     /* open io dialog */
     this.build();
     this.dom.ta.value = "";
-    this.dom.clientsql.value =
-        _("clientsql") + " (" + window.DATATYPES.getAttribute("db") + ")";
+    this.refreshExportTargetLabel();
     this.owner.window.open(_("saveload"), this.dom.container);
+};
+
+SQL.IO.prototype.refreshExportTargetLabel = function () {
+    this.dom.clientsql.value = _("clientsql") + " (" + this.getExportTarget() + ")";
 };
 
 SQL.IO.prototype.parseXml = function (xml) {
@@ -288,9 +305,10 @@ SQL.IO.prototype.clientlocallist = function () {
 
 SQL.IO.prototype.clientsql = function () {
     const bp = this.owner.getOption("staticpath");
-    const path = bp + "db/" + window.DATATYPES.getAttribute("db") + "/output.xsl";
+    const target = this.getExportTarget();
+    const path = bp + "db/" + target + "/output.xsl";
     const h = this.owner.getXhrHeaders();
-    h['transformation'] = 'mssql';
+    h['transformation'] = target;
     this.owner.window.showThrobber();
     OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
 };
@@ -304,13 +322,42 @@ SQL.IO.prototype.clientef = function () {
     OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
 };
 
+SQL.IO.prototype.getExportTarget = function () {
+    return this.dom.exporttarget.value || this.owner.getOption("db");
+};
+
+/* Maps a serialized copy only; target selection never rewrites the editor. */
+SQL.IO.prototype.getExportXml = function (target) {
+    const doc = this.parseXml(this.owner.toXML());
+    const diagnostics = [];
+    let safe = true;
+    for (const row of doc.querySelectorAll("sql > table > row")) {
+        const datatype = row.querySelector(":scope > datatype");
+        const portable = SQL.PortableTypes.canonical(datatype ? datatype.textContent : "");
+        const mapped = portable ? SQL.PortableTypes.map(portable, target) : { safe: false, diagnostics: ["Invalid portable datatype."], type: "" };
+        diagnostics.push.apply(diagnostics, mapped.diagnostics);
+        safe = safe && mapped.safe;
+        if (mapped.safe && datatype) { datatype.textContent = mapped.type; }
+    }
+    const datatypes = doc.querySelector("sql > datatypes");
+    if (datatypes) { datatypes.setAttribute("db", target); }
+    return { xml: new XMLSerializer().serializeToString(doc), diagnostics: diagnostics, safe: safe };
+};
+
+SQL.IO.prototype.getSafeExportXml = function (target) {
+    const mapped = this.getExportXml(target);
+    if (mapped.diagnostics.length) { alert(mapped.diagnostics.join("\n")); }
+    return mapped.safe ? mapped.xml : null;
+};
+
 SQL.IO.prototype.clientefzip = function () {
     if (typeof JSZip === "undefined") {
         alert(_("efzipexporterror"));
         return;
     }
 
-    const xml = this.owner.toXML();
+    const xml = this.getSafeExportXml("ef");
+    if (!xml) { return; }
     const tableCount = this.getModelTableCount(xml);
     if (!tableCount) {
         alert(_("efzipexportempty"));
@@ -400,7 +447,10 @@ SQL.IO.prototype.finish = function () {
             this.owner.window.hideThrobber();
             return;
         }
-        this.performTransformation(doc, this.owner.toXML());
+        const xml = this.getSafeExportXml(transformationType);
+        if (xml) {
+            this.performTransformation(doc, xml);
+        }
         this.owner.window.hideThrobber();
     });
 };
