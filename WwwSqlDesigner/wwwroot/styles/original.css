@@ -33,7 +33,8 @@ body {
     right: 0px;
     width: 150px;
     padding: 0px 5px 5px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     -moz-box-shadow: -4px 4px 8px #888;
     /* FF 3.5+ */
     -webkit-box-shadow: -4px 4px 8px #888;
