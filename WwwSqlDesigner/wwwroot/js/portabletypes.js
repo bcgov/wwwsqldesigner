@@ -7,7 +7,7 @@ SQL.PortableTypes = {
     registry: function () {
         const groups = [["Numeric", "integer decimal float"], ["Text", "string text json xml"], ["Date and Time", "date time datetime datetime-with-time-zone"], ["Other", "boolean binary uuid"]];
         let xml = '<datatypes db="portable">';
-        groups.forEach(function (group) { xml += '<group label="' + group[0] + '" color="#eeeeaa">'; group[1].split(" ").forEach(function (token) { xml += '<type label="' + token + '" length="' + (/^(decimal|string|binary)$/.test(token) ? "1" : "0") + '" sql="' + token + '" quote="" />'; }); xml += "</group>"; });
+        groups.forEach(function (group) { xml += '<group label="' + group[0] + '" color="#eeeeaa">'; group[1].split(" ").forEach(function (token) { xml += '<type label="' + token + '" length="' + (/^(decimal|string|binary)$/.test(token) ? "1" : "0") + '" sql="' + token + '" quote="' + (/^(string|text|json|xml|binary)$/.test(token) ? "&apos;" : "") + '" />'; }); xml += "</group>"; });
         return new DOMParser().parseFromString(xml + "</datatypes>", "text/xml").documentElement;
     },
     split: function (value) { const match = (value || "").trim().match(/^([^()]+?)(?:\((.*)\))?$/); return { name: match ? match[1].trim() : "", facets: match && match[2] ? match[2].trim() : "" }; },

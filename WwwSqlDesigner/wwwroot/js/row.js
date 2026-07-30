@@ -385,9 +385,15 @@ SQL.Row.prototype.toXML = function () {
     let xml = '';
     const name = this.getTitle().replace(/"/g, "&quot;");
     xml += '<row name="' + name + '" null="' + (this.data.nll ? "1" : "0") + '" autoincrement="' + (this.data.ai ? "1" : "0") + '">\n';
-    const type = this.getDataType().getAttribute("sql");
+    const elm = this.getDataType();
+    const type = elm.getAttribute("sql");
     xml += "<datatype>" + type + (this.data.size ? "(" + this.data.size + ")" : "") + "</datatype>\n";
-    if (this.data.def || this.data.def === null) { xml += "<default>" + SQL.escape(this.data.def === null ? "NULL" : this.data.def) + "</default>"; }
+    if (this.data.def || this.data.def === null) {
+        let value = this.data.def === null ? "NULL" : this.data.def;
+        const quote = elm.getAttribute("quote");
+        if (quote && value !== "CURRENT_TIMESTAMP") { value = quote + value + quote; }
+        xml += "<default>" + SQL.escape(value) + "</default>";
+    }
     for (let relation of this.relations) {
         if (relation.row2 !== this) { continue; }
         xml += '<relation table="' + relation.row1.owner.getTitle() + '" row="' + relation.row1.getTitle() + (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
@@ -410,7 +416,11 @@ SQL.Row.prototype.fromXML = function (node) {
         }
     }
     const defaultValue = node.getElementsByTagName("default")[0];
-    if (defaultValue && defaultValue.firstChild) { obj.def = defaultValue.firstChild.nodeValue; }
+    if (defaultValue && defaultValue.firstChild) {
+        obj.def = defaultValue.firstChild.nodeValue;
+        const quote = window.DATATYPES.getElementsByTagName("type")[obj.type].getAttribute("quote");
+        if (quote && obj.def.length >= quote.length * 2 && obj.def.indexOf(quote) === 0 && obj.def.lastIndexOf(quote) === obj.def.length - quote.length) { obj.def = obj.def.slice(quote.length, -quote.length); }
+    }
     this.update(obj);
     this.setTitle(node.getAttribute("name"));
 };

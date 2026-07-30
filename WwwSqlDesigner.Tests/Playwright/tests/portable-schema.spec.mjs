@@ -27,3 +27,23 @@ test("blocks unsupported input until a portable replacement is selected", async 
     await load(page, `<sql><datatypes db="mssql" /><table name="Location"><row name="Shape" null="1"><datatype>geography</datatype></row></table></sql>`);
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>json</datatype>");
 });
+test("serializes portable defaults with type-aware quoting", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="Text" null="0"><datatype>string(20)</datatype><default>hello</default></row><row name="Amount" null="0"><datatype>decimal(10,2)</datatype><default>12.50</default></row><row name="Empty" null="1"><datatype>string(20)</datatype><default>NULL</default></row><row name="Created" null="0"><datatype>datetime</datatype><default>CURRENT_TIMESTAMP</default></row></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<default>'hello'</default>");
+    expect(saved).toContain("<default>12.50</default>");
+    expect(saved).toContain("<default>'NULL'</default>");
+    expect(saved).toContain("<default>CURRENT_TIMESTAMP</default>");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("maps each unsupported column independently", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => { const choices = ["uuid", "json"]; window.prompt = () => choices.shift(); });
+    await load(page, `<sql><datatypes db="mssql" /><table name="Legacy"><row name="Key" null="0"><datatype>geography</datatype></row><row name="Document" null="1"><datatype>hierarchyid</datatype></row></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<datatype>uuid</datatype>");
+    expect(saved).toContain("<datatype>json</datatype>");
+});

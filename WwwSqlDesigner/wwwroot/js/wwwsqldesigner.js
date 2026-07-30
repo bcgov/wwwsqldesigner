@@ -357,12 +357,13 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
     }
     if (unknown.length) {
         const names = unknown.map(function (item) { return item.row.getAttribute("name") + " (" + item.original + ")"; }).join(", ");
-        const replacement = prompt("Choose a portable datatype for unsupported columns: " + names + "\nAvailable: " + SQL.PortableTypes.tokens.join(", "), "string");
-        const chosen = SQL.PortableTypes.canonical(replacement || "");
-        if (!chosen || chosen.facets) { return null; }
-        unknown.forEach(function (item) { item.datatype.textContent = chosen.kind; });
-    }
-    copy.setAttribute("format", SQL.PortableTypes.format);
+        for (const item of unknown) {
+            const replacement = prompt("Unsupported columns: " + names + "\nChoose a portable datatype for " + item.row.getAttribute("name") + " (" + item.original + ").\nAvailable: " + SQL.PortableTypes.tokens.join(", "), "string");
+            const chosen = SQL.PortableTypes.canonical(replacement || "");
+            if (!chosen || chosen.facets) { return null; }
+            item.datatype.textContent = chosen.kind;
+        }
+    }    copy.setAttribute("format", SQL.PortableTypes.format);
     return copy;
 };
 
