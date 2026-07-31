@@ -391,7 +391,7 @@ SQL.Row.prototype.toXML = function () {
     if (this.data.def || this.data.def === null) {
         let value = this.data.def === null ? "NULL" : this.data.def;
         const quote = elm.getAttribute("quote");
-        if (quote && value !== "CURRENT_TIMESTAMP") { value = quote + value + quote; }
+        if (quote && this.data.def !== null && value !== "CURRENT_TIMESTAMP") { value = quote + value + quote; }
         xml += "<default>" + SQL.escape(value) + "</default>";
     }
     for (let relation of this.relations) {

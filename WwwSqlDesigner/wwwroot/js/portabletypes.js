@@ -12,7 +12,7 @@ SQL.PortableTypes = {
     },
     split: function (value) { const match = (value || "").trim().match(/^([^()]+?)(?:\((.*)\))?$/); return { name: match ? match[1].trim() : "", facets: match && match[2] ? match[2].trim() : "" }; },
     source: function (dialect, value) { const parsed = this.split(value); const kind = (this.sourceAdapters[(dialect || "").toLowerCase()] || {})[parsed.name.toLowerCase().replace(/\s+/g, " ")]; return kind ? { kind: kind, facets: parsed.facets } : null; },
-    canonical: function (value) { const parsed = this.split(value); return this.tokens.indexOf(parsed.name) !== -1 ? { kind: parsed.name, facets: parsed.facets } : null; },
+    canonical: function (value) { const parsed = this.split(value); const kind = parsed.name.toLowerCase(); return this.tokens.indexOf(kind) !== -1 ? { kind: kind, facets: parsed.facets } : null; },
     formatToken: function (type) { return type.kind + (type.facets ? "(" + type.facets + ")" : ""); },
     map: function (type, target) {
         const dialect = (target || "").toLowerCase(); const result = { type: "", diagnostics: [], safe: true }; result.type = (this.targetAdapters[dialect] || {})[type.kind];

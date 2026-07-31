@@ -33,7 +33,7 @@ test("serializes portable defaults with type-aware quoting", async ({ page }) =>
     const saved = await page.evaluate(() => d.toXML());
     expect(saved).toContain("<default>'hello'</default>");
     expect(saved).toContain("<default>12.50</default>");
-    expect(saved).toContain("<default>'NULL'</default>");
+    expect(saved).toContain("<default>NULL</default>");
     expect(saved).toContain("<default>CURRENT_TIMESTAMP</default>");
     await load(page, saved);
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
