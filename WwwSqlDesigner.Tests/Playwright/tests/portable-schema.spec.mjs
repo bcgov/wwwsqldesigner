@@ -37,7 +37,8 @@ test("imports initial dialect adapters into canonical tokens", async ({ page }) 
     saved = await page.evaluate(() => d.toXML());
     expect(saved).toContain("<datatype>datetime-with-time-zone</datatype>");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "ef").type)).toBe("datetimeoffset");
-});test("serializes portable defaults with type-aware quoting", async ({ page }) => {
+});
+test("serializes portable defaults with type-aware quoting", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="Text" null="0"><datatype>string(20)</datatype><default>hello</default></row><row name="Amount" null="0"><datatype>decimal(10,2)</datatype><default>12.50</default></row><row name="Empty" null="1"><datatype>string(20)</datatype><default>NULL</default></row><row name="Created" null="0"><datatype>datetime</datatype><default>CURRENT_TIMESTAMP</default></row></table></sql>`);
     const saved = await page.evaluate(() => d.toXML());
@@ -56,4 +57,15 @@ test("maps each unsupported column independently", async ({ page }) => {
     const saved = await page.evaluate(() => d.toXML());
     expect(saved).toContain("<datatype>uuid</datatype>");
     expect(saved).toContain("<datatype>json</datatype>");
+});
+
+test("normalizes unlimited strings and avoids invalid binary facets", async ({ page }) => {
+    await page.goto("/");
+    const imported = await page.evaluate(() => SQL.PortableTypes.source("mssql", "nvarchar(max)"));
+    expect(imported.kind).toBe("text");
+    expect(imported.facets).toBe("");
+    const postgres = await page.evaluate(() => SQL.PortableTypes.map({ kind: "binary", facets: "16" }, "postgresql"));
+    expect(postgres.type).toBe("bytea");
+    expect(postgres.diagnostics.join(" ")).toContain("not enforced");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "binary", facets: "16" }, "mssql").type)).toBe("varbinary(16)");
 });
