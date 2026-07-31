@@ -80,21 +80,14 @@ SQL.Designer.prototype.languageResponse = function (xmlDoc) {
 };
 
 SQL.Designer.prototype.requestDB = function () {
-    /* get datatypes file */
-    const db = this.getOption("db");
-    const bp = this.getOption("staticpath");
-    const url = bp + "db/" + db + "/datatypes.xml";
-    OZ.Request(url, this.dbResponse.bind(this), { method: "get", xml: true });
+    /* The editor always uses the canonical portable registry. */
+    this.dbResponse(null);
 };
 
 SQL.Designer.prototype.dbResponse = function (xmlDoc) {
-    if (xmlDoc) {
-        window.DATATYPES = xmlDoc.documentElement;
-    }
+    window.DATATYPES = SQL.PortableTypes.registry();
     this.flag--;
-    if (!this.flag) {
-        this.init2();
-    }
+    if (!this.flag) { this.init2(); }
 };
 
 SQL.Designer.prototype.applyStyle = function () {
@@ -336,89 +329,68 @@ SQL.Designer.prototype.findNamedTable = function (name) {
 };
 
 SQL.Designer.prototype.toXML = function (recordSave) {
-    if (recordSave) {
-        this.legend.prepareForSave();
-    }
+    if (recordSave) { this.legend.prepareForSave(); }
     let xml = '<?xml version="1.0" encoding="utf-8" ?>\n';
     xml += "<!-- SQL XML created by WWW SQL Designer, https://github.com/ondras/wwwsqldesigner/ -->\n";
-    xml += "<sql>\n";
-    xml += this.legend.toXML();
-
-    /* serialize datatypes */
-    if (window.XMLSerializer) {
-        const s = new XMLSerializer();
-        xml += s.serializeToString(window.DATATYPES);
-    } else if (window.DATATYPES.xml) {
-        xml += window.DATATYPES.xml;
-    } else {
-        alert(_("errorxml") + ": " + e.message);
-    }
-
-    for (let table of this.tables) {
-        xml += table.toXML();
-    }
+    xml += '<sql format="portable-v1">\n' + this.legend.toXML();
+    xml += new XMLSerializer().serializeToString(SQL.PortableTypes.registry());
+    for (let table of this.tables) { xml += table.toXML(); }
     xml += "</sql>\n";
-    if (recordSave) {
-        this.legend.rememberSaved(xml);
-    }
+    if (recordSave) { this.legend.rememberSaved(xml); }
     return xml;
 };
 
-SQL.Designer.prototype.fromXML = function (node) {
-    this.clearTables();
-    const legends = node.getElementsByTagName("legend");
-    this.legend.fromXML(legends.length ? legends[0] : null);
-    const types = node.getElementsByTagName("datatypes");
-    if (types.length) {
-        window.DATATYPES = types[0];
+SQL.Designer.prototype.preparePortableImport = function (node) {
+    const copy = node.cloneNode(true);
+    const types = copy.getElementsByTagName("datatypes");
+    const currentDb = window.DATATYPES.getAttribute("db");
+    const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? this.getOption("db") : currentDb);
+    const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
+    const unknown = [];
+    for (const row of copy.getElementsByTagName("row")) {
+        const datatype = row.getElementsByTagName("datatype")[0];
+        if (!datatype) { continue; }
+        const original = datatype.textContent.trim();
+        let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
+        if (!type) { unknown.push({ row: row, datatype: datatype, original: original }); }
+        else { datatype.textContent = SQL.PortableTypes.formatToken(type); }
     }
-    const tables = node.getElementsByTagName("table");
-    for (let table of tables) {
-        const t = this.addTable("", 0, 0);
-        t.fromXML(table);
-    }
-
-    for (let table of this.tables) {
-        /* ff one-pixel shift hack */
-        table.select();
-        table.deselect();
-    }
-
-    /* relations */
-    const rs = node.getElementsByTagName("relation");
-    for (let rel of rs) {
-        let tname = rel.getAttribute("table");
-        let rname = rel.getAttribute("row");
-
-        const t1 = this.findNamedTable(tname);
-        if (!t1) {
-            continue;
+    if (unknown.length) {
+        const names = unknown.map(function (item) { return item.row.getAttribute("name") + " (" + item.original + ")"; }).join(", ");
+        for (const item of unknown) {
+            const replacement = prompt("Unsupported columns: " + names + "\nChoose a portable datatype for " + item.row.getAttribute("name") + " (" + item.original + ").\nAvailable: " + SQL.PortableTypes.tokens.join(", "), "string");
+            const chosen = SQL.PortableTypes.canonical(replacement || "");
+            if (!chosen || chosen.facets) { return null; }
+            item.datatype.textContent = chosen.kind;
         }
-        const r1 = t1.findNamedRow(rname);
-        if (!r1) {
-            continue;
-        }
-
-        tname = rel.parentNode.parentNode.getAttribute("name");
-        rname = rel.parentNode.getAttribute("name");
-        const t2 = this.findNamedTable(tname);
-        if (!t2) {
-            continue;
-        }
-        const r2 = t2.findNamedRow(rname);
-        if (!r2) {
-            continue;
-        }
-
-        const relation = this.addRelation(r1, r2);
-        relation.name = rel.getAttribute("name") || "";
-        relation.redraw();
-    }
-
-    this.sync();
-    this.legend.rememberSaved(this.toXML());
+    }    copy.setAttribute("format", SQL.PortableTypes.format);
+    return copy;
 };
 
+SQL.Designer.prototype.fromXML = function (node) {
+    const portable = this.preparePortableImport(node);
+    if (!portable) { return false; }
+    this.clearTables();
+    window.DATATYPES = SQL.PortableTypes.registry();
+    this.typeIndex = false;
+    this.fkTypeFor = false;
+    const legends = portable.getElementsByTagName("legend");
+    this.legend.fromXML(legends.length ? legends[0] : null);
+    const tables = portable.getElementsByTagName("table");
+    for (let table of tables) { const t = this.addTable("", 0, 0); t.fromXML(table); }
+    for (let table of this.tables) { table.select(); table.deselect(); }
+    const rs = portable.getElementsByTagName("relation");
+    for (let rel of rs) {
+        let t1 = this.findNamedTable(rel.getAttribute("table"));
+        let r1 = t1 && t1.findNamedRow(rel.getAttribute("row"));
+        let t2 = this.findNamedTable(rel.parentNode.parentNode.getAttribute("name"));
+        let r2 = t2 && t2.findNamedRow(rel.parentNode.getAttribute("name"));
+        if (r1 && r2) { const relation = this.addRelation(r1, r2); relation.name = rel.getAttribute("name") || ""; relation.redraw(); }
+    }
+    this.sync();
+    this.legend.rememberSaved(this.toXML());
+    return true;
+};
 SQL.Designer.prototype.setTitle = function (t) {
     document.title = this.title + (t ? " - " + t : "");
 };
