@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 async function load(page, xml) {
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
     await page.evaluate((value) => d.fromXML(new DOMParser().parseFromString(value, "text/xml").documentElement), xml);
 }
 
@@ -92,4 +93,16 @@ test("maps remaining source adapters into canonical tokens", async ({ page }) =>
         expect(await page.evaluate(() => d.toXML())).toContain(`<datatype>${portable}</datatype>`);
     }
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "boolean", facets: "" }, "cubrid").safe)).toBe(false);
+});
+
+test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="NullableText" null="1"><datatype>STRING(20)</datatype><default>NULL</default></row><row name="Id" null="0"><datatype>INTEGER</datatype></row></table></sql>');
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<datatype>string(20)</datatype>");
+    expect(saved).toContain("<datatype>integer</datatype>");
+    expect(saved).toContain("<default>NULL</default>");
+    expect(saved).not.toContain("<default>'NULL'</default>");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });
