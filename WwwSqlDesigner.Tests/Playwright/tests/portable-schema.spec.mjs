@@ -78,3 +78,15 @@ test("maps MySQL and SQLite adapters with precision diagnostics", async ({ page 
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>decimal(10,2)</datatype>");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "decimal", facets: "10,2" }, "sqlite").diagnostics.join(" "))).toContain("Precision and scale");
 });
+
+test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
+    await page.goto("/");
+    const mysql = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "mysql"));
+    expect(mysql.type).toBe("datetime");
+    expect(mysql.diagnostics.join(" ")).toContain("Time-zone semantics");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "mysql").type)).toBe("char(36)");
+    const sqlite = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "sqlite"));
+    expect(sqlite.type).toBe("text");
+    expect(sqlite.diagnostics.join(" ")).toContain("Time-zone semantics");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "sqlite").type)).toBe("text");
+});
