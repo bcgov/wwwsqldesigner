@@ -35,7 +35,9 @@ SQL.PortableTypes = {
     source: function (dialect, value) {
         const parsed = this.split(value); const normalized = parsed.name.toLowerCase().replace(/\s+/g, " "); const entry = (this.sourceAdapters[(dialect || "").toLowerCase()] || {})[normalized];
         if (!entry) { return { kind: "text", facets: "", diagnostics: [(value || "(empty type)") + " from " + (dialect || "unknown source") + " is imported as text."] }; }
-        return { kind: typeof entry === "string" ? entry : entry.kind, facets: parsed.facets, diagnostics: typeof entry === "string" || !entry.lossy ? [] : [entry.lossy] };
+        const kind = typeof entry === "string" ? entry : entry.kind;
+        if (kind === "string" && parsed.facets.toLowerCase() === "max") { return { kind: "text", facets: "", diagnostics: [value + " was imported as unlimited text."] }; }
+        return { kind: kind, facets: parsed.facets, diagnostics: typeof entry === "string" || !entry.lossy ? [] : [entry.lossy] };
     },
     canonical: function (value) { const parsed = this.split(value); return this.tokens.indexOf(parsed.name) !== -1 ? { kind: parsed.name, facets: parsed.facets } : null; },
     formatToken: function (type) { return type.kind + (type.facets ? "(" + type.facets + ")" : ""); },
@@ -43,7 +45,12 @@ SQL.PortableTypes = {
         const dialect = (target || "").toLowerCase(); const adapter = this.targetAdapters[dialect] || {}; const direct = adapter[type.kind]; const fallback = !direct && (adapter.text || adapter.string); const result = { type: direct || fallback || "", diagnostics: [], safe: !!(direct || fallback) };
         if (!result.safe) { result.diagnostics.push(this.formatToken(type) + " cannot be represented by " + dialect + "."); return result; }
         if (fallback) { result.diagnostics.push(this.formatToken(type) + " is exported as " + fallback + " in " + dialect + "."); return result; }
-        if (type.facets && /^(decimal|string|binary)$/.test(type.kind) && !/\(/.test(result.type)) { result.type += "(" + type.facets + ")"; }
+        if (type.facets && /^(decimal|string)$/.test(type.kind) && !/\(/.test(result.type)) { result.type += "(" + type.facets + ")";
+        }
+        if (type.kind === "binary" && type.facets) {
+            if (["mssql", "sqlalchemy"].indexOf(dialect) !== -1 && !/\(/.test(result.type)) { result.type += "(" + type.facets + ")"; }
+            else if (["mssql", "sqlalchemy"].indexOf(dialect) === -1) { result.diagnostics.push("Binary length " + type.facets + " is not enforced by " + dialect + "."); }
+        }
         if (type.kind === "decimal" && type.facets && ["sqlite", "vfp9"].indexOf(dialect) !== -1) { result.diagnostics.push("Precision and scale are not enforced by " + dialect + "."); }
         if (type.kind === "datetime-with-time-zone" && ["mssql", "postgresql", "oracle", "sqlalchemy", "ef"].indexOf(dialect) === -1) { result.diagnostics.push("Time-zone semantics are not preserved by " + dialect + "."); }
         if (type.kind === "uuid" && ["mssql", "postgresql", "sqlalchemy", "ef"].indexOf(dialect) === -1) { result.diagnostics.push("UUID semantics are represented as text by " + dialect + "."); }

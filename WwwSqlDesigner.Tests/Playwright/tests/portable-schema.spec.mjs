@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 async function load(page, xml) {
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
     await page.evaluate((value) => d.fromXML(new DOMParser().parseFromString(value, "text/xml").documentElement), xml);
 }
 
@@ -97,4 +98,27 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     await page.locator("#exporttarget").selectOption("postgresql");
     await expect(page.locator("#clientsql")).toContainText("postgresql");
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
+});
+
+test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="NullableText" null="1"><datatype>STRING(20)</datatype><default>NULL</default></row><row name="Id" null="0"><datatype>INTEGER</datatype></row></table></sql>');
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain("<datatype>string(20)</datatype>");
+    expect(saved).toContain("<datatype>integer</datatype>");
+    expect(saved).toContain("<default>NULL</default>");
+    expect(saved).not.toContain("<default>'NULL'</default>");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("normalizes unlimited strings and avoids invalid binary facets", async ({ page }) => {
+    await page.goto("/");
+    const imported = await page.evaluate(() => SQL.PortableTypes.source("mssql", "nvarchar(max)"));
+    expect(imported.kind).toBe("text");
+    expect(imported.facets).toBe("");
+    const postgres = await page.evaluate(() => SQL.PortableTypes.map({ kind: "binary", facets: "16" }, "postgresql"));
+    expect(postgres.type).toBe("bytea");
+    expect(postgres.diagnostics.join(" ")).toContain("not enforced");
+    expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "binary", facets: "16" }, "mssql").type)).toBe("varbinary(16)");
 });
