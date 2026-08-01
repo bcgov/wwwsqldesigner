@@ -27,7 +27,7 @@ test("imports specialized and unknown legacy types without a prompt", async ({ p
     expect(imported).toBe(true);
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>text</datatype>");
     await expect(page.locator("#iostatus")).toBeVisible();
-    await expect(page.locator("#iostatus")).toContainText("Import completed with");
+    await expect(page.locator("#iostatus")).toContainText("Import reported");
     await page.locator("#iostatusdismiss").click();
     await expect(page.locator("#iostatus")).toBeHidden();
 });
@@ -63,7 +63,7 @@ test("export warnings use the compact status line", async ({ page }) => {
     await page.locator("#saveload").click();
     expect(await page.evaluate(() => d.io.getSafeExportXml("sqlite"))).toContain("<datatype>text</datatype>");
     await expect(page.locator("#iostatus")).toBeVisible();
-    await expect(page.locator("#iostatus")).toContainText("Export completed with 1 conversion warning");
+    await expect(page.locator("#iostatus")).toContainText("Export reported 1 conversion warning");
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });
 
