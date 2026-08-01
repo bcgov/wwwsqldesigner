@@ -111,7 +111,7 @@ test("uses an independent export target while the editor remains portable", asyn
     await load(page, `<sql format="portable-v1"><datatypes db="portable" /><table name="Entry"><row name="Name" null="0"><datatype>string(20)</datatype></row></table></sql>`);
     await page.locator("#saveload").click();
     await page.locator("#exporttarget").selectOption("postgresql");
-    await expect(page.locator("#clientsql")).toContainText("postgresql");
+    await expect(page.locator("#clientsql")).toHaveValue(/postgresql/);
     const mapped = await page.evaluate(() => d.io.getExportXml("postgresql"));
     expect(mapped.safe).toBe(true);
     expect(mapped.xml).toContain("varchar(20)");

@@ -41,7 +41,7 @@ SQL.IO = function (owner) {
     this.dom.backend = OZ.$("backend");
     this.dom.exporttarget = OZ.$("exporttarget");
     this.dom.exporttargetlabel = OZ.$("exporttargetlabel");
-    this.dom.exporttargetlabel.innerHTML = window.LOCALE.exporttarget || "Export target:";
+    const exportLabel = _("exporttarget"); this.dom.exporttargetlabel.textContent = exportLabel === "exporttarget" ? "Export target:" : exportLabel;
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -332,7 +332,7 @@ SQL.IO.prototype.getExportXml = function (target) {
     const diagnostics = [];
     let safe = true;
     for (const row of doc.querySelectorAll("sql > table > row")) {
-        const datatype = row.querySelector(":scope > datatype");
+        const datatype = row.getElementsByTagName("datatype")[0];
         const portable = SQL.PortableTypes.canonical(datatype ? datatype.textContent : "");
         const mapped = portable ? SQL.PortableTypes.map(portable, target) : { safe: false, diagnostics: ["Invalid portable datatype."], type: "" };
         diagnostics.push.apply(diagnostics, mapped.diagnostics);
