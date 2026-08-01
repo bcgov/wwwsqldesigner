@@ -105,3 +105,8 @@ test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
     expect(sqlite.diagnostics.join(" ")).toContain("Time-zone semantics");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "sqlite").type)).toBe("text");
 });
+test("imports Oracle numeric synonyms", async ({ page }) => {
+    await page.goto("/");
+    const kinds = await page.evaluate(() => ["NUMBER", "NUMERIC", "DECIMAL", "INTEGER", "INT", "SMALLINT", "FLOAT"].map((type) => SQL.PortableTypes.source("oracle", type).kind));
+    expect(kinds).toEqual(["decimal", "decimal", "decimal", "integer", "integer", "integer", "float"]);
+});
