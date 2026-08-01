@@ -63,7 +63,7 @@ test("export warnings use the compact status line", async ({ page }) => {
     await page.locator("#saveload").click();
     expect(await page.evaluate(() => d.io.getSafeExportXml("sqlite"))).toContain("<datatype>text</datatype>");
     await expect(page.locator("#iostatus")).toBeVisible();
-    await expect(page.locator("#iostatus")).toContainText("exported as text");
+    await expect(page.locator("#iostatus")).toContainText("Export completed with 1 conversion warning");
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });
 
