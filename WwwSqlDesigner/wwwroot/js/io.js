@@ -41,12 +41,7 @@ SQL.IO = function (owner) {
     this.dom.backend = OZ.$("backend");
     this.dom.exporttarget = OZ.$("exporttarget");
     this.dom.exporttargetlabel = OZ.$("exporttargetlabel");
-    this.dom.exporttargetlabel.innerHTML = window.LOCALE.exporttarget || "Export target:";
-    this.dom.status = OZ.$("iostatus");
-    this.dom.statusmessage = OZ.$("iostatusmessage");
-    this.dom.statusdetails = OZ.$("iostatusdetails");
-    this.dom.statuslist = OZ.$("iostatuslist");
-    this.dom.statusdismiss = OZ.$("iostatusdismiss");
+    const exportLabel = _("exporttarget"); this.dom.exporttargetlabel.textContent = exportLabel === "exporttarget" ? "Export target:" : exportLabel;
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -75,7 +70,6 @@ SQL.IO = function (owner) {
     );
     OZ.Event.add(this.dom.clientload, "click", this.clientload.bind(this));
     OZ.Event.add(this.dom.clientsql, "click", this.clientsql.bind(this));
-    OZ.Event.add(this.dom.statusdismiss, "click", this.hideStatus.bind(this));
     OZ.Event.add(this.dom.exporttarget, "change", this.refreshExportTargetLabel.bind(this));
     OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
     OZ.Event.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
@@ -88,19 +82,6 @@ SQL.IO = function (owner) {
     this.build();
 };
 
-SQL.IO.prototype.hideStatus = function () {
-    this.dom.status.style.display = "none";
-};
-
-SQL.IO.prototype.showStatus = function (diagnostics, operation) {
-    const messages = Array.from(new Set(diagnostics || []));
-    if (!messages.length) { this.hideStatus(); return; }
-    this.dom.statusmessage.textContent = (operation || "Operation") + " completed with " + messages.length + " conversion warning" + (messages.length === 1 ? "." : "s.");
-    OZ.DOM.clear(this.dom.statuslist);
-    messages.forEach((message) => { const item = OZ.DOM.elm("li"); item.textContent = message; this.dom.statuslist.appendChild(item); });
-    this.dom.statusdetails.style.display = "";
-    this.dom.status.style.display = "block";
-};
 SQL.IO.prototype.build = function () {
     OZ.DOM.clear(this.dom.backend);
 
@@ -184,8 +165,7 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
         return false;
     }
     if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
-    /* Keep the pane open when conversion warnings need to be read. */
-    if (this.dom.status.style.display === "none") { this.owner.window.close(); }
+    this.owner.window.close();
     return true;
 };
 
@@ -352,7 +332,7 @@ SQL.IO.prototype.getExportXml = function (target) {
     const diagnostics = [];
     let safe = true;
     for (const row of doc.querySelectorAll("sql > table > row")) {
-        const datatype = row.querySelector(":scope > datatype");
+        const datatype = row.getElementsByTagName("datatype")[0];
         const portable = SQL.PortableTypes.canonical(datatype ? datatype.textContent : "");
         const mapped = portable ? SQL.PortableTypes.map(portable, target) : { safe: false, diagnostics: ["Invalid portable datatype."], type: "" };
         diagnostics.push.apply(diagnostics, mapped.diagnostics);
@@ -366,7 +346,7 @@ SQL.IO.prototype.getExportXml = function (target) {
 
 SQL.IO.prototype.getSafeExportXml = function (target) {
     const mapped = this.getExportXml(target);
-    this.showStatus(mapped.diagnostics, "Export");
+    if (mapped.diagnostics.length) { alert(mapped.diagnostics.join("\n")); }
     return mapped.safe ? mapped.xml : null;
 };
 
