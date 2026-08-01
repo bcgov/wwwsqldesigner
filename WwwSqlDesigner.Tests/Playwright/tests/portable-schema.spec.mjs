@@ -96,7 +96,7 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     expect(saved).toContain("<default>12.50</default>");
     await page.locator("#saveload").click();
     await page.locator("#exporttarget").selectOption("postgresql");
-    await expect(page.locator("#clientsql")).toContainText("postgresql");
+    await expect(page.locator("#clientsql")).toHaveValue(/postgresql/);
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
 });
 
