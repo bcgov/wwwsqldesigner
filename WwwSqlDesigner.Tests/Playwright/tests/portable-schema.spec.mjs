@@ -134,3 +134,10 @@ test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
     expect(sqlite.diagnostics.join(" ")).toContain("Time-zone semantics");
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "uuid", facets: "" }, "sqlite").type)).toBe("text");
 });
+test("drops lossy native metadata from portable facets", async ({ page }) => {
+    await page.goto("/");
+    const imported = await page.evaluate(() => SQL.PortableTypes.source("mysql", "enum('a','b')"));
+    expect(imported.kind).toBe("string");
+    expect(imported.facets).toBe("");
+    expect(imported.diagnostics.join(" ")).toContain("ignored");
+});

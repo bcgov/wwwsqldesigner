@@ -37,7 +37,7 @@ SQL.PortableTypes = {
         if (!entry) { return { kind: "text", facets: "", diagnostics: [(value || "(empty type)") + " from " + (dialect || "unknown source") + " is imported as text."] }; }
         const kind = typeof entry === "string" ? entry : entry.kind;
         if (kind === "string" && parsed.facets.toLowerCase() === "max") { return { kind: "text", facets: "", diagnostics: [value + " was imported as unlimited text."] }; }
-        return { kind: kind, facets: parsed.facets, diagnostics: typeof entry === "string" || !entry.lossy ? [] : [entry.lossy] };
+        const diagnostics = typeof entry === "string" || !entry.lossy ? [] : [entry.lossy]; if (typeof entry !== "string" && parsed.facets) { diagnostics.push("Facets (" + parsed.facets + ") on " + (value || "(empty type)") + " are ignored."); } return { kind: kind, facets: typeof entry === "string" ? parsed.facets : "", diagnostics: diagnostics };
     },
     canonical: function (value) { const parsed = this.split(value); return this.tokens.indexOf(parsed.name) !== -1 ? { kind: parsed.name, facets: parsed.facets } : null; },
     formatToken: function (type) { return type.kind + (type.facets ? "(" + type.facets + ")" : ""); },
