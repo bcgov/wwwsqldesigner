@@ -39,7 +39,7 @@ SQL.PortableTypes = {
         if (kind === "string" && parsed.facets.toLowerCase() === "max") { return { kind: "text", facets: "", diagnostics: [value + " was imported as unlimited text."] }; }
         const diagnostics = typeof entry === "string" || !entry.lossy ? [] : [entry.lossy]; if (typeof entry !== "string" && parsed.facets) { diagnostics.push("Facets (" + parsed.facets + ") on " + (value || "(empty type)") + " are ignored."); } return { kind: kind, facets: typeof entry === "string" ? parsed.facets : "", diagnostics: diagnostics };
     },
-    canonical: function (value) { const parsed = this.split(value); return this.tokens.indexOf(parsed.name) !== -1 ? { kind: parsed.name, facets: parsed.facets } : null; },
+    canonical: function (value) { const parsed = this.split(value); const kind = parsed.name.toLowerCase(); return this.tokens.indexOf(kind) !== -1 ? { kind: kind, facets: parsed.facets } : null; },
     formatToken: function (type) { return type.kind + (type.facets ? "(" + type.facets + ")" : ""); },
     map: function (type, target) {
         const dialect = (target || "").toLowerCase(); const adapter = this.targetAdapters[dialect] || {}; const direct = adapter[type.kind]; const fallback = !direct && (adapter.text || adapter.string); const result = { type: direct || fallback || "", diagnostics: [], safe: !!(direct || fallback) };
