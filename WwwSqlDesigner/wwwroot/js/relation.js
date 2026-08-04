@@ -91,7 +91,7 @@ SQL.Relation = function (owner, row1, row2) {
         this.owner.dom.container.appendChild(this.dom.handle);
     }
 
-    this.dom.handle.addEventListener("click", this.editName.bind(this));`r`n`r`n    this.dom.input = document.createElement("input");
+    this.dom.input = document.createElement("input");
     this.dom.input.setAttribute("type", "text");
     this.dom.input.setAttribute("class", "relation-name-input");
     this.dom.input.setAttribute("aria-label", _("relationname"));
