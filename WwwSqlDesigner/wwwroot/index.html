@@ -204,6 +204,14 @@
                             <input type="button" id="clientsql" />
                             <input type="button" id="clientef" />
                             <input type="button" id="clientefzip" />
+                            <div id="iostatus" role="status" style="display: none; margin-top: 0.5em">
+                                <span id="iostatusmessage"></span>
+                                <button type="button" id="iostatusdismiss" aria-label="Dismiss conversion warnings">Dismiss</button>
+                                <details id="iostatusdetails">
+                                    <summary>Details</summary>
+                                    <ul id="iostatuslist"></ul>
+                                </details>
+                            </div>
                         </fieldset>
                     </td>
                     <td style="width: 40%">
