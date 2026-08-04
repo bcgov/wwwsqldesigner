@@ -346,30 +346,25 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
     const currentDb = window.DATATYPES.getAttribute("db");
     const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? this.getOption("db") : currentDb);
     const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
-    const unknown = [];
+    const diagnostics = [];
     for (const row of copy.getElementsByTagName("row")) {
         const datatype = row.getElementsByTagName("datatype")[0];
         if (!datatype) { continue; }
         const original = datatype.textContent.trim();
         let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
-        if (!type) { unknown.push({ row: row, datatype: datatype, original: original }); }
-        else { datatype.textContent = SQL.PortableTypes.formatToken(type); }
-    }
-    if (unknown.length) {
-        const names = unknown.map(function (item) { return item.row.getAttribute("name") + " (" + item.original + ")"; }).join(", ");
-        for (const item of unknown) {
-            const replacement = prompt("Unsupported columns: " + names + "\nChoose a portable datatype for " + item.row.getAttribute("name") + " (" + item.original + ").\nAvailable: " + SQL.PortableTypes.tokens.join(", "), "string");
-            const chosen = SQL.PortableTypes.canonical(replacement || "");
-            if (!chosen || chosen.facets) { return null; }
-            item.datatype.textContent = chosen.kind;
+        if (!type) {
+            const label = original || "(empty type)";
+            type = { kind: "text", facets: "", diagnostics: [label + " is not a portable type and is imported as text."] };
         }
-    }    copy.setAttribute("format", SQL.PortableTypes.format);
-    return copy;
+        datatype.textContent = SQL.PortableTypes.formatToken(type);
+        if (type.diagnostics) { diagnostics.push.apply(diagnostics, type.diagnostics); }
+    }
+    copy.setAttribute("format", SQL.PortableTypes.format);
+    return { node: copy, diagnostics: diagnostics };
 };
-
 SQL.Designer.prototype.fromXML = function (node) {
-    const portable = this.preparePortableImport(node);
-    if (!portable) { return false; }
+    const prepared = this.preparePortableImport(node);
+    const portable = prepared.node;
     this.clearTables();
     window.DATATYPES = SQL.PortableTypes.registry();
     this.typeIndex = false;
@@ -389,6 +384,7 @@ SQL.Designer.prototype.fromXML = function (node) {
     }
     this.sync();
     this.legend.rememberSaved(this.toXML());
+    if (this.io) { this.io.showStatus(prepared.diagnostics, "Import"); }
     return true;
 };
 SQL.Designer.prototype.setTitle = function (t) {
