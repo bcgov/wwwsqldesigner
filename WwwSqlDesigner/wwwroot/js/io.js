@@ -137,6 +137,7 @@ SQL.IO.prototype.build = function () {
 SQL.IO.prototype.click = function () {
     /* open io dialog */
     this.build();
+    this.hideStatus();
     this.dom.ta.value = "";
     this.refreshExportTargetLabel();
     this.owner.window.open(_("saveload"), this.dom.container);

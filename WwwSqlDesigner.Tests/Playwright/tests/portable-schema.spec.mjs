@@ -23,12 +23,15 @@ test("imports specialized and unknown legacy types without a prompt", async ({ p
     await page.waitForFunction(() => typeof d !== "undefined" && d.io);
     await page.evaluate(() => { window.prompt = () => { throw new Error("Import must not prompt"); }; });
     await page.locator("#saveload").click();
-    const imported = await page.evaluate(() => d.io.fromXML(new DOMParser().parseFromString("<sql><datatypes db=\"mssql\" /><table name=\"Location\"><row name=\"Shape\" null=\"1\"><datatype>geography</datatype></row><row name=\"Mystery\" null=\"1\"><datatype>future_type</datatype></row></table></sql>", "text/xml")));
+    const imported = await page.evaluate(() => d.io.fromXML(new DOMParser().parseFromString("<sql><datatypes db=\"mssql\" /><table name=\"Location\"><row name=\"Shape\" null=\"1\"><datatype>geography</datatype></row><row name=\"Mystery\" null=\"1\"><datatype>future_type</datatype></row><row name=\"Empty\" null=\"1\"><datatype></datatype></row></table></sql>", "text/xml")));
     expect(imported).toBe(true);
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>text</datatype>");
     await expect(page.locator("#iostatus")).toBeVisible();
     await expect(page.locator("#iostatus")).toContainText("Import reported");
+    await expect(page.locator("#iostatuslist")).toContainText("(empty type)");
     await page.locator("#iostatusdismiss").click();
+    await expect(page.locator("#iostatus")).toBeHidden();
+    await page.evaluate(() => d.io.click());
     await expect(page.locator("#iostatus")).toBeHidden();
 });
 

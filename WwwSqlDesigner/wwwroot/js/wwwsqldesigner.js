@@ -353,7 +353,8 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
         const original = datatype.textContent.trim();
         let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
         if (!type) {
-            type = { kind: "text", facets: "", diagnostics: [original + " is not a portable type and is imported as text."] };
+            const label = original || "(empty type)";
+            type = { kind: "text", facets: "", diagnostics: [label + " is not a portable type and is imported as text."] };
         }
         datatype.textContent = SQL.PortableTypes.formatToken(type);
         if (type.diagnostics) { diagnostics.push.apply(diagnostics, type.diagnostics); }
