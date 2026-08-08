@@ -713,6 +713,8 @@ label, input, select {
 .diagram-legend-timestamp > span.empty {
     opacity: .7;
     font-style: italic;
+}
+
 .relation-handle {
     background-color: #fff;
     border-radius: 2px;
@@ -725,7 +727,7 @@ label, input, select {
 }
 
 .relation-handle.relation-control-transitioning {
-    transition: left 120ms ease-out, top 120ms ease-out, x 120ms ease-out, y 120ms ease-out, width 120ms ease-out, height 120ms ease-out;
+    transition: left 120ms ease-out, top 120ms ease-out, x 120ms ease-out, y 120ms ease-out, width 120ms ease-out, height 120ms ease-out, border-radius 120ms ease-out, rx 120ms ease-out, ry 120ms ease-out;
 }
 
 input.relation-name-input {
