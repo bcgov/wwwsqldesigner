@@ -10,6 +10,7 @@ SQL.Relation = function (owner, row1, row2) {
     this.highlighted = null;
     this.name = "";
     this.editing = false;
+    this.controlHovered = false;
     this.editingWidth = 0;
     this.transitionTimeout = null;
     SQL.Visual.apply(this);
@@ -96,7 +97,6 @@ SQL.Relation = function (owner, row1, row2) {
     this.dom.input.setAttribute("class", "relation-name-input");
     this.dom.input.setAttribute("aria-label", _("relationname"));
     this.dom.input.setAttribute("autocomplete", "off");
-    this.dom.input.setAttribute("placeholder", "+");
     this.dom.input.readOnly = true;
     this.owner.dom.container.appendChild(this.dom.input);
 
@@ -105,6 +105,8 @@ SQL.Relation = function (owner, row1, row2) {
     this.dom.input.addEventListener("blur", this.finishName.bind(this, false));
     this.dom.input.addEventListener("input", this.resizeName.bind(this));
     this.dom.input.addEventListener("keydown", this.keydownName.bind(this));
+    this.dom.input.addEventListener("mouseenter", this.hoverControl.bind(this, true));
+    this.dom.input.addEventListener("mouseleave", this.hoverControl.bind(this, false));
     this.outsideClick = this.clickAway.bind(this);
     this.redraw();
 };
@@ -178,6 +180,15 @@ SQL.Relation.prototype.selectName = function () {
     }
 };
 
+SQL.Relation.prototype.hoverControl = function (hovered) {
+    if (this.controlHovered === hovered) {
+        return;
+    }
+    this.transitionControl();
+    this.controlHovered = hovered;
+    this.redraw();
+};
+
 SQL.Relation.prototype.keydownName = function (e) {
     if (!this.editing && (e.key === "Enter" || e.key === " ")) {
         this.editName(e);
@@ -249,31 +260,37 @@ SQL.Relation.prototype.redrawControl = function (x, y) {
     this.labelPosition = [x, y];
     const hasName = !!this.name;
     const editing = this.editing;
-    const handleSize = hasName || editing ? 24 : 16;
+    const compact = !hasName && !editing && !this.controlHovered;
+    const handleSize = hasName || editing ? 24 : (compact ? 10 : 16);
     const pointX = x;
     const pointY = y;
     const controlWidth = editing
         ? this.editingWidth
-        : (hasName ? this.measureNameWidth(this.name) + 16 : 16);
+        : (hasName ? this.measureNameWidth(this.name) + 16 : handleSize);
+    const inputWidth = editing ? controlWidth : Math.max(24, controlWidth);
+    const inputHeight = Math.max(24, handleSize);
     if (this.owner.vector) {
         this.dom.handle.setAttribute("x", pointX - controlWidth / 2);
         this.dom.handle.setAttribute("y", pointY - handleSize / 2);
         this.dom.handle.setAttribute("width", controlWidth);
         this.dom.handle.setAttribute("height", handleSize);
+        this.dom.handle.setAttribute("rx", compact ? handleSize / 2 : 6);
+        this.dom.handle.setAttribute("ry", compact ? handleSize / 2 : 6);
     } else {
         this.dom.handle.style.left = pointX - controlWidth / 2 + "px";
         this.dom.handle.style.top = pointY - handleSize / 2 + "px";
         this.dom.handle.style.width = controlWidth + "px";
         this.dom.handle.style.height = handleSize + "px";
+        this.dom.handle.style.borderRadius = compact ? "50%" : "";
     }
     if (!editing) {
         this.dom.input.value = this.name;
     }
     this.dom.input.readOnly = !editing;
-    this.dom.input.style.left = pointX - controlWidth / 2 + "px";
-    this.dom.input.style.top = pointY - handleSize / 2 + "px";
-    this.dom.input.style.width = controlWidth + "px";
-    this.dom.input.style.height = handleSize + "px";
+    this.dom.input.style.left = pointX - inputWidth / 2 + "px";
+    this.dom.input.style.top = pointY - inputHeight / 2 + "px";
+    this.dom.input.style.width = inputWidth + "px";
+    this.dom.input.style.height = inputHeight + "px";
     this.dom.input.style.visibility = "";
 };
 

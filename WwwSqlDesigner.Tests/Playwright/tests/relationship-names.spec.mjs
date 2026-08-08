@@ -20,16 +20,51 @@ test("names, persists, clears, and safely renders a relationship label", async (
     const input = page.locator("input.relation-name-input");
     await expect(input).toBeVisible();
     await expect(input).toHaveValue("");
-    await expect(input).toHaveAttribute("placeholder", "+");
-    await expect(page.locator("svg .relation-handle")).toHaveCSS("width", "16px");
-    await expect(page.locator("svg .relation-handle")).toHaveCSS("height", "16px");
-    await expect(page.locator("svg .relation-handle")).toHaveAttribute("x");
-    await expect(page.locator("svg .relation-handle")).toHaveAttribute("y");
+    await expect(input).not.toHaveAttribute("placeholder", "+");
+    await expect(input).toHaveCSS("position", "absolute");
+    await expect(input).toHaveCSS("z-index", "2");
+    await expect(input).toHaveCSS("width", "24px");
+    await expect(input).toHaveCSS("height", "24px");
+    const handle = page.locator("svg .relation-handle");
+    await expect(handle).toHaveCSS("width", "10px");
+    await expect(handle).toHaveCSS("height", "10px");
+    await expect(handle).toHaveAttribute("rx", "5");
+    await expect(handle).toHaveAttribute("ry", "5");
+    await expect(handle).toHaveAttribute("x");
+    await expect(handle).toHaveAttribute("y");
+
+    const inputBounds = await input.boundingBox();
+    const handleBounds = await handle.boundingBox();
+    expect(inputBounds).not.toBeNull();
+    expect(handleBounds).not.toBeNull();
+    const inputCenter = {
+        x: inputBounds.x + inputBounds.width / 2,
+        y: inputBounds.y + inputBounds.height / 2,
+    };
+    const handleCenter = {
+        x: handleBounds.x + handleBounds.width / 2,
+        y: handleBounds.y + handleBounds.height / 2,
+    };
+    expect(Math.abs(inputCenter.x - handleCenter.x)).toBeLessThan(1);
+    expect(Math.abs(inputCenter.y - handleCenter.y)).toBeLessThan(1);
+
+    await input.hover();
+    await expect(handle).toHaveClass(/relation-control-transitioning/);
+    await expect(input).toHaveClass(/relation-control-transitioning/);
+    await expect(handle).toHaveCSS("transition-property", /border-radius.*rx.*ry/);
+    await expect(handle).toHaveCSS("width", "16px");
+    await expect(handle).toHaveCSS("height", "16px");
+    await expect(input).toHaveCSS("width", "24px");
+    await expect(input).toHaveCSS("height", "24px");
+    await expect(handle).toHaveAttribute("rx", "6");
+    await expect(handle).toHaveAttribute("ry", "6");
 
     await input.click();
     await expect(input).toBeVisible();
     await expect(input).toBeFocused();
     await expect(input).toHaveCSS("width", "24px");
+    await expect(handle).toHaveAttribute("rx", "6");
+    await expect(handle).toHaveAttribute("ry", "6");
     await input.fill("  has <img src=x>  ");
     await input.press("Enter");
     await expect(input).not.toBeFocused();
@@ -121,8 +156,18 @@ test("relationship labels render in non-SVG mode and do not affect exports", asy
     expect(namedSql).toBe(unnamedSql);
     expect(namedEf).toBe(unnamedEf);
 
-    await page.evaluate(() => d.setOption("vector", false));
+    await page.evaluate(() => d.setOption("vector", ""));
     await page.reload();
+    await loadModel(page, unnamedModel);
+    const nonVectorInput = page.locator("#area input.relation-name-input");
+    const nonVectorHandle = page.locator("#area .relation-handle");
+    await expect(nonVectorInput).toHaveCSS("width", "24px");
+    await expect(nonVectorInput).toHaveCSS("height", "24px");
+    await expect(nonVectorHandle).toHaveCSS("border-radius", "50%");
+    await nonVectorInput.hover();
+    await expect(nonVectorHandle).toHaveCSS("transition-property", /border-radius.*rx.*ry/);
+    await expect(nonVectorHandle).not.toHaveCSS("border-radius", "50%");
+
     await loadModel(page, unnamedModel.replace('row="Id" />', 'row="Id" name="has" />'));
     await expect(page.locator("#area .relation-handle")).toBeVisible();
     await expect(page.locator("#area input.relation-name-input")).toHaveValue("has");
