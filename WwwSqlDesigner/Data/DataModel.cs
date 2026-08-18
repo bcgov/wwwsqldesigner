@@ -19,6 +19,11 @@ namespace WwwSqlDesigner.Data
         [Description("The XML data for the model")]
         public string Data { get; set; } = null!;
 
+        [MaxLength(256)]
+        [Required]
+        [Description("The authenticated user that owns the model")]
+        public string OwnerId { get; set; } = "legacy";
+
         [Required]
         [Description("The date and time when this model was created")]
         public DateTime CreatedAt { get; set; }

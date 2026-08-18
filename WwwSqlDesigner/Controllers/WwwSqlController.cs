@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text;
+using WwwSqlDesigner.Authentication;
 using WwwSqlDesigner.Data;
 
 namespace WwwSqlDesigner.Controllers
@@ -11,12 +13,14 @@ namespace WwwSqlDesigner.Controllers
     {
         private readonly ILogger<WwwSqlController> _logger;
         private readonly ApplicationDbContext _context;
+        private readonly KeycloakSettings _keycloakSettings;
         private readonly IAntiforgery? _antiforgery;
 
-        public WwwSqlController(ILogger<WwwSqlController> logger, ApplicationDbContext context, IAntiforgery? antiforgery = null)
+        public WwwSqlController(ILogger<WwwSqlController> logger, ApplicationDbContext context, KeycloakSettings? keycloakSettings = null, IAntiforgery? antiforgery = null)
         {
             _logger = logger;
             _context = context;
+            _keycloakSettings = keycloakSettings ?? new KeycloakSettings();
             _antiforgery = antiforgery;
         }
 
@@ -24,7 +28,7 @@ namespace WwwSqlDesigner.Controllers
         [Route("backend/netcore-ef/list")]
         public async Task<IActionResult> List()
         {
-            var list = await _context.DataModels.AsNoTracking()
+            var list = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
                 .OrderBy(x => x.Keyword)
                 .OrderByDescending(x => x.Version)
                 .Select(x => x.Keyword + " v" + x.Version + " - /?keyword=" + x.Keyword + "&version=" + x.Version)
@@ -41,7 +45,7 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
 
-            IQueryable<DataModel> query = _context.DataModels;
+            IQueryable<DataModel> query = ApplyOwnerFilter(_context.DataModels);
             DataModel? model;
             if (!version.HasValue)
             {
@@ -69,6 +73,8 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
 
+            var ownerId = GetCurrentOwnerId();
+
             //Read XML data from request body
             Request.EnableBuffering();
             Request.Body.Position = 0;
@@ -77,7 +83,7 @@ namespace WwwSqlDesigner.Controllers
             {
                 xmlData = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
-            var save = await _context.DataModels
+            var save = await ApplyOwnerFilter(_context.DataModels)
                 .OrderByDescending(x => x.CreatedAt)
                 .FirstOrDefaultAsync(x => x.Keyword == keyword);
             if (null == save)
@@ -86,6 +92,7 @@ namespace WwwSqlDesigner.Controllers
                 {
                     Keyword = keyword,
                     Data = xmlData,
+                    OwnerId = ownerId,
                     CreatedAt = DateTime.Now,
                     Version = 0,
                 };
@@ -98,6 +105,7 @@ namespace WwwSqlDesigner.Controllers
                 {
                     Keyword = keyword,
                     Data = xmlData,
+                    OwnerId = ownerId,
                     CreatedAt = DateTime.Now,
                     Version = save.Version + 1,  //This does not need to be thread-safe as a unique (key/version) key exists in the DB.
                 };
@@ -128,5 +136,29 @@ namespace WwwSqlDesigner.Controllers
             return NotFound();
         }
 
+        private string GetCurrentOwnerId()
+        {
+            if (!_keycloakSettings.IsConfigured)
+            {
+                return _keycloakSettings.LegacyOwnerId;
+            }
+
+            return User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub")
+                ?? User.FindFirstValue("preferred_username")
+                ?? User.FindFirstValue(ClaimTypes.Upn)
+                ?? User.Identity?.Name
+                ?? _keycloakSettings.LegacyOwnerId;
+        }
+
+        private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query)
+        {
+            if (!_keycloakSettings.IsConfigured)
+            {
+                return query.Where(x => x.OwnerId == _keycloakSettings.LegacyOwnerId);
+            }
+
+            return query.Where(x => x.OwnerId == GetCurrentOwnerId());
+        }
     }
 }

@@ -33,7 +33,8 @@ var keycloakSettings = new KeycloakSettings
     Enabled = keycloakEnabled,
     Authority = keycloakAuthority,
     ClientId = keycloakClientId,
-    ClientSecret = keycloakClientSecret
+    ClientSecret = keycloakClientSecret,
+    LegacyOwnerId = keycloakSection["LegacyOwnerId"] ?? "legacy"
 };
 builder.Services.AddSingleton(keycloakSettings);
 

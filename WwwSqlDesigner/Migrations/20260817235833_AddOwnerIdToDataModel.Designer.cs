@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WwwSqlDesigner.Data;
 
@@ -11,9 +12,11 @@ using WwwSqlDesigner.Data;
 namespace WwwSqlDesigner.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817235833_AddOwnerIdToDataModel")]
+    partial class AddOwnerIdToDataModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -25,12 +28,6 @@ namespace WwwSqlDesigner.Migrations
 
             modelBuilder.Entity("WwwSqlDesigner.Data.DataModel", b =>
                 {
-                    b.Property<string>("OwnerId")
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)")
-                        .HasDefaultValue("legacy");
-
                     b.Property<string>("Keyword")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
@@ -47,7 +44,11 @@ namespace WwwSqlDesigner.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("OwnerId", "Keyword", "Version");
+                    b.Property<string>("OwnerId")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Keyword", "Version");
 
                     b.HasIndex("OwnerId", "Keyword", "Version");
 

@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Security.Claims;
 using System.Text;
+using WwwSqlDesigner.Authentication;
 
 namespace WwwSqlDesigner.Controllers.Tests
 {
@@ -31,6 +33,15 @@ namespace WwwSqlDesigner.Controllers.Tests
             services.AddSingleton<IAntiforgery, TestAntiforgery>();
             httpContext.RequestServices = services.BuildServiceProvider();
             httpContext.Request.Headers["X-CSRF-TOKEN"] = "request-token";
+            return httpContext;
+        }
+
+        private static DefaultHttpContext CreateAuthenticatedHttpContext(string ownerId)
+        {
+            var httpContext = CreateHttpContextWithAntiforgery();
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                new[] { new Claim(ClaimTypes.NameIdentifier, ownerId) },
+                authenticationType: "Test"));
             return httpContext;
         }
 
@@ -200,6 +211,49 @@ namespace WwwSqlDesigner.Controllers.Tests
             var dbContent = _dbContext.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefault(x => x.Keyword == "Test1");
             Assert.IsNotNull(dbContent);
             Assert.AreNotEqual(oldVersion, dbContent.Version);
+        }
+
+        [TestMethod()]
+        public async Task ServerModelsAreScopedToOwner()
+        {
+            var settings = new KeycloakSettings
+            {
+                Enabled = true,
+                Authority = "https://login.example/realms/standard",
+                ClientId = "wwwsqldesigner"
+            };
+            var ownerA = new WwwSqlController(InitializeLogger<WwwSqlController>(), _dbContext, settings);
+            var ownerB = new WwwSqlController(InitializeLogger<WwwSqlController>(), _dbContext, settings);
+
+            var ownerAContext = CreateAuthenticatedHttpContext("owner-a");
+            using var ownerAStream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            ownerAContext.Request.Body = ownerAStream;
+            ownerA.ControllerContext = new ControllerContext { HttpContext = ownerAContext };
+            await ownerA.Save("SharedKeyword").ConfigureAwait(true);
+
+            var ownerBContext = CreateAuthenticatedHttpContext("owner-b");
+            using var ownerBStream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            ownerBContext.Request.Body = ownerBStream;
+            ownerB.ControllerContext = new ControllerContext { HttpContext = ownerBContext };
+            await ownerB.Save("SharedKeyword").ConfigureAwait(true);
+
+            var ownerAResult = await ownerA.Load("SharedKeyword", null).ConfigureAwait(true);
+            var ownerBResult = await ownerB.Load("SharedKeyword", null).ConfigureAwait(true);
+            var ownerOnlyContext = CreateAuthenticatedHttpContext("owner-a");
+            using var ownerOnlyStream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            ownerOnlyContext.Request.Body = ownerOnlyStream;
+            ownerA.ControllerContext = new ControllerContext { HttpContext = ownerOnlyContext };
+            await ownerA.Save("OwnerOnlyKeyword").ConfigureAwait(true);
+            var ownerOnlyList = await ownerA.List().ConfigureAwait(true);
+            var missingForOtherOwner = await ownerB.Load("OwnerOnlyKeyword", null).ConfigureAwait(true);
+            var ownerBList = await ownerB.List().ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(ownerAResult, typeof(ContentResult));
+            Assert.IsInstanceOfType(ownerBResult, typeof(ContentResult));
+            Assert.AreEqual(2, _dbContext.DataModels.Count(x => x.Keyword == "SharedKeyword"));
+            StringAssert.Contains(((ContentResult)ownerOnlyList).Content, "OwnerOnlyKeyword");
+            Assert.IsInstanceOfType(missingForOtherOwner, typeof(NotFoundResult));
+            Assert.IsFalse(((ContentResult)ownerBList).Content!.Contains("OwnerOnlyKeyword", StringComparison.Ordinal));
         }
 
         [TestMethod()]

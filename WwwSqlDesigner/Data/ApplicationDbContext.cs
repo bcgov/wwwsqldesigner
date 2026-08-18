@@ -14,11 +14,13 @@ namespace WwwSqlDesigner.Data
         {
             modelBuilder.UseCollation("Latin1_General_CI_AS");
 
-            modelBuilder.Entity<DataModel>().HasKey(x => new { x.Keyword, x.Version });
+            modelBuilder.Entity<DataModel>().HasKey(x => new { x.OwnerId, x.Keyword, x.Version });
 
             modelBuilder.Entity<DataModel>(entity =>
             {
+                entity.Property(e => e.OwnerId).HasDefaultValue("legacy");
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
+                entity.HasIndex(e => new { e.OwnerId, e.Keyword, e.Version });
             });
         }
     }
