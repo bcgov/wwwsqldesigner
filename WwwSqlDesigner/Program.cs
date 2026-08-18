@@ -1,4 +1,11 @@
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
+using WwwSqlDesigner.Authentication;
+using WwwSqlDesigner.Controllers;
 using WwwSqlDesigner.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +16,101 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddControllersWithViews();
+builder.Services.AddAuthorization();
+builder.Services.AddScoped<RequireKeycloakAuthenticationFilter>();
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+});
+
+var keycloakSection = builder.Configuration.GetSection("Authentication:Keycloak");
+var keycloakEnabled = keycloakSection.GetValue<bool>("Enabled");
+var keycloakAuthority = keycloakSection["Authority"];
+var keycloakBaseUrl = keycloakSection["BaseUrl"];
+var keycloakRealm = keycloakSection["Realm"];
+if (string.IsNullOrWhiteSpace(keycloakAuthority)
+    && !string.IsNullOrWhiteSpace(keycloakBaseUrl)
+    && !string.IsNullOrWhiteSpace(keycloakRealm))
+{
+    keycloakAuthority = $"{keycloakBaseUrl.TrimEnd('/')}/realms/{keycloakRealm}";
+}
+var keycloakClientId = keycloakSection["ClientId"];
+var keycloakClientSecret = keycloakSection["ClientSecret"];
+var keycloakCallbackPath = keycloakSection["CallbackPath"] ?? "/signin-oidc";
+var keycloakSignedOutCallbackPath = keycloakSection["SignedOutCallbackPath"] ?? "/signout-callback-oidc";
+var keycloakResponseType = keycloakSection["ResponseType"] ?? OpenIdConnectResponseType.Code;
+var keycloakScopes = keycloakSection["Scopes"] ?? "openid profile email";
+var keycloakSettings = new KeycloakSettings
+{
+    Enabled = keycloakEnabled,
+    Authority = keycloakAuthority,
+    ClientId = keycloakClientId,
+    ClientSecret = keycloakClientSecret
+};
+builder.Services.AddSingleton(keycloakSettings);
+
+if (keycloakEnabled && !keycloakSettings.IsConfigured)
+{
+    throw new InvalidOperationException(
+        "Keycloak is enabled but Authority and ClientId must be configured.");
+}
+
+if (keycloakSettings.IsConfigured)
+{
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+    })
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/account/login";
+        options.LogoutPath = "/account/logout";
+        options.AccessDeniedPath = "/account/access-denied";
+    })
+    .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.Authority = keycloakAuthority;
+        options.ClientId = keycloakClientId;
+        options.ClientSecret = keycloakClientSecret;
+        options.CallbackPath = keycloakCallbackPath;
+        options.SignedOutCallbackPath = keycloakSignedOutCallbackPath;
+        options.ResponseType = keycloakResponseType;
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.SaveTokens = true;
+        options.UsePkce = true;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            NameClaimType = "preferred_username",
+            RoleClaimType = "groups"
+        };
+        options.Scope.Clear();
+        foreach (var scope in keycloakScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            options.Scope.Add(scope);
+        }
+        options.Events = new OpenIdConnectEvents
+        {
+            OnRemoteFailure = context =>
+            {
+                context.Response.Redirect("/account/login?error=remote");
+                context.HandleResponse();
+                return Task.CompletedTask;
+            }
+        };
+    });
+}
+else
+{
+    builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddCookie(options =>
+        {
+            options.LoginPath = "/account/login";
+            options.LogoutPath = "/account/logout";
+            options.AccessDeniedPath = "/account/access-denied";
+        });
+}
 
 var app = builder.Build();
 
@@ -29,6 +131,17 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.Use(async (context, next) =>
+{
+    var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+    var tokens = antiforgery.GetAndStoreTokens(context);
+    if (!string.IsNullOrWhiteSpace(tokens.RequestToken))
+    {
+        context.Response.Headers["X-CSRF-TOKEN"] = tokens.RequestToken;
+    }
+    await next();
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

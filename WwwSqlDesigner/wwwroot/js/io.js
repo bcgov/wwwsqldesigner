@@ -3,6 +3,7 @@ SQL.IO = function (owner) {
     this._name = ""; /* last used name with server load/save */
     this.lastUsedName =
         ""; /* last used name with local storage */
+    this._csrfToken = "";
     this.dom = {
         container: OZ.$("io"),
     };
@@ -90,6 +91,28 @@ SQL.IO = function (owner) {
 
 SQL.IO.prototype.hideStatus = function () {
     this.dom.status.style.display = "none";
+};
+
+SQL.IO.prototype.setCsrfToken = function (headers) {
+    const token = headers && (headers["X-CSRF-TOKEN"] || headers["x-csrf-token"]);
+    if (token) {
+        this._csrfToken = token;
+    }
+};
+
+SQL.IO.prototype.ensureCsrfToken = function (callback) {
+    if (this._csrfToken) {
+        callback();
+        return;
+    }
+
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/csrf";
+    const h = this.owner.getXhrHeaders();
+    OZ.Request(url, (data, code, headers) => {
+        this.setCsrfToken(headers);
+        callback();
+    }, { headers: h });
 };
 
 SQL.IO.prototype.showStatus = function (diagnostics, operation) {
@@ -601,15 +624,20 @@ SQL.IO.prototype.serversave = function (e, keyword) {
         this.dom.backend.value +
         "/save/?keyword=" +
         encodeURIComponent(name);
-    const h = this.owner.getXhrHeaders();
-    h["Content-type"] = "application/xml";
     this.owner.window.showThrobber();
     this.owner.setTitle(name);
-    OZ.Request(url, this.saveresponse, {
-        xml: true,
-        method: "post",
-        data: xml,
-        headers: h,
+    this.ensureCsrfToken(() => {
+        const h = this.owner.getXhrHeaders();
+        if (this._csrfToken) {
+            h["X-CSRF-TOKEN"] = this._csrfToken;
+        }
+        h["Content-type"] = "application/xml";
+        OZ.Request(url, this.saveresponse, {
+            xml: true,
+            method: "post",
+            data: xml,
+            headers: h,
+        });
     });
 };
 
@@ -679,12 +707,14 @@ SQL.IO.prototype.check = function (code) {
     }
 };
 
-SQL.IO.prototype.saveresponse = function (data, code) {
+SQL.IO.prototype.saveresponse = function (data, code, headers) {
+    this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
     this.check(code);
 };
 
-SQL.IO.prototype.loadresponse = function (data, code) {
+SQL.IO.prototype.loadresponse = function (data, code, headers) {
+    this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
     if (!this.check(code)) {
         return;
@@ -693,7 +723,8 @@ SQL.IO.prototype.loadresponse = function (data, code) {
     this.owner.setTitle(this.name);
 };
 
-SQL.IO.prototype.listresponse = function (data, code) {
+SQL.IO.prototype.listresponse = function (data, code, headers) {
+    this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
     if (!this.check(code)) {
         return;
@@ -701,7 +732,8 @@ SQL.IO.prototype.listresponse = function (data, code) {
     this.dom.ta.value = data;
 };
 
-SQL.IO.prototype.importresponse = function (data, code) {
+SQL.IO.prototype.importresponse = function (data, code, headers) {
+    this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
     if (!this.check(code)) {
         return;

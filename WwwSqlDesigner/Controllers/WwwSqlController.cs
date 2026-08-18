@@ -1,26 +1,30 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using WwwSqlDesigner.Data;
 
 namespace WwwSqlDesigner.Controllers
 {
+    [ServiceFilter(typeof(RequireKeycloakAuthenticationFilter))]
     public class WwwSqlController : Controller
     {
         private readonly ILogger<WwwSqlController> _logger;
         private readonly ApplicationDbContext _context;
+        private readonly IAntiforgery? _antiforgery;
 
-        public WwwSqlController(ILogger<WwwSqlController> logger, ApplicationDbContext context)
+        public WwwSqlController(ILogger<WwwSqlController> logger, ApplicationDbContext context, IAntiforgery? antiforgery = null)
         {
             _logger = logger;
             _context = context;
+            _antiforgery = antiforgery;
         }
 
         [HttpGet]
         [Route("backend/netcore-ef/list")]
         public async Task<IActionResult> List()
         {
-            var list = await _context.DataModels
+            var list = await _context.DataModels.AsNoTracking()
                 .OrderBy(x => x.Keyword)
                 .OrderByDescending(x => x.Version)
                 .Select(x => x.Keyword + " v" + x.Version + " - /?keyword=" + x.Keyword + "&version=" + x.Version)
@@ -36,14 +40,16 @@ namespace WwwSqlDesigner.Controllers
             {
                 return NotFound();
             }
+
+            IQueryable<DataModel> query = _context.DataModels;
             DataModel? model;
             if (!version.HasValue)
             {
-                model = await _context.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(x => x.Keyword == keyword);
+                model = await query.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(x => x.Keyword == keyword);
             }
             else
             {
-                model = await _context.DataModels.FirstOrDefaultAsync(x => x.Keyword == keyword && x.Version == version);
+                model = await query.FirstOrDefaultAsync(x => x.Keyword == keyword && x.Version == version);
             }
             if (null == model)
             {
@@ -54,6 +60,7 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [Route("backend/netcore-ef/save")]
         public async Task<IActionResult> Save(string? keyword)
         {
@@ -61,6 +68,7 @@ namespace WwwSqlDesigner.Controllers
             {
                 return NotFound();
             }
+
             //Read XML data from request body
             Request.EnableBuffering();
             Request.Body.Position = 0;
@@ -69,7 +77,9 @@ namespace WwwSqlDesigner.Controllers
             {
                 xmlData = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
-            var save = _context.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefault(x => x.Keyword == keyword);
+            var save = await _context.DataModels
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync(x => x.Keyword == keyword);
             if (null == save)
             {
                 var newModel = new DataModel()
@@ -99,10 +109,24 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [HttpGet]
+        [Route("backend/netcore-ef/csrf")]
+        public IActionResult CsrfToken()
+        {
+            if (_antiforgery is null)
+            {
+                return NoContent();
+            }
+
+            var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+            return Content(tokens.RequestToken ?? string.Empty);
+        }
+
+        [HttpGet]
         [Route("backend/netcore-ef/import")]
         public IActionResult Import()
         {
             return NotFound();
         }
+
     }
 }
