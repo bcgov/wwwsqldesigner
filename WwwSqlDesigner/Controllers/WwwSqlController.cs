@@ -74,6 +74,29 @@ namespace WwwSqlDesigner.Controllers
             return Content(model.Data, "text/xml");
         }
 
+        [HttpGet]
+        [Route("backend/netcore-ef/versions")]
+        public async Task<IActionResult> Versions(string? keyword)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                return BadRequest();
+            }
+
+            var versions = await _context.DataModels
+                .AsNoTracking()
+                .Where(x => x.Keyword == keyword)
+                .OrderByDescending(x => x.Version)
+                .Select(x => new ModelVersionResponse(x.Keyword, x.Version, x.CreatedAt))
+                .ToListAsync();
+            if (versions.Count == 0)
+            {
+                return NotFound();
+            }
+
+            return new JsonResult(versions);
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Route("backend/netcore-ef/save")]
@@ -311,4 +334,6 @@ namespace WwwSqlDesigner.Controllers
 
     public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);
     public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
+    public sealed record ModelVersionResponse(string Keyword, int Version, DateTime CreatedAt);
+}
 }

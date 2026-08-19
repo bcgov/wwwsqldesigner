@@ -22,6 +22,7 @@ SQL.IO = function (owner) {
         "quicksave",
         "serversave",
         "serverload",
+        "serverversions",
         "serverlist",
         "servershare",
         "serverunshare",
@@ -58,6 +59,10 @@ SQL.IO = function (owner) {
         this.dom.serverunshare.value = "Remove share";
     }
     this.updateServerModelControls();
+    this.dom.serverversionslist = OZ.$("serverversionslist");
+    if (this.dom.serverversions.value === "serverversions") {
+        this.dom.serverversions.value = "Load version";
+    }
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -93,6 +98,7 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
+    OZ.Event.add(this.dom.serverversions, "click", this.serverversions.bind(this));
     OZ.Event.add(this.dom.serverlist, "click", this.serverlist.bind(this));
     OZ.Event.add(this.dom.servershare, "click", this.servershare.bind(this));
     OZ.Event.add(this.dom.serverunshare, "click", this.serverunshare.bind(this));
@@ -707,6 +713,45 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     this.owner.window.showThrobber();
     this._pendingName = name;
     OZ.Request(url, this.loadresponse, { xml: true, headers: h });
+};
+
+SQL.IO.prototype.serverversions = function () {
+    const name = this._name || prompt(_("serverloadprompt"), "");
+    if (!name) {
+        return;
+    }
+
+    this._name = name;
+    this.dom.serverversionslist.textContent = "Loading versions...";
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/versions/?keyword=" + encodeURIComponent(name);
+    const h = this.owner.getXhrHeaders();
+    OZ.Request(url, (data, code) => {
+        if (!this.check(code)) {
+            this.dom.serverversionslist.textContent = "No versions available.";
+            return;
+        }
+
+        let versions;
+        try {
+            versions = JSON.parse(data);
+        } catch {
+            this.dom.serverversionslist.textContent = "Unable to read versions.";
+            return;
+        }
+
+        OZ.DOM.clear(this.dom.serverversionslist);
+        const heading = OZ.DOM.elm("strong");
+        heading.textContent = "Versions for " + name;
+        this.dom.serverversionslist.appendChild(heading);
+        for (const version of versions) {
+            const button = OZ.DOM.elm("button");
+            button.type = "button";
+            button.textContent = "v" + version.version + " (" + new Date(version.createdAt).toLocaleString() + ")";
+            OZ.Event.add(button, "click", () => this.serverload(name, version.version));
+            this.dom.serverversionslist.appendChild(button);
+        }
+    }, { headers: h });
 };
 
 SQL.IO.prototype.serverlist = function (e) {

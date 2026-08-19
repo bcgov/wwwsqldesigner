@@ -217,6 +217,14 @@ test("runs every bundled export stylesheet against a portable model", async ({ p
     }
 });
 
+test("exposes one-click server version loading controls", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    await expect(page.locator("#serverversions")).toHaveValue("Load version");
+    await expect(page.locator("#serverversionslist")).toBeAttached();
+    expect(await page.evaluate(() => typeof d.io.serverversions)).toBe("function");
+});
+
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
     await page.goto("/");
     await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="NullableText" null="1"><datatype>STRING(20)</datatype><default>NULL</default></row><row name="Id" null="0"><datatype>INTEGER</datatype></row></table></sql>');

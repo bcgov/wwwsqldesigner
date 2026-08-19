@@ -175,6 +175,24 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.AreEqual(content, FooBarModelXml);
         }
 
+        [TestMethod]
+        public async Task VersionsReturnsNewestFirstForKeyword()
+        {
+            var result = await _controller.Versions("Test1");
+
+            var json = (JsonResult)result;
+            var versions = (IEnumerable<ModelVersionResponse>)json.Value!;
+            CollectionAssert.AreEqual(new[] { 1, 0 }, versions.Select(x => x.Version).ToArray());
+        }
+
+        [TestMethod]
+        public async Task VersionsReturnsNotFoundForUnknownKeyword()
+        {
+            var result = await _controller.Versions("Missing");
+
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+
         [TestMethod()]
         public async Task SaveTestNoKeyword()
         {
