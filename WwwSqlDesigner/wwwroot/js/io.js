@@ -22,6 +22,8 @@ SQL.IO = function (owner) {
         "serversave",
         "serverload",
         "serverlist",
+        "servershare",
+        "serverunshare",
         "serverimport",
     ];
     for (let id of ids) {
@@ -48,6 +50,12 @@ SQL.IO = function (owner) {
     this.dom.statusdetails = OZ.$("iostatusdetails");
     this.dom.statuslist = OZ.$("iostatuslist");
     this.dom.statusdismiss = OZ.$("iostatusdismiss");
+    if (this.dom.servershare.value === "servershare") {
+        this.dom.servershare.value = "Share (view only)";
+    }
+    if (this.dom.serverunshare.value === "serverunshare") {
+        this.dom.serverunshare.value = "Remove share";
+    }
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -84,6 +92,8 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
     OZ.Event.add(this.dom.serverlist, "click", this.serverlist.bind(this));
+    OZ.Event.add(this.dom.servershare, "click", this.servershare.bind(this));
+    OZ.Event.add(this.dom.serverunshare, "click", this.serverunshare.bind(this));
     OZ.Event.add(this.dom.serverimport, "click", this.serverimport.bind(this));
     OZ.Event.add(document, "keydown", this.press.bind(this));
     this.build();
@@ -679,6 +689,73 @@ SQL.IO.prototype.serverlist = function (e) {
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     OZ.Request(url, this.listresponse, { headers: h });
+};
+
+SQL.IO.prototype.servershare = function () {
+    const name = this._name || prompt(_("serversaveprompt"), "");
+    if (!name) {
+        return;
+    }
+
+    const targetType = prompt("Share with User or Group:", "User");
+    const targetId = prompt("User identifier or group name:");
+    if (!targetType || !targetId) {
+        return;
+    }
+
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/access/grant/?keyword=" + encodeURIComponent(name);
+    this.ensureCsrfToken(() => {
+        const headers = this.owner.getXhrHeaders();
+        headers["Content-type"] = "application/json";
+        if (this._csrfToken) {
+            headers["X-CSRF-TOKEN"] = this._csrfToken;
+        }
+        OZ.Request(url, (data, code, responseHeaders) => {
+            this.setCsrfToken(responseHeaders);
+            if (code === 204) {
+                alert("Read-only access granted.");
+            } else {
+                this.check(code);
+            }
+        }, {
+            method: "post",
+            data: JSON.stringify({ targetType: targetType.trim(), targetId: targetId.trim(), permission: "View" }),
+            headers: headers
+        });
+    });
+};
+
+SQL.IO.prototype.serverunshare = function () {
+    const name = this._name || prompt(_("serverloadprompt"), "");
+    if (!name) {
+        return;
+    }
+
+    const targetType = prompt("Remove User or Group share:", "User");
+    const targetId = prompt("User identifier or group name:");
+    if (!targetType || !targetId) {
+        return;
+    }
+
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/access/grant/?keyword="
+        + encodeURIComponent(name) + "&targetType=" + encodeURIComponent(targetType.trim())
+        + "&targetId=" + encodeURIComponent(targetId.trim());
+    this.ensureCsrfToken(() => {
+        const headers = this.owner.getXhrHeaders();
+        if (this._csrfToken) {
+            headers["X-CSRF-TOKEN"] = this._csrfToken;
+        }
+        OZ.Request(url, (data, code, responseHeaders) => {
+            this.setCsrfToken(responseHeaders);
+            if (code === 204) {
+                alert("Share removed.");
+            } else {
+                this.check(code);
+            }
+        }, { method: "delete", headers: headers });
+    });
 };
 
 SQL.IO.prototype.serverimport = function (e) {

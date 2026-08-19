@@ -9,6 +9,7 @@ namespace WwwSqlDesigner.Data
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
         public virtual DbSet<DataModel> DataModels { get; set; } = null!;
+        public virtual DbSet<DataModelAccessGrant> DataModelAccessGrants { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -21,6 +22,13 @@ namespace WwwSqlDesigner.Data
                 entity.Property(e => e.OwnerId).HasDefaultValue("legacy");
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
                 entity.HasIndex(e => new { e.OwnerId, e.Keyword, e.Version });
+            });
+
+            modelBuilder.Entity<DataModelAccessGrant>(entity =>
+            {
+                entity.HasKey(x => new { x.OwnerId, x.Keyword, x.TargetType, x.TargetId });
+                entity.Property(e => e.Permission).HasDefaultValue("View");
+                entity.HasIndex(e => new { e.TargetType, e.TargetId, e.Permission });
             });
         }
     }

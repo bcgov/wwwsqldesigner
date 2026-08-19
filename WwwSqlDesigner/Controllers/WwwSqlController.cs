@@ -83,11 +83,17 @@ namespace WwwSqlDesigner.Controllers
             {
                 xmlData = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
-            var save = await ApplyOwnerFilter(_context.DataModels)
+            var save = await ApplyOwnerFilter(_context.DataModels, includeGrants: false)
                 .OrderByDescending(x => x.CreatedAt)
                 .FirstOrDefaultAsync(x => x.Keyword == keyword);
             if (null == save)
             {
+                var visibleModelExists = await ApplyOwnerFilter(_context.DataModels).AnyAsync(x => x.Keyword == keyword);
+                if (visibleModelExists)
+                {
+                    return Forbid();
+                }
+
                 var newModel = new DataModel()
                 {
                     Keyword = keyword,
@@ -136,6 +142,106 @@ namespace WwwSqlDesigner.Controllers
             return NotFound();
         }
 
+        [HttpGet]
+        [Route("backend/netcore-ef/access")]
+        public async Task<IActionResult> Access(string? keyword)
+        {
+            if (string.IsNullOrEmpty(keyword))
+            {
+                return NotFound();
+            }
+
+            var ownerId = GetCurrentOwnerId();
+            var ownsModel = await _context.DataModels.AnyAsync(x => x.OwnerId == ownerId && x.Keyword == keyword);
+            if (!ownsModel)
+            {
+                return NotFound();
+            }
+
+            var grants = await _context.DataModelAccessGrants
+                .AsNoTracking()
+                .Where(x => x.OwnerId == ownerId && x.Keyword == keyword)
+                .OrderBy(x => x.TargetType)
+                .ThenBy(x => x.TargetId)
+                .Select(x => new AccessGrantResponse(x.TargetType, x.TargetId, x.Permission))
+                .ToListAsync();
+            return new JsonResult(grants);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Route("backend/netcore-ef/access/grant")]
+        public async Task<IActionResult> GrantAccess(string? keyword, [FromBody] AccessGrantRequest? request)
+        {
+            if (string.IsNullOrWhiteSpace(keyword) || request is null)
+            {
+                return BadRequest();
+            }
+
+            var ownerId = GetCurrentOwnerId();
+            var ownsModel = await _context.DataModels.AnyAsync(x => x.OwnerId == ownerId && x.Keyword == keyword);
+            if (!ownsModel)
+            {
+                return NotFound();
+            }
+
+            var targetType = request.TargetType?.Trim();
+            var targetId = request.TargetId?.Trim();
+            var permission = request.Permission?.Trim();
+            if (!IsValidTargetType(targetType) || string.IsNullOrWhiteSpace(targetId) || targetId.Length > 256
+                || !IsValidPermission(permission))
+            {
+                return BadRequest("TargetType, TargetId, and Permission are invalid.");
+            }
+
+            var exists = await _context.DataModelAccessGrants.AnyAsync(x =>
+                x.OwnerId == ownerId
+                && x.Keyword == keyword
+                && x.TargetType == targetType
+                && x.TargetId == targetId);
+            if (exists)
+            {
+                return Conflict();
+            }
+
+            _context.DataModelAccessGrants.Add(new DataModelAccessGrant
+            {
+                OwnerId = ownerId,
+                Keyword = keyword,
+                TargetType = targetType!,
+                TargetId = targetId!,
+                Permission = permission!
+            });
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpDelete]
+        [ValidateAntiForgeryToken]
+        [Route("backend/netcore-ef/access/grant")]
+        public async Task<IActionResult> RevokeAccess(string? keyword, string? targetType, string? targetId)
+        {
+            if (string.IsNullOrWhiteSpace(keyword) || !IsValidTargetType(targetType) || string.IsNullOrWhiteSpace(targetId))
+            {
+                return BadRequest();
+            }
+
+            var ownerId = GetCurrentOwnerId();
+            var grant = await _context.DataModelAccessGrants.FirstOrDefaultAsync(x =>
+                x.OwnerId == ownerId
+                && x.Keyword == keyword
+                && x.TargetType == targetType
+                && x.TargetId == targetId);
+            if (grant is null)
+            {
+                return NotFound();
+            }
+
+            _context.DataModelAccessGrants.Remove(grant);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
         private string GetCurrentOwnerId()
         {
             if (!_keycloakSettings.IsConfigured)
@@ -151,14 +257,53 @@ namespace WwwSqlDesigner.Controllers
                 ?? _keycloakSettings.LegacyOwnerId;
         }
 
-        private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query)
+        private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query, bool includeGrants = true)
         {
             if (!_keycloakSettings.IsConfigured)
             {
                 return query.Where(x => x.OwnerId == _keycloakSettings.LegacyOwnerId);
             }
 
-            return query.Where(x => x.OwnerId == GetCurrentOwnerId());
+            var ownerId = GetCurrentOwnerId();
+            if (!includeGrants)
+            {
+                return query.Where(x => x.OwnerId == ownerId);
+            }
+
+            var groupIds = GetCurrentGroupIds();
+            return query.Where(x =>
+                x.OwnerId == ownerId
+                || _context.DataModelAccessGrants.Any(grant =>
+                    grant.OwnerId == x.OwnerId
+                    && grant.Keyword == x.Keyword
+                    && (grant.Permission == "View" || grant.Permission == "Edit")
+                    && ((grant.TargetType == "User" && grant.TargetId == ownerId)
+                        || (grant.TargetType == "Group" && groupIds.Contains(grant.TargetId)))));
+        }
+
+        private string[] GetCurrentGroupIds()
+        {
+            return User.Claims
+                .Where(x => x.Type == "groups" || x.Type == ClaimTypes.Role || x.Type == "group")
+                .Select(x => x.Value)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static bool IsValidTargetType(string? targetType)
+        {
+            return string.Equals(targetType, "User", StringComparison.Ordinal)
+                || string.Equals(targetType, "Group", StringComparison.Ordinal);
+        }
+
+        private static bool IsValidPermission(string? permission)
+        {
+            return string.Equals(permission, "View", StringComparison.Ordinal)
+                || string.Equals(permission, "Edit", StringComparison.Ordinal);
         }
     }
+
+    public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);
+    public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
 }

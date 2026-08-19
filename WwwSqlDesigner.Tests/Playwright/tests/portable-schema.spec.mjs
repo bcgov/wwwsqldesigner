@@ -103,6 +103,15 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
 });
 
+test("exposes owner-only read-only sharing controls for server models", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    await expect(page.locator("#servershare")).toHaveValue(/Share/);
+    await expect(page.locator("#serverunshare")).toHaveValue(/Remove share/);
+    expect(await page.evaluate(() => typeof d.io.servershare)).toBe("function");
+    expect(await page.evaluate(() => typeof d.io.serverunshare)).toBe("function");
+});
+
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
     await page.goto("/");
     await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="NullableText" null="1"><datatype>STRING(20)</datatype><default>NULL</default></row><row name="Id" null="0"><datatype>INTEGER</datatype></row></table></sql>');
