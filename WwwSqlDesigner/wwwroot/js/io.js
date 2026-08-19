@@ -87,7 +87,7 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.clientload, "click", this.clientload.bind(this));
     OZ.Event.add(this.dom.clientsql, "click", this.clientsql.bind(this));
     OZ.Event.add(this.dom.statusdismiss, "click", this.hideStatus.bind(this));
-    OZ.Event.add(this.dom.exporttarget, "change", this.refreshExportTargetLabel.bind(this));
+    OZ.Event.add(this.dom.exporttarget, "change", this.changeExportTarget.bind(this));
     OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
     OZ.Event.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
     OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
@@ -165,13 +165,13 @@ SQL.IO.prototype.build = function () {
         }
     }
 
-    const selectedTarget = this.dom.exporttarget.value || this.owner.getOption("db");
+    const selectedTarget = this.getExportTarget();
     OZ.DOM.clear(this.dom.exporttarget);
-    for (const target of CONFIG.AVAILABLE_DBS.filter((value, index, values) => values.indexOf(value) === index)) {
+    for (const target of CONFIG.EXPORT_TARGETS) {
         const option = OZ.DOM.elm("option");
-        option.value = target;
-        option.innerHTML = target;
-        option.selected = target === selectedTarget;
+        option.value = target.id;
+        option.textContent = target.label;
+        option.selected = target.id === selectedTarget;
         this.dom.exporttarget.appendChild(option);
     }
 };
@@ -186,7 +186,12 @@ SQL.IO.prototype.click = function () {
 };
 
 SQL.IO.prototype.refreshExportTargetLabel = function () {
-    this.dom.clientsql.value = _("clientsql") + " (" + this.getExportTarget() + ")";
+    this.dom.clientsql.value = _("clientsql") + " (" + this.getExportTargetDefinition().label + ")";
+};
+
+SQL.IO.prototype.changeExportTarget = function () {
+    this.owner.setOption("lastExportTarget", this.getExportTarget());
+    this.refreshExportTargetLabel();
 };
 
 SQL.IO.prototype.parseXml = function (xml) {
@@ -395,7 +400,13 @@ SQL.IO.prototype.clientef = function () {
 };
 
 SQL.IO.prototype.getExportTarget = function () {
-    return this.dom.exporttarget.value || this.owner.getOption("db");
+    return this.getExportTargetDefinition().id;
+};
+
+SQL.IO.prototype.getExportTargetDefinition = function () {
+    const selected = this.dom.exporttarget.value || this.owner.getOption("lastExportTarget");
+    return CONFIG.EXPORT_TARGETS.find((target) => target.id === selected)
+        || CONFIG.EXPORT_TARGETS.find((target) => target.id === CONFIG.DEFAULT_DB);
 };
 
 /* Maps a serialized copy only; target selection never rewrites the editor. */

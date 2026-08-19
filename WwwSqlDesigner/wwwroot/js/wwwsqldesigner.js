@@ -226,6 +226,8 @@ SQL.Designer.prototype.getOption = function (name) {
             return CONFIG.DEFAULT_LOCALE;
         case "db":
             return CONFIG.DEFAULT_DB;
+        case "lastExportTarget":
+            return CONFIG.DEFAULT_DB;
         case "efnamespace":
             return CONFIG.EF_DEFAULT_NAMESPACE;
         case "efcontext":
