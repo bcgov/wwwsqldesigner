@@ -1,7 +1,5 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Text;
 
@@ -24,57 +22,6 @@ namespace WwwSqlDesigner.Controllers.Tests
             return new WwwSqlController(logger, _dbContext);
         }
 
-        private static DefaultHttpContext CreateHttpContextWithAntiforgery()
-        {
-            var httpContext = new DefaultHttpContext();
-            var services = new ServiceCollection();
-            services.AddSingleton<IAntiforgery, TestAntiforgery>();
-            httpContext.RequestServices = services.BuildServiceProvider();
-            httpContext.Request.Headers["X-CSRF-TOKEN"] = "request-token";
-            return httpContext;
-        }
-
-        private sealed class TestAntiforgery : IAntiforgery
-        {
-            public AntiforgeryTokenSet GetAndStoreTokens(HttpContext httpContext)
-                => new("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
-
-            public AntiforgeryTokenSet? GetAndStoreTokens(HttpContext httpContext, AntiforgeryTokenSet? tokenSet)
-                => tokenSet ?? new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
-
-            public Task<AntiforgeryTokenSet> GetAndStoreTokensAsync(HttpContext httpContext, AntiforgeryTokenSet? tokenSet, CancellationToken cancellationToken = default)
-                => Task.FromResult(tokenSet ?? new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN"));
-
-            public AntiforgeryTokenSet GetTokens(HttpContext httpContext)
-                => new("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
-
-            public Task<AntiforgeryTokenSet> GetTokensAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
-                => Task.FromResult(new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN"));
-
-            public void SetCookieTokenAndHeader(HttpContext httpContext)
-            {
-            }
-
-            public Task SetCookieTokenAndHeaderAsync(HttpContext httpContext)
-                => Task.CompletedTask;
-
-            public Task<bool> IsRequestValidAsync(HttpContext httpContext)
-            {
-                var isValid = string.Equals(httpContext.Request.Headers["X-CSRF-TOKEN"], "request-token", StringComparison.Ordinal);
-                return Task.FromResult(isValid);
-            }
-
-            public Task ValidateRequestAsync(HttpContext httpContext)
-            {
-                var isValid = string.Equals(httpContext.Request.Headers["X-CSRF-TOKEN"], "request-token", StringComparison.Ordinal);
-                if (!isValid)
-                {
-                    throw new InvalidOperationException("Invalid antiforgery token.");
-                }
-
-                return Task.CompletedTask;
-            }
-        }
         #endregion
 
         #region Init Test Data
@@ -164,10 +111,6 @@ namespace WwwSqlDesigner.Controllers.Tests
         [TestMethod()]
         public async Task SaveTestNoKeyword()
         {
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = CreateHttpContextWithAntiforgery()
-            };
             var result = await _controller.Save(null).ConfigureAwait(true);
             Assert.IsInstanceOfType(result, typeof(NotFoundResult));
         }
@@ -175,7 +118,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         [TestMethod()]
         public async Task SaveTestNew()
         {
-            var httpContext = CreateHttpContextWithAntiforgery();
+            var httpContext = new DefaultHttpContext();
             using MemoryStream stream = new(Encoding.UTF8.GetBytes(FooBarModelXml));
             httpContext.Request.Body = stream;
             httpContext.Request.ContentLength = stream.Length;
@@ -193,7 +136,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         public async Task SaveTestUpdate()
         {
             int oldVersion = _dbContext.DataModels.OrderByDescending(x => x.CreatedAt).First(x => x.Keyword == "Test1").Version;
-            var httpContext = CreateHttpContextWithAntiforgery();
+            var httpContext = new DefaultHttpContext();
             using MemoryStream stream = new(Encoding.UTF8.GetBytes(FooBarModelXml));
             httpContext.Request.Body = stream;
             httpContext.Request.ContentLength = stream.Length;

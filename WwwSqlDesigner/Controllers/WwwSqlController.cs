@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
@@ -11,13 +10,11 @@ namespace WwwSqlDesigner.Controllers
     {
         private readonly ILogger<WwwSqlController> _logger;
         private readonly ApplicationDbContext _context;
-        private readonly IAntiforgery? _antiforgery;
 
-        public WwwSqlController(ILogger<WwwSqlController> logger, ApplicationDbContext context, IAntiforgery? antiforgery = null)
+        public WwwSqlController(ILogger<WwwSqlController> logger, ApplicationDbContext context)
         {
             _logger = logger;
             _context = context;
-            _antiforgery = antiforgery;
         }
 
         [HttpGet]
@@ -60,7 +57,6 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
         [Route("backend/netcore-ef/save")]
         public async Task<IActionResult> Save(string? keyword)
         {
@@ -106,19 +102,6 @@ namespace WwwSqlDesigner.Controllers
             }
             _context.SaveChanges();
             return Content(string.Empty);
-        }
-
-        [HttpGet]
-        [Route("backend/netcore-ef/csrf")]
-        public IActionResult CsrfToken()
-        {
-            if (_antiforgery is null)
-            {
-                return NoContent();
-            }
-
-            var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
-            return Content(tokens.RequestToken ?? string.Empty);
         }
 
         [HttpGet]
