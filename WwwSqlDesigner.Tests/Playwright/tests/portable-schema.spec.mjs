@@ -221,6 +221,7 @@ test("exposes one-click server version loading controls", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();
     await expect(page.locator("#serverversions")).toHaveValue("Load version");
+    await expect(page.locator("#serverversionslist")).toBeHidden();
     await expect(page.locator("#serverversionslist")).toBeAttached();
     expect(await page.evaluate(() => typeof d.io.serverversions)).toBe("function");
 });

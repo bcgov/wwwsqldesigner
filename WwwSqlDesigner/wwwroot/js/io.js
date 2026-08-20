@@ -63,6 +63,7 @@ SQL.IO = function (owner) {
     if (this.dom.serverversions.value === "serverversions") {
         this.dom.serverversions.value = "Load version";
     }
+    this.dom.serverversions.setAttribute("aria-expanded", "false");
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -716,12 +717,20 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
 };
 
 SQL.IO.prototype.serverversions = function () {
+    if (this.dom.serverversionslist.style.display !== "none") {
+        this.dom.serverversionslist.style.display = "none";
+        this.dom.serverversions.setAttribute("aria-expanded", "false");
+        return;
+    }
+
     const name = this._name || prompt(_("serverloadprompt"), "");
     if (!name) {
         return;
     }
 
     this._name = name;
+    this.dom.serverversionslist.style.display = "";
+    this.dom.serverversions.setAttribute("aria-expanded", "true");
     this.dom.serverversionslist.textContent = "Loading versions...";
     const bp = this.owner.getOption("xhrpath");
     const url = bp + "backend/" + this.dom.backend.value + "/versions/?keyword=" + encodeURIComponent(name);
@@ -748,7 +757,11 @@ SQL.IO.prototype.serverversions = function () {
             const button = OZ.DOM.elm("button");
             button.type = "button";
             button.textContent = "v" + version.version + " (" + new Date(version.createdAt).toLocaleString() + ")";
-            OZ.Event.add(button, "click", () => this.serverload(name, version.version));
+            OZ.Event.add(button, "click", () => {
+                this.serverload(name, version.version);
+                this.dom.serverversionslist.style.display = "none";
+                this.dom.serverversions.setAttribute("aria-expanded", "false");
+            });
             this.dom.serverversionslist.appendChild(button);
         }
     }, { headers: h });
