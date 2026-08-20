@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -19,11 +18,6 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddControllersWithViews();
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<RequireKeycloakAuthenticationFilter>();
-builder.Services.AddAntiforgery(options =>
-{
-    options.HeaderName = "X-CSRF-TOKEN";
-});
-
 var keycloakSection = builder.Configuration.GetSection("Authentication:Keycloak");
 var keycloakEnabled = keycloakSection.GetValue<bool>("Enabled");
 var keycloakAuthority = keycloakSection["Authority"];
@@ -139,17 +133,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
-
-app.Use(async (context, next) =>
-{
-    var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
-    var tokens = antiforgery.GetAndStoreTokens(context);
-    if (!string.IsNullOrWhiteSpace(tokens.RequestToken))
-    {
-        context.Response.Headers["X-CSRF-TOKEN"] = tokens.RequestToken;
-    }
-    await next();
-});
 
 app.UseAuthorization();
 
