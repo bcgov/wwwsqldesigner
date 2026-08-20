@@ -601,10 +601,10 @@ SQL.IO.prototype.serversave = function (e, keyword) {
         this.dom.backend.value +
         "/save/?keyword=" +
         encodeURIComponent(name);
-    this.owner.window.showThrobber();
-    this.owner.setTitle(name);
     const h = this.owner.getXhrHeaders();
     h["Content-type"] = "application/xml";
+    this.owner.window.showThrobber();
+    this.owner.setTitle(name);
     OZ.Request(url, this.saveresponse, {
         xml: true,
         method: "post",

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Text;
@@ -21,7 +21,6 @@ namespace WwwSqlDesigner.Controllers.Tests
             var logger = InitializeLogger<WwwSqlController>();
             return new WwwSqlController(logger, _dbContext);
         }
-
         #endregion
 
         #region Init Test Data
