@@ -26,20 +26,8 @@ builder.Services.AddAntiforgery(options =>
 var keycloakSection = builder.Configuration.GetSection("Authentication:Keycloak");
 var keycloakEnabled = keycloakSection.GetValue<bool>("Enabled");
 var keycloakAuthority = keycloakSection["Authority"];
-var keycloakBaseUrl = keycloakSection["BaseUrl"];
-var keycloakRealm = keycloakSection["Realm"];
-if (string.IsNullOrWhiteSpace(keycloakAuthority)
-    && !string.IsNullOrWhiteSpace(keycloakBaseUrl)
-    && !string.IsNullOrWhiteSpace(keycloakRealm))
-{
-    keycloakAuthority = $"{keycloakBaseUrl.TrimEnd('/')}/realms/{keycloakRealm}";
-}
 var keycloakClientId = keycloakSection["ClientId"];
 var keycloakClientSecret = keycloakSection["ClientSecret"];
-var keycloakCallbackPath = keycloakSection["CallbackPath"] ?? "/signin-oidc";
-var keycloakSignedOutCallbackPath = keycloakSection["SignedOutCallbackPath"] ?? "/signout-callback-oidc";
-var keycloakResponseType = keycloakSection["ResponseType"] ?? OpenIdConnectResponseType.Code;
-var keycloakScopes = keycloakSection["Scopes"] ?? "openid profile email";
 var keycloakSettings = new KeycloakSettings
 {
     Enabled = keycloakEnabled,
@@ -73,9 +61,9 @@ if (keycloakSettings.IsConfigured)
         options.Authority = keycloakAuthority;
         options.ClientId = keycloakClientId;
         options.ClientSecret = keycloakClientSecret;
-        options.CallbackPath = keycloakCallbackPath;
-        options.SignedOutCallbackPath = keycloakSignedOutCallbackPath;
-        options.ResponseType = keycloakResponseType;
+        options.CallbackPath = "/signin-oidc";
+        options.SignedOutCallbackPath = "/signout-callback-oidc";
+        options.ResponseType = OpenIdConnectResponseType.Code;
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
         options.SaveTokens = true;
         options.UsePkce = true;
@@ -86,7 +74,7 @@ if (keycloakSettings.IsConfigured)
             RoleClaimType = "groups"
         };
         options.Scope.Clear();
-        foreach (var scope in keycloakScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var scope in new[] { "openid", "profile", "email" })
         {
             options.Scope.Add(scope);
         }
