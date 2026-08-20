@@ -11,10 +11,5 @@ WwwSqlDesigner.Tests/Playwright/node_modules/
 WwwSqlDesigner.Tests/Playwright/test-results/
 WwwSqlDesigner.Tests/Playwright/playwright-report/
 
-# Local SpecKit tooling and generated workflow files
-.specify/
-.speckitcommands/
-specs/
-
-# Local, untracked follow-up notes
-.local/
+# Local, untracked planning and follow-up notes
+.working/
