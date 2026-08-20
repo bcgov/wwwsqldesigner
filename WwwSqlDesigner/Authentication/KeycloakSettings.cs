@@ -11,5 +11,20 @@ namespace WwwSqlDesigner.Authentication
             Enabled
             && !string.IsNullOrWhiteSpace(Authority)
             && !string.IsNullOrWhiteSpace(ClientId);
+
+        public void Validate(bool isDevelopment)
+        {
+            if (!isDevelopment && !IsConfigured)
+            {
+                throw new InvalidOperationException(
+                    "Keycloak must be configured outside the Development environment.");
+            }
+
+            if (Enabled && !IsConfigured)
+            {
+                throw new InvalidOperationException(
+                    "Keycloak is enabled but Authority and ClientId must be configured.");
+            }
+        }
     }
 }

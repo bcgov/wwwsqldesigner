@@ -36,16 +36,20 @@ namespace WwwSqlDesigner.Controllers
 
         [AllowAnonymous]
         [HttpGet("logout")]
-        public async Task<IActionResult> Logout(string? returnUrl = null)
+        public IActionResult Logout(string? returnUrl = null)
         {
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-            if (_keycloakSettings.IsConfigured)
+            var safeReturnUrl = GetSafeReturnUrl(returnUrl);
+            if (!_keycloakSettings.IsConfigured)
             {
-                await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+                return SignOut(
+                    new AuthenticationProperties { RedirectUri = safeReturnUrl },
+                    CookieAuthenticationDefaults.AuthenticationScheme);
             }
 
-            return LocalRedirect(GetSafeReturnUrl(returnUrl));
+            return SignOut(
+                new AuthenticationProperties { RedirectUri = safeReturnUrl },
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         private string GetSafeReturnUrl(string? returnUrl)
@@ -63,6 +67,15 @@ namespace WwwSqlDesigner.Controllers
         public IActionResult AccessDenied()
         {
             return StatusCode(StatusCodes.Status403Forbidden, "Access denied.");
+        }
+
+        [AllowAnonymous]
+        [HttpGet("authentication-error")]
+        public IActionResult AuthenticationError()
+        {
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                "Authentication failed. Please retry by visiting /account/login.");
         }
     }
 }

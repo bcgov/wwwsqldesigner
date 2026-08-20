@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -37,11 +38,7 @@ var keycloakSettings = new KeycloakSettings
 };
 builder.Services.AddSingleton(keycloakSettings);
 
-if (keycloakEnabled && !keycloakSettings.IsConfigured)
-{
-    throw new InvalidOperationException(
-        "Keycloak is enabled but Authority and ClientId must be configured.");
-}
+keycloakSettings.Validate(builder.Environment.IsDevelopment());
 
 if (keycloakSettings.IsConfigured)
 {
@@ -82,7 +79,7 @@ if (keycloakSettings.IsConfigured)
         {
             OnRemoteFailure = context =>
             {
-                context.Response.Redirect("/account/login?error=remote");
+                context.Response.Redirect("/account/authentication-error");
                 context.HandleResponse();
                 return Task.CompletedTask;
             }
@@ -115,6 +112,29 @@ else
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+
+app.Use(async (context, next) =>
+{
+    var isAppShellRequest =
+        context.Request.Path == "/"
+        || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase);
+
+    if (keycloakSettings.IsConfigured
+        && isAppShellRequest
+        && context.User.Identity?.IsAuthenticated != true)
+    {
+        var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
+        await context.ChallengeAsync(
+            OpenIdConnectDefaults.AuthenticationScheme,
+            new AuthenticationProperties { RedirectUri = returnUrl });
+        return;
+    }
+
+    await next();
+});
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -131,7 +151,6 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
