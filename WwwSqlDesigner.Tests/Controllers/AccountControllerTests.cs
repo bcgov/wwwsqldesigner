@@ -22,6 +22,22 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
+        public void KeycloakValidationRejectsMissingConfidentialClientSecret()
+        {
+            var settings = new KeycloakSettings
+            {
+                Enabled = true,
+                Authority = "https://example.test/realms/test",
+                ClientId = "client"
+            };
+
+            var exception = Assert.ThrowsException<InvalidOperationException>(
+                () => settings.Validate(isDevelopment: true));
+
+            StringAssert.Contains(exception.Message, "ClientSecret");
+        }
+
+        [TestMethod]
         public void AuthenticationErrorReturnsBadGatewayWithoutChallenge()
         {
             var controller = new AccountController(new KeycloakSettings

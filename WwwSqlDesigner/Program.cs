@@ -163,4 +163,9 @@ if (app.Environment.IsDevelopment())
     using var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     context.Database.Migrate();
 }
+
 app.Run();
+
+public partial class Program
+{
+}

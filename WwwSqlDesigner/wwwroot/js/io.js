@@ -93,14 +93,15 @@ SQL.IO.prototype.hideStatus = function () {
     this.dom.status.style.display = "none";
 };
 
-SQL.IO.prototype.setCsrfToken = function (headers) {
+SQL.IO.prototype.setCsrfToken = function (headers, data) {
     const token = headers && (headers["X-CSRF-TOKEN"] || headers["x-csrf-token"]);
-    if (token) {
-        this._csrfToken = token;
+    const responseToken = token || (typeof data === "string" ? data.trim() : "");
+    if (responseToken) {
+        this._csrfToken = responseToken;
     }
 };
 
-SQL.IO.prototype.ensureCsrfToken = function (callback) {
+SQL.IO.prototype.ensureCsrfToken = function (callback, failure) {
     if (this._csrfToken) {
         callback();
         return;
@@ -110,8 +111,12 @@ SQL.IO.prototype.ensureCsrfToken = function (callback) {
     const url = bp + "backend/" + this.dom.backend.value + "/csrf";
     const h = this.owner.getXhrHeaders();
     OZ.Request(url, (data, code, headers) => {
-        this.setCsrfToken(headers);
-        callback();
+        this.setCsrfToken(headers, data);
+        if (code >= 200 && code < 300 && this._csrfToken) {
+            callback();
+            return;
+        }
+        failure();
     }, { headers: h });
 };
 
@@ -628,9 +633,7 @@ SQL.IO.prototype.serversave = function (e, keyword) {
     this.owner.setTitle(name);
     this.ensureCsrfToken(() => {
         const h = this.owner.getXhrHeaders();
-        if (this._csrfToken) {
-            h["X-CSRF-TOKEN"] = this._csrfToken;
-        }
+        h["X-CSRF-TOKEN"] = this._csrfToken;
         h["Content-type"] = "application/xml";
         OZ.Request(url, this.saveresponse, {
             xml: true,
@@ -638,6 +641,9 @@ SQL.IO.prototype.serversave = function (e, keyword) {
             data: xml,
             headers: h,
         });
+    }, () => {
+        this.owner.window.hideThrobber();
+        alert("Unable to obtain a CSRF token. The save was not sent.");
     });
 };
 

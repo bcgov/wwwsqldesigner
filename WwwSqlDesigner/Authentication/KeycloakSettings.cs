@@ -10,7 +10,8 @@ namespace WwwSqlDesigner.Authentication
         public bool IsConfigured =>
             Enabled
             && !string.IsNullOrWhiteSpace(Authority)
-            && !string.IsNullOrWhiteSpace(ClientId);
+            && !string.IsNullOrWhiteSpace(ClientId)
+            && !string.IsNullOrWhiteSpace(ClientSecret);
 
         public void Validate(bool isDevelopment)
         {
@@ -23,7 +24,7 @@ namespace WwwSqlDesigner.Authentication
             if (Enabled && !IsConfigured)
             {
                 throw new InvalidOperationException(
-                    "Keycloak is enabled but Authority and ClientId must be configured.");
+                    "Keycloak is enabled but Authority, ClientId, and ClientSecret must be configured.");
             }
         }
     }

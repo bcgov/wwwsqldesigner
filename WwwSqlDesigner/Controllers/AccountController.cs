@@ -35,7 +35,8 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [AllowAnonymous]
-        [HttpGet("logout")]
+        [HttpPost("logout")]
+        [ValidateAntiForgeryToken]
         public IActionResult Logout(string? returnUrl = null)
         {
             var safeReturnUrl = GetSafeReturnUrl(returnUrl);
