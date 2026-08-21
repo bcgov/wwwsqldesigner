@@ -29,7 +29,7 @@ namespace WwwSqlDesigner.Migrations
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)")
-                        .HasDefaultValue("legacy");
+                        .HasDefaultValue("unowned");
 
                     b.Property<string>("Keyword")
                         .HasMaxLength(30)

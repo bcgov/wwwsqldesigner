@@ -19,7 +19,7 @@ namespace WwwSqlDesigner.Data
 
             modelBuilder.Entity<DataModel>(entity =>
             {
-                entity.Property(e => e.OwnerId).HasDefaultValue("legacy");
+                entity.Property(e => e.OwnerId).HasDefaultValue(DataModel.UnownedOwnerId);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
                 entity.HasIndex(e => new { e.OwnerId, e.Keyword, e.Version });
             });

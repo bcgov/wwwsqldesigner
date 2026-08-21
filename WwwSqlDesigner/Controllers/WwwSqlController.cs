@@ -49,7 +49,7 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
 
-            var currentOwnerId = GetCurrentOwnerId();
+            var currentOwnerId = GetEffectiveOwnerId();
             IQueryable<DataModel> query = ApplyOwnerFilter(_context.DataModels)
                 .Where(x => string.IsNullOrWhiteSpace(ownerId) || x.OwnerId == ownerId!.Trim());
             DataModel? model;
@@ -84,7 +84,7 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
 
-            var ownerId = GetCurrentOwnerId();
+            var ownerId = GetEffectiveOwnerId();
 
             //Read XML data from request body
             Request.EnableBuffering();
@@ -162,7 +162,7 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
 
-            var ownerId = GetCurrentOwnerId();
+            var ownerId = GetEffectiveOwnerId();
             var ownsModel = await _context.DataModels.AnyAsync(x => x.OwnerId == ownerId && x.Keyword == keyword);
             if (!ownsModel)
             {
@@ -189,7 +189,7 @@ namespace WwwSqlDesigner.Controllers
                 return BadRequest();
             }
 
-            var ownerId = GetCurrentOwnerId();
+            var ownerId = GetEffectiveOwnerId();
             var ownsModel = await _context.DataModels.AnyAsync(x => x.OwnerId == ownerId && x.Keyword == keyword);
             if (!ownsModel)
             {
@@ -237,7 +237,7 @@ namespace WwwSqlDesigner.Controllers
                 return BadRequest();
             }
 
-            var ownerId = GetCurrentOwnerId();
+            var ownerId = GetEffectiveOwnerId();
             var grant = await _context.DataModelAccessGrants.FirstOrDefaultAsync(x =>
                 x.OwnerId == ownerId
                 && x.Keyword == keyword
@@ -253,11 +253,11 @@ namespace WwwSqlDesigner.Controllers
             return NoContent();
         }
 
-        private string GetCurrentOwnerId()
+        private string GetEffectiveOwnerId()
         {
             if (!_keycloakSettings.IsConfigured)
             {
-                return _keycloakSettings.LegacyOwnerId;
+                return DataModel.UnownedOwnerId;
             }
 
             return User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -265,17 +265,17 @@ namespace WwwSqlDesigner.Controllers
                 ?? User.FindFirstValue("preferred_username")
                 ?? User.FindFirstValue(ClaimTypes.Upn)
                 ?? User.Identity?.Name
-                ?? _keycloakSettings.LegacyOwnerId;
+                ?? DataModel.UnownedOwnerId;
         }
 
         private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query, bool includeGrants = true)
         {
             if (!_keycloakSettings.IsConfigured)
             {
-                return query.Where(x => x.OwnerId == _keycloakSettings.LegacyOwnerId);
+                return query.Where(x => x.OwnerId == DataModel.UnownedOwnerId);
             }
 
-            var ownerId = GetCurrentOwnerId();
+            var ownerId = GetEffectiveOwnerId();
             if (!includeGrants)
             {
                 return query.Where(x => x.OwnerId == ownerId);

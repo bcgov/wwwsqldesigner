@@ -6,8 +6,6 @@ namespace WwwSqlDesigner.Authentication
         public string? Authority { get; init; }
         public string? ClientId { get; init; }
         public string? ClientSecret { get; init; }
-        public string LegacyOwnerId { get; init; } = "legacy";
-
         public bool IsConfigured =>
             Enabled
             && !string.IsNullOrWhiteSpace(Authority)

@@ -177,7 +177,6 @@ namespace WwwSqlDesigner.Controllers.Tests
                 builder.UseSetting("Authentication:Keycloak:Authority", "https://example.test/realms/test");
                 builder.UseSetting("Authentication:Keycloak:ClientId", "client");
                 builder.UseSetting("Authentication:Keycloak:ClientSecret", "secret");
-                builder.UseSetting("Authentication:Keycloak:LegacyOwnerId", "pipeline-test");
                 builder.ConfigureAppConfiguration((_, configuration) =>
                 {
                     configuration.Sources.Clear();
@@ -187,7 +186,6 @@ namespace WwwSqlDesigner.Controllers.Tests
                         ["Authentication:Keycloak:Authority"] = "https://example.test/realms/test",
                         ["Authentication:Keycloak:ClientId"] = "client",
                         ["Authentication:Keycloak:ClientSecret"] = "secret",
-                        ["Authentication:Keycloak:LegacyOwnerId"] = "pipeline-test"
                     });
                 });
                 builder.ConfigureTestServices(services =>

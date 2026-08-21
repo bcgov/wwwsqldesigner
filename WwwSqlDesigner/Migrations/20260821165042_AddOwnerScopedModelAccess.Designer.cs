@@ -12,8 +12,8 @@ using WwwSqlDesigner.Data;
 namespace WwwSqlDesigner.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260817235833_AddOwnerIdToDataModel")]
-    partial class AddOwnerIdToDataModel
+    [Migration("20260821165042_AddOwnerScopedModelAccess")]
+    partial class AddOwnerScopedModelAccess
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -28,6 +28,12 @@ namespace WwwSqlDesigner.Migrations
 
             modelBuilder.Entity("WwwSqlDesigner.Data.DataModel", b =>
                 {
+                    b.Property<string>("OwnerId")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasDefaultValue("unowned");
+
                     b.Property<string>("Keyword")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
@@ -44,15 +50,43 @@ namespace WwwSqlDesigner.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("OwnerId")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.HasKey("Keyword", "Version");
+                    b.HasKey("OwnerId", "Keyword", "Version");
 
                     b.HasIndex("OwnerId", "Keyword", "Version");
 
                     b.ToTable("DataModels");
+                });
+
+            modelBuilder.Entity("WwwSqlDesigner.Data.DataModelAccessGrant", b =>
+                {
+                    b.Property<string>("OwnerId")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Keyword")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("TargetType")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("TargetId")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasDefaultValue("View");
+
+                    b.HasKey("OwnerId", "Keyword", "TargetType", "TargetId");
+
+                    b.HasIndex("TargetType", "TargetId", "Permission");
+
+                    b.ToTable("DataModelAccessGrants");
                 });
 #pragma warning restore 612, 618
         }
