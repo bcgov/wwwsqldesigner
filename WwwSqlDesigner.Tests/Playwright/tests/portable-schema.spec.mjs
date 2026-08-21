@@ -217,29 +217,10 @@ test("runs every bundled export stylesheet against a portable model", async ({ p
     }
 });
 
-test("exposes one-click server version loading controls", async ({ page }) => {
+test("loads the newest server model from the name and version form", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();
-    await expect(page.locator("#serverversions")).toHaveValue("Load version");
-    await expect(page.locator("#serverversions")).toBeDisabled();
-    await expect(page.locator("#serverversionslist")).toBeHidden();
-    await expect(page.locator("#serverversionslist")).toBeAttached();
-    expect(await page.evaluate(() => typeof d.io.serverversions)).toBe("function");
-});
-
-test("requests versions for the loaded owner only", async ({ page }) => {
-    await page.goto("/");
-    await page.locator("#saveload").click();
-    let versionsRequest;
     let loadRequest;
-    await page.route("**/backend/netcore-ef/versions/**", async (route) => {
-        versionsRequest = route.request();
-        await route.fulfill({
-            status: 200,
-            contentType: "application/json",
-            body: JSON.stringify([{ keyword: "Shared", version: 2, createdAt: "2026-08-21T12:00:00Z" }]),
-        });
-    });
     await page.route("**/backend/netcore-ef/load/**", async (route) => {
         loadRequest = route.request();
         await route.fulfill({
@@ -248,17 +229,22 @@ test("requests versions for the loaded owner only", async ({ page }) => {
             body: "<sql><datatypes db=\"mssql\" /></sql>",
         });
     });
-    await page.evaluate(() => {
-        d.io._name = "Shared";
-        d.io._loadedOwnerId = "owner-b";
-        d.io.updateServerModelControls();
-    });
-    await page.locator("#serverversions").click();
-    await expect.poll(() => versionsRequest && versionsRequest.url()).toContain("ownerId=owner-b");
-    await page.locator("#serverversionslist button").click();
+    await page.locator("#serverload").click();
+    await expect(page.locator("#serverloadform")).toBeVisible();
+    await expect(page.locator("#serverloadname")).toBeFocused();
+    await page.locator("#serverloadname").fill("Shared");
+    await page.locator("#windowok").click();
+    await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
+    await expect.poll(() => loadRequest && loadRequest.url()).not.toContain("version=");
+
+    loadRequest = null;
+    await page.locator("#saveload").click();
+    await page.locator("#serverload").click();
+    await page.locator("#serverloadname").fill("Shared");
+    await page.locator("#serverloadversion").fill("2");
+    await page.locator("#windowok").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("version=2");
-    await expect.poll(() => loadRequest && loadRequest.url()).toContain("ownerId=owner-b");
 });
 
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {

@@ -175,52 +175,6 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.AreEqual(content, FooBarModelXml);
         }
 
-        [TestMethod]
-        public async Task VersionsReturnsNewestFirstForKeyword()
-        {
-            var result = await _controller.Versions("Test1", DataModel.UnownedOwnerId);
-
-            var json = (JsonResult)result;
-            var versions = (IEnumerable<ModelVersionResponse>)json.Value!;
-            CollectionAssert.AreEqual(new[] { 1, 0 }, versions.Select(x => x.Version).ToArray());
-        }
-
-        [TestMethod]
-        public async Task VersionsReturnsNotFoundForUnknownKeyword()
-        {
-            var result = await _controller.Versions("Missing", DataModel.UnownedOwnerId);
-
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
-        }
-
-        [TestMethod]
-        public async Task VersionsOnlyReturnsAccessibleOwnerStream()
-        {
-            var settings = ConfiguredKeycloak();
-            _dbContext.DataModels.AddRange(
-                new DataModel { OwnerId = "alice", Keyword = "SharedVersions", Version = 0, Data = FooBarModelXml },
-                new DataModel { OwnerId = "alice", Keyword = "SharedVersions", Version = 1, Data = FooBarModelXml },
-                new DataModel { OwnerId = "bob", Keyword = "SharedVersions", Version = 0, Data = FooBarModelXml },
-                new DataModel { OwnerId = "private", Keyword = "PrivateVersions", Version = 0, Data = FooBarModelXml });
-            _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
-            {
-                OwnerId = "bob",
-                Keyword = "SharedVersions",
-                TargetType = "User",
-                TargetId = "viewer",
-                Permission = "View"
-            });
-            _dbContext.SaveChanges();
-
-            var viewer = InitializeController(settings, User("viewer"));
-            var shared = (JsonResult)await viewer.Versions("SharedVersions", "bob");
-            var sharedVersions = (IEnumerable<ModelVersionResponse>)shared.Value!;
-            CollectionAssert.AreEqual(new[] { 0 }, sharedVersions.Select(x => x.Version).ToArray());
-
-            Assert.IsInstanceOfType(await viewer.Versions("SharedVersions", "alice"), typeof(NotFoundResult));
-            Assert.IsInstanceOfType(await viewer.Versions("PrivateVersions", "private"), typeof(NotFoundResult));
-        }
-
         [TestMethod()]
         public async Task SaveTestNoKeyword()
         {

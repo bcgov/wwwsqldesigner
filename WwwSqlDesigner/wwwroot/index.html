@@ -217,8 +217,6 @@
                             <input type="button" id="serversave" />
                             <input type="button" id="quicksave" />
                             <input type="button" id="serverload" />
-                            <input type="button" id="serverversions" />
-                            <div id="serverversionslist" aria-live="polite" style="display: none"></div>
                             <input type="button" id="serverlist" />
                             <input type="button" id="servershare" disabled />
                             <input type="button" id="serverunshare" disabled />
@@ -237,6 +235,13 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <div id="serverloadform" style="display: none">
+        <label for="serverloadname">Model name</label>
+        <input type="text" id="serverloadname" required />
+        <label for="serverloadversion">Version (optional)</label>
+        <input type="number" id="serverloadversion" min="0" step="1" />
     </div>
 
     <div id="keys">

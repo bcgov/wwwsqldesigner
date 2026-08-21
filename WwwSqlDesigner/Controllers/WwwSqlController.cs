@@ -59,7 +59,10 @@ namespace WwwSqlDesigner.Controllers
             }
             else
             {
-                model = await query.FirstOrDefaultAsync(x => x.Keyword == keyword && x.Version == version);
+                model = await query
+                    .Where(x => x.Keyword == keyword && x.Version == version)
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync();
             }
             if (null == model)
             {
@@ -67,35 +70,11 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
             var ownsModel = string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal);
-            Response.Headers["X-MODEL-OWNER-ID"] = model.OwnerId;
             if (!ownsModel)
             {
                 Response.Headers["X-MODEL-COPYABLE"] = "true";
             }
             return Content(model.Data, "text/xml");
-        }
-
-        [HttpGet]
-        [Route("backend/netcore-ef/versions")]
-        public async Task<IActionResult> Versions(string? keyword, string? ownerId)
-        {
-            if (string.IsNullOrWhiteSpace(keyword) || string.IsNullOrWhiteSpace(ownerId))
-            {
-                return BadRequest();
-            }
-
-            var versions = await ApplyOwnerFilter(_context.DataModels)
-                .AsNoTracking()
-                .Where(x => x.Keyword == keyword && x.OwnerId == ownerId.Trim())
-                .OrderByDescending(x => x.Version)
-                .Select(x => new ModelVersionResponse(x.Keyword, x.Version, x.CreatedAt))
-                .ToListAsync();
-            if (versions.Count == 0)
-            {
-                return NotFound();
-            }
-
-            return new JsonResult(versions);
         }
 
         [HttpPost]
@@ -148,7 +127,6 @@ namespace WwwSqlDesigner.Controllers
                 _logger.LogInformation("New Data model version: {keyword:0}", keyword);
             }
             _context.SaveChanges();
-            Response.Headers["X-MODEL-OWNER-ID"] = ownerId;
             return Content(string.Empty);
         }
 
@@ -336,5 +314,4 @@ namespace WwwSqlDesigner.Controllers
 
     public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);
     public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
-    public sealed record ModelVersionResponse(string Keyword, int Version, DateTime CreatedAt);
 }

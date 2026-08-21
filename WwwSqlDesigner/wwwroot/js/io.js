@@ -5,7 +5,6 @@ SQL.IO = function (owner) {
         ""; /* last used name with local storage */
     this._csrfToken = "";
     this._serverModelState = "none";
-    this._loadedOwnerId = "";
     this.dom = {
         container: OZ.$("io"),
     };
@@ -23,7 +22,6 @@ SQL.IO = function (owner) {
         "quicksave",
         "serversave",
         "serverload",
-        "serverversions",
         "serverlist",
         "servershare",
         "serverunshare",
@@ -53,6 +51,9 @@ SQL.IO = function (owner) {
     this.dom.statusdetails = OZ.$("iostatusdetails");
     this.dom.statuslist = OZ.$("iostatuslist");
     this.dom.statusdismiss = OZ.$("iostatusdismiss");
+    this.dom.serverloadform = OZ.$("serverloadform");
+    this.dom.serverloadname = OZ.$("serverloadname");
+    this.dom.serverloadversion = OZ.$("serverloadversion");
     if (this.dom.servershare.value === "servershare") {
         this.dom.servershare.value = "Share (view only)";
     }
@@ -60,11 +61,6 @@ SQL.IO = function (owner) {
         this.dom.serverunshare.value = "Remove share";
     }
     this.updateServerModelControls();
-    this.dom.serverversionslist = OZ.$("serverversionslist");
-    if (this.dom.serverversions.value === "serverversions") {
-        this.dom.serverversions.value = "Load version";
-    }
-    this.dom.serverversions.setAttribute("aria-expanded", "false");
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -100,7 +96,6 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
-    OZ.Event.add(this.dom.serverversions, "click", this.serverversions.bind(this));
     OZ.Event.add(this.dom.serverlist, "click", this.serverlist.bind(this));
     OZ.Event.add(this.dom.servershare, "click", this.servershare.bind(this));
     OZ.Event.add(this.dom.serverunshare, "click", this.serverunshare.bind(this));
@@ -186,6 +181,10 @@ SQL.IO.prototype.build = function () {
 
 SQL.IO.prototype.click = function () {
     /* open io dialog */
+    if (this.dom.serverloadform.parentNode !== document.body) {
+        document.body.appendChild(this.dom.serverloadform);
+    }
+    this.dom.serverloadform.style.display = "none";
     this.build();
     this.hideStatus();
     this.dom.ta.value = "";
@@ -261,7 +260,6 @@ SQL.IO.prototype.clientload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
-        this._loadedOwnerId = "";
         this.updateServerModelControls();
     }
 };
@@ -348,7 +346,6 @@ SQL.IO.prototype.clientlocalload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
-        this._loadedOwnerId = "";
         this.updateServerModelControls();
     }
 };
@@ -696,6 +693,28 @@ SQL.IO.prototype.quicksave = function (e) {
 };
 
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
+    if (typeof keyword === "undefined") {
+        this.dom.serverloadname.value = this._name;
+        this.dom.serverloadversion.value = "";
+        this.dom.serverloadform.style.display = "";
+        this.owner.window.open(_("serverloadprompt"), this.dom.serverloadform, () => {
+            if (!this.dom.serverloadname.validity.valid) {
+                this.dom.serverloadname.reportValidity();
+                return false;
+            }
+            if (!this.dom.serverloadversion.validity.valid) {
+                this.dom.serverloadversion.reportValidity();
+                return false;
+            }
+            const selectedVersion = this.dom.serverloadversion.value === ""
+                ? null
+                : Number(this.dom.serverloadversion.value);
+            this.serverload(false, this.dom.serverloadname.value.trim(), selectedVersion, null);
+            this.dom.serverloadform.style.display = "none";
+            document.body.appendChild(this.dom.serverloadform);
+        });
+        return;
+    }
     const name = keyword || prompt(_("serverloadprompt"), this._name);
     if (!name) {
         return;
@@ -710,69 +729,13 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     if (version !== null && version !== undefined) {
         url += "&version=" + encodeURIComponent(version);
     }
-    const selectedOwnerId = ownerId || (version !== null && version !== undefined ? this._loadedOwnerId : "");
-    if (selectedOwnerId) {
-        url += "&ownerId=" + encodeURIComponent(selectedOwnerId);
+    if (ownerId) {
+        url += "&ownerId=" + encodeURIComponent(ownerId);
     }
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     this._pendingName = name;
     OZ.Request(url, this.loadresponse, { xml: true, headers: h });
-};
-
-SQL.IO.prototype.serverversions = function () {
-    if (!this._loadedOwnerId || !this._name) {
-        return;
-    }
-    if (this.dom.serverversionslist.style.display !== "none") {
-        this.dom.serverversionslist.style.display = "none";
-        this.dom.serverversions.setAttribute("aria-expanded", "false");
-        return;
-    }
-
-    const name = this._name;
-    if (!name) {
-        return;
-    }
-
-    this._name = name;
-    this.dom.serverversionslist.style.display = "";
-    this.dom.serverversions.setAttribute("aria-expanded", "true");
-    this.dom.serverversionslist.textContent = "Loading versions...";
-    const bp = this.owner.getOption("xhrpath");
-    const url = bp + "backend/" + this.dom.backend.value + "/versions/?keyword="
-        + encodeURIComponent(name) + "&ownerId=" + encodeURIComponent(this._loadedOwnerId);
-    const h = this.owner.getXhrHeaders();
-    OZ.Request(url, (data, code) => {
-        if (!this.check(code)) {
-            this.dom.serverversionslist.textContent = "No versions available.";
-            return;
-        }
-
-        let versions;
-        try {
-            versions = JSON.parse(data);
-        } catch {
-            this.dom.serverversionslist.textContent = "Unable to read versions.";
-            return;
-        }
-
-        OZ.DOM.clear(this.dom.serverversionslist);
-        const heading = OZ.DOM.elm("strong");
-        heading.textContent = "Versions for " + name;
-        this.dom.serverversionslist.appendChild(heading);
-        for (const version of versions) {
-            const button = OZ.DOM.elm("button");
-            button.type = "button";
-            button.textContent = "v" + version.version + " (" + new Date(version.createdAt).toLocaleString() + ")";
-            OZ.Event.add(button, "click", () => {
-                this.serverload(null, name, version.version, this._loadedOwnerId);
-                this.dom.serverversionslist.style.display = "none";
-                this.dom.serverversions.setAttribute("aria-expanded", "false");
-            });
-            this.dom.serverversionslist.appendChild(button);
-        }
-    }, { headers: h });
 };
 
 SQL.IO.prototype.serverlist = function (e) {
@@ -796,7 +759,6 @@ SQL.IO.prototype.parseShareRecipient = function (value) {
 
 SQL.IO.prototype.updateServerModelControls = function () {
     const ownerControlsEnabled = this._serverModelState === "owned";
-    this.dom.serverversions.disabled = !this._loadedOwnerId || !this._name;
     this.dom.servershare.disabled = !ownerControlsEnabled;
     this.dom.serverunshare.disabled = !ownerControlsEnabled;
     this.dom.serversave.disabled = false;
@@ -909,7 +871,6 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
     if (this.check(code) && code >= 200 && code < 300) {
-        this._loadedOwnerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || "";
         this._serverModelState = "owned";
         this.updateServerModelControls();
     }
@@ -925,7 +886,6 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
     if (!this.fromXML(data)) {
         return;
     }
-    this._loadedOwnerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || "";
     this._name = this._pendingName;
     this.name = this._pendingName;
     this._serverModelState = copyable ? "copyable" : "owned";
@@ -951,7 +911,6 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
     if (this.fromXML(data)) {
         this._serverModelState = "none";
         this._name = "";
-        this._loadedOwnerId = "";
         this.updateServerModelControls();
         this.owner.alignTables();
     }
