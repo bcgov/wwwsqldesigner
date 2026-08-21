@@ -125,6 +125,26 @@ test("exposes owner-only read-only sharing controls for server models", async ({
     expect(await page.evaluate(() => d.io.parseShareRecipient("finance"))).toBeNull();
 });
 
+test("sends sharing grants as JSON", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    let request;
+    await page.route("**/backend/netcore-ef/access/grant**", async (route) => {
+        request = route.request();
+        await route.fulfill({ status: 204 });
+    });
+    await page.evaluate(() => {
+        window.prompt = () => "user:abc";
+        d.io._name = "Saved";
+        d.io._csrfToken = "token";
+        d.io._serverModelState = "owned";
+        d.io.updateServerModelControls();
+    });
+    await page.locator("#servershare").click();
+    await expect.poll(() => request && request.headers()["content-type"]).toBe("application/json");
+    expect(request.postData()).toBe(JSON.stringify({ targetType: "User", targetId: "abc", permission: "View" }));
+});
+
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
     await page.goto("/");
     await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="NullableText" null="1"><datatype>STRING(20)</datatype><default>NULL</default></row><row name="Id" null="0"><datatype>INTEGER</datatype></row></table></sql>');

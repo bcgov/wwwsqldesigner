@@ -14,6 +14,10 @@ namespace WwwSqlDesigner.Migrations
                 name: "PK_DataModels",
                 table: "DataModels");
 
+            migrationBuilder.DropIndex(
+                name: "IX_DataModels_OwnerId_Keyword_Version",
+                table: "DataModels");
+
             migrationBuilder.Sql(
                 "UPDATE [DataModels] SET [OwnerId] = N'legacy' WHERE [OwnerId] IS NULL OR [OwnerId] = N'';");
 
@@ -33,6 +37,11 @@ namespace WwwSqlDesigner.Migrations
                 name: "PK_DataModels",
                 table: "DataModels",
                 columns: new[] { "OwnerId", "Keyword", "Version" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DataModels_OwnerId_Keyword_Version",
+                table: "DataModels",
+                columns: new[] { "OwnerId", "Keyword", "Version" });
         }
 
         /// <inheritdoc />
@@ -40,6 +49,10 @@ namespace WwwSqlDesigner.Migrations
         {
             migrationBuilder.DropPrimaryKey(
                 name: "PK_DataModels",
+                table: "DataModels");
+
+            migrationBuilder.DropIndex(
+                name: "IX_DataModels_OwnerId_Keyword_Version",
                 table: "DataModels");
 
             migrationBuilder.AlterColumn<string>(
@@ -57,6 +70,11 @@ namespace WwwSqlDesigner.Migrations
                 name: "PK_DataModels",
                 table: "DataModels",
                 columns: new[] { "Keyword", "Version" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DataModels_OwnerId_Keyword_Version",
+                table: "DataModels",
+                columns: new[] { "OwnerId", "Keyword", "Version" });
         }
     }
 }

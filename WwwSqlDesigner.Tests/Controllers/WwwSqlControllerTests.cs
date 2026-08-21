@@ -400,6 +400,40 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
+        public async Task RoleClaimDoesNotGrantGroupAccess()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner",
+                Keyword = "RoleOnly",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
+            {
+                OwnerId = "owner",
+                Keyword = "RoleOnly",
+                TargetType = "Group",
+                TargetId = "team-a",
+                Permission = "View"
+            });
+            _dbContext.SaveChanges();
+
+            var roleOnlyUser = new ClaimsPrincipal(new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "viewer"),
+                    new Claim(ClaimTypes.Role, "team-a")
+                },
+                "Test"));
+
+            var result = await InitializeController(settings, roleOnlyUser).Load("RoleOnly", null);
+
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+
+        [TestMethod]
         public async Task EditPermissionIsRejected()
         {
             var settings = ConfiguredKeycloak();

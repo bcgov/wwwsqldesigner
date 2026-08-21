@@ -295,7 +295,7 @@ namespace WwwSqlDesigner.Controllers
         private string[] GetCurrentGroupIds()
         {
             return User.Claims
-                .Where(x => x.Type == "groups" || x.Type == ClaimTypes.Role || x.Type == "group")
+                .Where(x => x.Type == "groups" || x.Type == "group")
                 .Select(x => x.Value)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.Ordinal)
