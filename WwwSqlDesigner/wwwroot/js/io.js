@@ -5,7 +5,6 @@ SQL.IO = function (owner) {
         ""; /* last used name with local storage */
     this._csrfToken = "";
     this._serverModelState = "none";
-    this._ownerId = null;
     this.dom = {
         container: OZ.$("io"),
     };
@@ -247,10 +246,8 @@ SQL.IO.prototype.clientload = function () {
     }
 
     if (this.fromXMLText(xml)) {
-        this._readOnly = false;
         this._serverModelState = "none";
         this._name = "";
-        this._ownerId = null;
         this.updateServerModelControls();
     }
 };
@@ -335,10 +332,8 @@ SQL.IO.prototype.clientlocalload = function () {
     }
 
     if (this.fromXMLText(xml)) {
-        this._readOnly = false;
         this._serverModelState = "none";
         this._name = "";
-        this._ownerId = null;
         this.updateServerModelControls();
     }
 };
@@ -644,7 +639,7 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {
-    if (this._readOnly) {
+    if (this._serverModelState === "shared") {
         this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
         return;
     }
@@ -704,7 +699,6 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     this._pendingName = name;
-    this._pendingOwnerId = ownerId || null;
     OZ.Request(url, this.loadresponse, { xml: true, headers: h });
 };
 
@@ -843,7 +837,6 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
     this.owner.window.hideThrobber();
     if (this.check(code) && code >= 200 && code < 300) {
         this._serverModelState = "owned";
-        this._ownerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || this._ownerId;
         this.updateServerModelControls();
     }
 };
@@ -860,8 +853,6 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
     }
     this._name = this._pendingName;
     this.name = this._pendingName;
-    this._ownerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || this._pendingOwnerId;
-    this._readOnly = readOnly;
     this._serverModelState = readOnly ? "shared" : "owned";
     this.updateServerModelControls();
     this.owner.setTitle(this.name);
@@ -883,10 +874,8 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
         return;
     }
     if (this.fromXML(data)) {
-        this._readOnly = false;
         this._serverModelState = "none";
         this._name = "";
-        this._ownerId = null;
         this.updateServerModelControls();
         this.owner.alignTables();
     }
@@ -894,7 +883,7 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
 
 SQL.IO.prototype.press = function (e) {
     if (e.keyCode == 113) {
-        if (this._readOnly) {
+        if (this._serverModelState === "shared") {
             this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
             return;
         }

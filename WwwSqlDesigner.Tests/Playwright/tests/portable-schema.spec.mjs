@@ -110,6 +110,8 @@ test("exposes owner-only read-only sharing controls for server models", async ({
     await expect(page.locator("#serverunshare")).toHaveValue(/Remove share/);
     await expect(page.locator("#servershare")).toBeDisabled();
     await expect(page.locator("#serverunshare")).toBeDisabled();
+    await expect(page.locator("#servershare")).toHaveCSS("box-shadow", "none");
+    await expect(page.locator("#servershare")).toHaveCSS("cursor", "not-allowed");
     expect(await page.evaluate(() => typeof d.io.servershare)).toBe("function");
     expect(await page.evaluate(() => typeof d.io.serverunshare)).toBe("function");
     expect(await page.evaluate(() => d.io.parseShareRecipient("user:abc"))).toEqual({
