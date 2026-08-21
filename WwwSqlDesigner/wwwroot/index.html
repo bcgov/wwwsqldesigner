@@ -45,11 +45,6 @@
             <div id="toggle"></div>
             <input type="button" id="saveload" />
 
-            <form method="post" action="account/logout" id="logout-form">
-                <input type="hidden" name="returnUrl" value="/" />
-                <button type="submit">Sign out</button>
-            </form>
-
             <hr />
 
             <input type="button" id="addtable" />
@@ -328,38 +323,6 @@
     </div>
 
     <script type="text/javascript">
-        const logoutForm = document.getElementById("logout-form");
-        logoutForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            const form = event.currentTarget;
-            let response;
-            try {
-                response = await fetch("/backend/netcore-ef/csrf", {
-                    credentials: "same-origin"
-                });
-            } catch {
-                alert("Unable to obtain a CSRF token. Sign out was not sent.");
-                return;
-            }
-            if (!response.ok) {
-                alert("Unable to obtain a CSRF token. Sign out was not sent.");
-                return;
-            }
-
-            const token = response.headers.get("X-CSRF-TOKEN") || (await response.text()).trim();
-            if (!token) {
-                alert("Unable to obtain a CSRF token. Sign out was not sent.");
-                return;
-            }
-
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = "__RequestVerificationToken";
-            input.value = token;
-            form.appendChild(input);
-            form.submit();
-        });
-
         const d = new SQL.Designer();
     </script>
 </body>

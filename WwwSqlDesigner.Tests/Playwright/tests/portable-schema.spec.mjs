@@ -108,8 +108,19 @@ test("exposes owner-only read-only sharing controls for server models", async ({
     await page.locator("#saveload").click();
     await expect(page.locator("#servershare")).toHaveValue(/Share/);
     await expect(page.locator("#serverunshare")).toHaveValue(/Remove share/);
+    await expect(page.locator("#servershare")).toBeDisabled();
+    await expect(page.locator("#serverunshare")).toBeDisabled();
     expect(await page.evaluate(() => typeof d.io.servershare)).toBe("function");
     expect(await page.evaluate(() => typeof d.io.serverunshare)).toBe("function");
+    expect(await page.evaluate(() => d.io.parseShareRecipient("user:abc"))).toEqual({
+        targetType: "User",
+        targetId: "abc",
+    });
+    expect(await page.evaluate(() => d.io.parseShareRecipient("group:finance"))).toEqual({
+        targetType: "Group",
+        targetId: "finance",
+    });
+    expect(await page.evaluate(() => d.io.parseShareRecipient("finance"))).toBeNull();
 });
 
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
