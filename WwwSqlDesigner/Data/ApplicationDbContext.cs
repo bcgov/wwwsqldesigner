@@ -21,7 +21,6 @@ namespace WwwSqlDesigner.Data
             {
                 entity.Property(e => e.OwnerId).HasDefaultValue(DataModel.UnownedOwnerId);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
-                entity.HasIndex(e => new { e.OwnerId, e.Keyword, e.Version });
             });
 
             modelBuilder.Entity<DataModelAccessGrant>(entity =>

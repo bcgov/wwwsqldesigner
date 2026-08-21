@@ -43,11 +43,6 @@ namespace WwwSqlDesigner.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_DataModels_OwnerId_Keyword_Version",
-                table: "DataModels",
-                columns: new[] { "OwnerId", "Keyword", "Version" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_DataModelAccessGrants_TargetType_TargetId_Permission",
                 table: "DataModelAccessGrants",
                 columns: new[] { "TargetType", "TargetId", "Permission" });
@@ -56,15 +51,24 @@ namespace WwwSqlDesigner.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                IF EXISTS (
+                    SELECT [Keyword], [Version]
+                    FROM [DataModels]
+                    GROUP BY [Keyword], [Version]
+                    HAVING COUNT(*) > 1
+                )
+                BEGIN
+                    THROW 51000, 'Cannot roll back owner-scoped model access because owner/version collisions exist.', 1;
+                END
+                """);
+
             migrationBuilder.DropTable(
                 name: "DataModelAccessGrants");
 
             migrationBuilder.DropPrimaryKey(
                 name: "PK_DataModels",
-                table: "DataModels");
-
-            migrationBuilder.DropIndex(
-                name: "IX_DataModels_OwnerId_Keyword_Version",
                 table: "DataModels");
 
             migrationBuilder.DropColumn(

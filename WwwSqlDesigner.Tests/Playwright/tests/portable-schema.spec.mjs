@@ -103,7 +103,7 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
 });
 
-test("exposes owner-only read-only sharing controls for server models", async ({ page }) => {
+test("exposes owner-only sharing controls for server models", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();
     await expect(page.locator("#servershare")).toHaveValue(/Share/);
@@ -112,6 +112,21 @@ test("exposes owner-only read-only sharing controls for server models", async ({
     await expect(page.locator("#serverunshare")).toBeDisabled();
     await expect(page.locator("#servershare")).toHaveCSS("box-shadow", "none");
     await expect(page.locator("#servershare")).toHaveCSS("cursor", "not-allowed");
+    expect(await page.evaluate(() => {
+        d.io._serverModelState = "copyable";
+        d.io.updateServerModelControls();
+        return {
+            saveDisabled: d.io.dom.serversave.disabled,
+            quickSaveDisabled: d.io.dom.quicksave.disabled,
+            shareDisabled: d.io.dom.servershare.disabled,
+            removeShareDisabled: d.io.dom.serverunshare.disabled,
+        };
+    })).toEqual({
+        saveDisabled: false,
+        quickSaveDisabled: false,
+        shareDisabled: true,
+        removeShareDisabled: true,
+    });
     expect(await page.evaluate(() => typeof d.io.servershare)).toBe("function");
     expect(await page.evaluate(() => typeof d.io.serverunshare)).toBe("function");
     expect(await page.evaluate(() => d.io.parseShareRecipient("user:abc"))).toEqual({

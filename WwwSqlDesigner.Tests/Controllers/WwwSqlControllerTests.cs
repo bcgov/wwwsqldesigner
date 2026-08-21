@@ -290,6 +290,26 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
+        public async Task AuthenticatedUsersCanLoadUnownedModels()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = DataModel.UnownedOwnerId,
+                Keyword = "PublicLegacy",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.SaveChanges();
+
+            var controller = InitializeController(settings, User("viewer"));
+            var result = await controller.Load("PublicLegacy", null);
+
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.AreEqual("true", controller.Response.Headers["X-MODEL-COPYABLE"].ToString());
+        }
+
+        [TestMethod]
         public async Task ListEncodesOwnerIdInModelLinks()
         {
             var settings = ConfiguredKeycloak();
@@ -342,7 +362,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
-        public async Task SharedViewerCanLoadButCannotSave()
+        public async Task SharedViewerCanLoadAndSaveOwnCopy()
         {
             var settings = ConfiguredKeycloak();
             _dbContext.DataModels.Add(new DataModel
@@ -369,8 +389,9 @@ namespace WwwSqlDesigner.Controllers.Tests
             viewer.HttpContext.Request.Body = stream;
             viewer.HttpContext.Request.ContentLength = stream.Length;
             var saveResult = await viewer.Save("Shared");
-            Assert.IsInstanceOfType(saveResult, typeof(ForbidResult));
+            Assert.IsInstanceOfType(saveResult, typeof(ContentResult));
             Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "owner" && x.Keyword == "Shared"));
+            Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "viewer" && x.Keyword == "Shared"));
         }
 
         [TestMethod]
@@ -395,8 +416,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var content = (ContentResult)result;
             StringAssert.Contains(content.Content, "name=\"B\"");
-            Assert.AreEqual("owner-b", viewer.Response.Headers["X-MODEL-OWNER-ID"].ToString());
-            Assert.AreEqual("true", viewer.Response.Headers["X-MODEL-READONLY"].ToString());
+            Assert.AreEqual("true", viewer.Response.Headers["X-MODEL-COPYABLE"].ToString());
         }
 
         [TestMethod]
@@ -431,6 +451,16 @@ namespace WwwSqlDesigner.Controllers.Tests
             var result = await InitializeController(settings, roleOnlyUser).Load("RoleOnly", null);
 
             Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+
+        [TestMethod]
+        public async Task ConfiguredUserWithoutStableIdentityCannotLoadModels()
+        {
+            var settings = ConfiguredKeycloak();
+            var user = new ClaimsPrincipal(new ClaimsIdentity("Test"));
+
+            await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+                () => InitializeController(settings, user).Load("Missing", null));
         }
 
         [TestMethod]

@@ -49,8 +49,6 @@ namespace WwwSqlDesigner.Migrations
 
                     b.HasKey("OwnerId", "Keyword", "Version");
 
-                    b.HasIndex("OwnerId", "Keyword", "Version");
-
                     b.ToTable("DataModels");
                 });
 

@@ -66,10 +66,10 @@ namespace WwwSqlDesigner.Controllers
                 _logger.LogWarning("Keyword not found: {keyword:0}", keyword);
                 return NotFound();
             }
-            Response.Headers["X-MODEL-OWNER-ID"] = model.OwnerId;
-            if (!string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal))
+            var ownsModel = string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal);
+            if (!ownsModel)
             {
-                Response.Headers["X-MODEL-READONLY"] = "true";
+                Response.Headers["X-MODEL-COPYABLE"] = "true";
             }
             return Content(model.Data, "text/xml");
         }
@@ -99,12 +99,6 @@ namespace WwwSqlDesigner.Controllers
                 .FirstOrDefaultAsync(x => x.Keyword == keyword);
             if (null == save)
             {
-                var visibleModelExists = await ApplyOwnerFilter(_context.DataModels).AnyAsync(x => x.Keyword == keyword);
-                if (visibleModelExists)
-                {
-                    return Forbid();
-                }
-
                 var newModel = new DataModel()
                 {
                     Keyword = keyword,
@@ -265,7 +259,7 @@ namespace WwwSqlDesigner.Controllers
                 ?? User.FindFirstValue("preferred_username")
                 ?? User.FindFirstValue(ClaimTypes.Upn)
                 ?? User.Identity?.Name
-                ?? DataModel.UnownedOwnerId;
+                ?? throw new InvalidOperationException("The authenticated user has no stable owner identifier claim.");
         }
 
         private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query, bool includeGrants = true)
@@ -284,6 +278,7 @@ namespace WwwSqlDesigner.Controllers
             var groupIds = GetCurrentGroupIds();
             return query.Where(x =>
                 x.OwnerId == ownerId
+                || x.OwnerId == DataModel.UnownedOwnerId
                 || _context.DataModelAccessGrants.Any(grant =>
                     grant.OwnerId == x.OwnerId
                     && grant.Keyword == x.Keyword

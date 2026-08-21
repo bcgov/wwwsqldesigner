@@ -639,10 +639,6 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {
-    if (this._serverModelState === "shared") {
-        this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
-        return;
-    }
     const name = keyword || prompt(_("serversaveprompt"), this._name);
     if (!name) {
         return;
@@ -725,9 +721,8 @@ SQL.IO.prototype.updateServerModelControls = function () {
     const ownerControlsEnabled = this._serverModelState === "owned";
     this.dom.servershare.disabled = !ownerControlsEnabled;
     this.dom.serverunshare.disabled = !ownerControlsEnabled;
-    const readOnly = this._serverModelState === "shared";
-    this.dom.serversave.disabled = readOnly;
-    this.dom.quicksave.disabled = readOnly;
+    this.dom.serversave.disabled = false;
+    this.dom.quicksave.disabled = false;
 };
 
 SQL.IO.prototype.servershare = function () {
@@ -843,7 +838,7 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
 
 SQL.IO.prototype.loadresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
-    const readOnly = headers && (headers["X-MODEL-READONLY"] || headers["x-model-readonly"]) === "true";
+    const copyable = headers && (headers["X-MODEL-COPYABLE"] || headers["x-model-copyable"]) === "true";
     this.owner.window.hideThrobber();
     if (!this.check(code)) {
         return;
@@ -853,7 +848,7 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
     }
     this._name = this._pendingName;
     this.name = this._pendingName;
-    this._serverModelState = readOnly ? "shared" : "owned";
+    this._serverModelState = copyable ? "copyable" : "owned";
     this.updateServerModelControls();
     this.owner.setTitle(this.name);
 };
@@ -883,10 +878,6 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
 
 SQL.IO.prototype.press = function (e) {
     if (e.keyCode == 113) {
-        if (this._serverModelState === "shared") {
-            this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
-            return;
-        }
         if (OZ.opera) {
             e.preventDefault();
         }
