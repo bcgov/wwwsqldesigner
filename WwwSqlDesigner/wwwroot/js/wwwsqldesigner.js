@@ -128,13 +128,14 @@ SQL.Designer.prototype.init2 = function () {
     const url = window.location.href;
     const regexKeyword = url.match(/keyword=([^&]+)/);
     const regexVersion = url.match(/version=([^&]+)/);
+    const regexOwnerId = url.match(/ownerId=([^&]+)/);
     if (regexKeyword && regexVersion) {
         const keyword = regexKeyword[1];
         const version = regexVersion[1];
-        this.io.serverload(false, keyword, version);
+        this.io.serverload(false, decodeURIComponent(keyword), decodeURIComponent(version), regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null);
     } else if (regexKeyword) {
         const keyword = regexKeyword[1];
-        this.io.serverload(false, keyword);
+        this.io.serverload(false, decodeURIComponent(keyword), null, regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null);
     }
     document.body.style.visibility = "visible";
 };

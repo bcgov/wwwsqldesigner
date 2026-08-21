@@ -229,7 +229,8 @@ namespace WwwSqlDesigner.Controllers.Tests
             {
                 Enabled = true,
                 Authority = "https://login.example/realms/standard",
-                ClientId = "wwwsqldesigner"
+                ClientId = "wwwsqldesigner",
+                ClientSecret = "test-secret"
             };
             var ownerA = new WwwSqlController(InitializeLogger<WwwSqlController>(), _dbContext, settings);
             var ownerB = new WwwSqlController(InitializeLogger<WwwSqlController>(), _dbContext, settings);
@@ -286,6 +287,27 @@ namespace WwwSqlDesigner.Controllers.Tests
             StringAssert.Contains(result.Content, "UserShared");
             StringAssert.Contains(result.Content, "GroupShared");
             Assert.IsFalse(result.Content!.Contains("Private", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public async Task ListEncodesOwnerIdInModelLinks()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner&team",
+                Keyword = "Shared model",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.SaveChanges();
+
+            var controller = InitializeController(settings, User("owner&team"));
+            var result = (ContentResult)await controller.List();
+
+            StringAssert.Contains(result.Content, "keyword=Shared%20model");
+            StringAssert.Contains(result.Content, "ownerId=owner%26team");
+            Assert.IsFalse(result.Content!.Contains("ownerId=owner&team", StringComparison.Ordinal));
         }
 
         [TestMethod]
@@ -351,13 +373,61 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "owner" && x.Keyword == "Shared"));
         }
 
+        [TestMethod]
+        public async Task SharedModelsWithSameKeywordCanBeSelectedByOwner()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.AddRange(
+                new DataModel { OwnerId = "owner-a", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"A\" /></sql>", CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "owner-b", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"B\" /></sql>", CreatedAt = DateTime.UtcNow });
+            _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
+            {
+                OwnerId = "owner-b",
+                Keyword = "Shared",
+                TargetType = "User",
+                TargetId = "viewer",
+                Permission = "View"
+            });
+            _dbContext.SaveChanges();
+
+            var viewer = InitializeController(settings, User("viewer"));
+            var result = await viewer.Load("Shared", null, "owner-b");
+
+            var content = (ContentResult)result;
+            StringAssert.Contains(content.Content, "name=\"B\"");
+            Assert.AreEqual("owner-b", viewer.Response.Headers["X-MODEL-OWNER-ID"].ToString());
+            Assert.AreEqual("true", viewer.Response.Headers["X-MODEL-READONLY"].ToString());
+        }
+
+        [TestMethod]
+        public async Task EditPermissionIsRejected()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner",
+                Keyword = "Shared",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.SaveChanges();
+
+            var owner = InitializeController(settings, User("owner"));
+            var result = await owner.GrantAccess(
+                "Shared",
+                new AccessGrantRequest("User", "viewer", "Edit"));
+
+            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+        }
+
         private static KeycloakSettings ConfiguredKeycloak()
         {
             return new KeycloakSettings
             {
                 Enabled = true,
                 Authority = "https://login.example/realms/standard",
-                ClientId = "wwwsqldesigner"
+                ClientId = "wwwsqldesigner",
+                ClientSecret = "test-secret"
             };
         }
 

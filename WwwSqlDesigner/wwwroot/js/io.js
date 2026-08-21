@@ -626,6 +626,10 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {
+    if (this._readOnly) {
+        this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
+        return;
+    }
     const name = keyword || prompt(_("serversaveprompt"), this._name);
     if (!name) {
         return;
@@ -661,12 +665,13 @@ SQL.IO.prototype.quicksave = function (e) {
     this.serversave(e, this._name);
 };
 
-SQL.IO.prototype.serverload = function (e, keyword, version) {
+SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     const name = keyword || prompt(_("serverloadprompt"), this._name);
     if (!name) {
         return;
     }
     this._name = name;
+    this._ownerId = ownerId || null;
     const bp = this.owner.getOption("xhrpath");
     let url =
         bp +
@@ -676,6 +681,9 @@ SQL.IO.prototype.serverload = function (e, keyword, version) {
         encodeURIComponent(name);
     if (version) {
         url += "&version=" + encodeURIComponent(version);
+    }
+    if (ownerId) {
+        url += "&ownerId=" + encodeURIComponent(ownerId);
     }
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
@@ -777,6 +785,9 @@ SQL.IO.prototype.serverimport = function (e) {
 
 SQL.IO.prototype.check = function (code) {
     switch (code) {
+        case 403:
+            this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
+            return false;
         case 201:
         case 404:
         case 500:
@@ -798,6 +809,11 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
 
 SQL.IO.prototype.loadresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
+    const readOnly = headers && (headers["X-MODEL-READONLY"] || headers["x-model-readonly"]) === "true";
+    this._readOnly = readOnly;
+    this.dom.serversave.disabled = readOnly;
+    this.dom.quicksave.disabled = readOnly;
+    this._ownerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || this._ownerId;
     this.owner.window.hideThrobber();
     if (!this.check(code)) {
         return;
@@ -828,6 +844,10 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
 
 SQL.IO.prototype.press = function (e) {
     if (e.keyCode == 113) {
+        if (this._readOnly) {
+            this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
+            return;
+        }
         if (OZ.opera) {
             e.preventDefault();
         }

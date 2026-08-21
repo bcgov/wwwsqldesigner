@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -87,8 +88,88 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         }
 
+        [TestMethod]
+        public async Task GrantWithoutAntiforgeryTokenReturnsBadRequest()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                "/backend/netcore-ef/access/grant?keyword=pipeline-test")
+            {
+                Content = JsonContent.Create(new { targetType = "User", targetId = "target", permission = "View" })
+            };
+
+            var response = await client.SendAsync(request);
+
+            Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task RevokeWithoutAntiforgeryTokenReturnsBadRequest()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            var response = await client.DeleteAsync(
+                "/backend/netcore-ef/access/grant?keyword=pipeline-test&targetType=User&targetId=target");
+
+            Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task GrantAndRevokeWithValidAntiforgeryTokenAreAllowed()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            var tokenResponse = await client.GetAsync("/backend/netcore-ef/csrf");
+            tokenResponse.EnsureSuccessStatusCode();
+            var token = tokenResponse.Headers.GetValues("X-CSRF-TOKEN").Single();
+
+            using var saveContent = new StringContent("<sql />");
+            saveContent.Headers.ContentType = new MediaTypeHeaderValue("application/xml");
+            using var saveRequest = new HttpRequestMessage(
+                HttpMethod.Post,
+                "/backend/netcore-ef/save?keyword=pipeline-test")
+            {
+                Content = saveContent
+            };
+            saveRequest.Headers.Add("X-CSRF-TOKEN", token);
+            var saveResponse = await client.SendAsync(saveRequest);
+            Assert.AreEqual(HttpStatusCode.OK, saveResponse.StatusCode);
+
+            using var grantRequest = new HttpRequestMessage(
+                HttpMethod.Post,
+                "/backend/netcore-ef/access/grant?keyword=pipeline-test")
+            {
+                Content = JsonContent.Create(new { targetType = "User", targetId = "target", permission = "View" })
+            };
+            grantRequest.Headers.Add("X-CSRF-TOKEN", token);
+            var grantResponse = await client.SendAsync(grantRequest);
+            Assert.AreEqual(HttpStatusCode.NoContent, grantResponse.StatusCode);
+
+            using var revokeRequest = new HttpRequestMessage(
+                HttpMethod.Delete,
+                "/backend/netcore-ef/access/grant?keyword=pipeline-test&targetType=User&targetId=target");
+            revokeRequest.Headers.Add("X-CSRF-TOKEN", token);
+            var revokeResponse = await client.SendAsync(revokeRequest);
+            Assert.AreEqual(HttpStatusCode.NoContent, revokeResponse.StatusCode);
+        }
+
         private sealed class TestApplicationFactory : WebApplicationFactory<Program>
         {
+            private readonly string _databaseName = $"WwwSqlControllerPipelineTests-{Guid.NewGuid()}";
+
             protected override void ConfigureWebHost(IWebHostBuilder builder)
             {
                 builder.UseEnvironment("Testing");
@@ -96,6 +177,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 builder.UseSetting("Authentication:Keycloak:Authority", "https://example.test/realms/test");
                 builder.UseSetting("Authentication:Keycloak:ClientId", "client");
                 builder.UseSetting("Authentication:Keycloak:ClientSecret", "secret");
+                builder.UseSetting("Authentication:Keycloak:LegacyOwnerId", "pipeline-test");
                 builder.ConfigureAppConfiguration((_, configuration) =>
                 {
                     configuration.Sources.Clear();
@@ -104,7 +186,8 @@ namespace WwwSqlDesigner.Controllers.Tests
                         ["Authentication:Keycloak:Enabled"] = "true",
                         ["Authentication:Keycloak:Authority"] = "https://example.test/realms/test",
                         ["Authentication:Keycloak:ClientId"] = "client",
-                        ["Authentication:Keycloak:ClientSecret"] = "secret"
+                        ["Authentication:Keycloak:ClientSecret"] = "secret",
+                        ["Authentication:Keycloak:LegacyOwnerId"] = "pipeline-test"
                     });
                 });
                 builder.ConfigureTestServices(services =>
@@ -112,7 +195,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                     services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
                     services.RemoveAll<ApplicationDbContext>();
                     services.AddDbContext<ApplicationDbContext>(options =>
-                        options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+                        options.UseInMemoryDatabase(_databaseName));
 
                     services.AddAuthentication(options =>
                     {
@@ -139,7 +222,11 @@ namespace WwwSqlDesigner.Controllers.Tests
             protected override Task<AuthenticateResult> HandleAuthenticateAsync()
             {
                 var identity = new ClaimsIdentity(
-                    new[] { new Claim(ClaimTypes.Name, "pipeline-test") },
+                    new[]
+                    {
+                        new Claim(ClaimTypes.Name, "pipeline-test"),
+                        new Claim(ClaimTypes.NameIdentifier, "pipeline-test")
+                    },
                     "Test");
                 return Task.FromResult(
                     AuthenticateResult.Success(new AuthenticationTicket(

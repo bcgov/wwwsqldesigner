@@ -28,24 +28,30 @@ namespace WwwSqlDesigner.Controllers
         [Route("backend/netcore-ef/list")]
         public async Task<IActionResult> List()
         {
-            var list = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
+            var models = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
                 .OrderBy(x => x.Keyword)
                 .OrderByDescending(x => x.Version)
-                .Select(x => x.Keyword + " v" + x.Version + " - /?keyword=" + x.Keyword + "&version=" + x.Version)
                 .ToListAsync();
+            var list = models.Select(x =>
+                x.Keyword + " v" + x.Version
+                + " - /?keyword=" + Uri.EscapeDataString(x.Keyword)
+                + "&version=" + Uri.EscapeDataString(x.Version.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                + "&ownerId=" + Uri.EscapeDataString(x.OwnerId));
             return Content(string.Join("\n", list));
         }
 
         [HttpGet]
         [Route("backend/netcore-ef/load")]
-        public async Task<IActionResult> Load(string? keyword, int? version)
+        public async Task<IActionResult> Load(string? keyword, int? version, string? ownerId = null)
         {
             if (string.IsNullOrEmpty(keyword))
             {
                 return NotFound();
             }
 
-            IQueryable<DataModel> query = ApplyOwnerFilter(_context.DataModels);
+            var currentOwnerId = GetCurrentOwnerId();
+            IQueryable<DataModel> query = ApplyOwnerFilter(_context.DataModels)
+                .Where(x => string.IsNullOrWhiteSpace(ownerId) || x.OwnerId == ownerId!.Trim());
             DataModel? model;
             if (!version.HasValue)
             {
@@ -59,6 +65,11 @@ namespace WwwSqlDesigner.Controllers
             {
                 _logger.LogWarning("Keyword not found: {keyword:0}", keyword);
                 return NotFound();
+            }
+            Response.Headers["X-MODEL-OWNER-ID"] = model.OwnerId;
+            if (!string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal))
+            {
+                Response.Headers["X-MODEL-READONLY"] = "true";
             }
             return Content(model.Data, "text/xml");
         }
@@ -276,7 +287,7 @@ namespace WwwSqlDesigner.Controllers
                 || _context.DataModelAccessGrants.Any(grant =>
                     grant.OwnerId == x.OwnerId
                     && grant.Keyword == x.Keyword
-                    && (grant.Permission == "View" || grant.Permission == "Edit")
+                    && grant.Permission == "View"
                     && ((grant.TargetType == "User" && grant.TargetId == ownerId)
                         || (grant.TargetType == "Group" && groupIds.Contains(grant.TargetId)))));
         }
@@ -299,8 +310,7 @@ namespace WwwSqlDesigner.Controllers
 
         private static bool IsValidPermission(string? permission)
         {
-            return string.Equals(permission, "View", StringComparison.Ordinal)
-                || string.Equals(permission, "Edit", StringComparison.Ordinal);
+            return string.Equals(permission, "View", StringComparison.Ordinal);
         }
     }
 
