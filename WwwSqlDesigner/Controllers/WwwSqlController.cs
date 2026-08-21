@@ -67,6 +67,7 @@ namespace WwwSqlDesigner.Controllers
                 return NotFound();
             }
             var ownsModel = string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal);
+            Response.Headers["X-MODEL-OWNER-ID"] = model.OwnerId;
             if (!ownsModel)
             {
                 Response.Headers["X-MODEL-COPYABLE"] = "true";
@@ -76,16 +77,16 @@ namespace WwwSqlDesigner.Controllers
 
         [HttpGet]
         [Route("backend/netcore-ef/versions")]
-        public async Task<IActionResult> Versions(string? keyword)
+        public async Task<IActionResult> Versions(string? keyword, string? ownerId)
         {
-            if (string.IsNullOrWhiteSpace(keyword))
+            if (string.IsNullOrWhiteSpace(keyword) || string.IsNullOrWhiteSpace(ownerId))
             {
                 return BadRequest();
             }
 
-            var versions = await _context.DataModels
+            var versions = await ApplyOwnerFilter(_context.DataModels)
                 .AsNoTracking()
-                .Where(x => x.Keyword == keyword)
+                .Where(x => x.Keyword == keyword && x.OwnerId == ownerId.Trim())
                 .OrderByDescending(x => x.Version)
                 .Select(x => new ModelVersionResponse(x.Keyword, x.Version, x.CreatedAt))
                 .ToListAsync();
@@ -147,6 +148,7 @@ namespace WwwSqlDesigner.Controllers
                 _logger.LogInformation("New Data model version: {keyword:0}", keyword);
             }
             _context.SaveChanges();
+            Response.Headers["X-MODEL-OWNER-ID"] = ownerId;
             return Content(string.Empty);
         }
 

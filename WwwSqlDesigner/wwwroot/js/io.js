@@ -5,6 +5,7 @@ SQL.IO = function (owner) {
         ""; /* last used name with local storage */
     this._csrfToken = "";
     this._serverModelState = "none";
+    this._loadedOwnerId = "";
     this.dom = {
         container: OZ.$("io"),
     };
@@ -260,6 +261,7 @@ SQL.IO.prototype.clientload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
+        this._loadedOwnerId = "";
         this.updateServerModelControls();
     }
 };
@@ -346,6 +348,7 @@ SQL.IO.prototype.clientlocalload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
+        this._loadedOwnerId = "";
         this.updateServerModelControls();
     }
 };
@@ -704,11 +707,12 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
         this.dom.backend.value +
         "/load/?keyword=" +
         encodeURIComponent(name);
-    if (version) {
+    if (version !== null && version !== undefined) {
         url += "&version=" + encodeURIComponent(version);
     }
-    if (ownerId) {
-        url += "&ownerId=" + encodeURIComponent(ownerId);
+    const selectedOwnerId = ownerId || (version !== null && version !== undefined ? this._loadedOwnerId : "");
+    if (selectedOwnerId) {
+        url += "&ownerId=" + encodeURIComponent(selectedOwnerId);
     }
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
@@ -717,13 +721,16 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
 };
 
 SQL.IO.prototype.serverversions = function () {
+    if (!this._loadedOwnerId || !this._name) {
+        return;
+    }
     if (this.dom.serverversionslist.style.display !== "none") {
         this.dom.serverversionslist.style.display = "none";
         this.dom.serverversions.setAttribute("aria-expanded", "false");
         return;
     }
 
-    const name = this._name || prompt(_("serverloadprompt"), "");
+    const name = this._name;
     if (!name) {
         return;
     }
@@ -733,7 +740,8 @@ SQL.IO.prototype.serverversions = function () {
     this.dom.serverversions.setAttribute("aria-expanded", "true");
     this.dom.serverversionslist.textContent = "Loading versions...";
     const bp = this.owner.getOption("xhrpath");
-    const url = bp + "backend/" + this.dom.backend.value + "/versions/?keyword=" + encodeURIComponent(name);
+    const url = bp + "backend/" + this.dom.backend.value + "/versions/?keyword="
+        + encodeURIComponent(name) + "&ownerId=" + encodeURIComponent(this._loadedOwnerId);
     const h = this.owner.getXhrHeaders();
     OZ.Request(url, (data, code) => {
         if (!this.check(code)) {
@@ -758,7 +766,7 @@ SQL.IO.prototype.serverversions = function () {
             button.type = "button";
             button.textContent = "v" + version.version + " (" + new Date(version.createdAt).toLocaleString() + ")";
             OZ.Event.add(button, "click", () => {
-                this.serverload(name, version.version);
+                this.serverload(name, version.version, this._loadedOwnerId);
                 this.dom.serverversionslist.style.display = "none";
                 this.dom.serverversions.setAttribute("aria-expanded", "false");
             });
@@ -788,6 +796,7 @@ SQL.IO.prototype.parseShareRecipient = function (value) {
 
 SQL.IO.prototype.updateServerModelControls = function () {
     const ownerControlsEnabled = this._serverModelState === "owned";
+    this.dom.serverversions.disabled = !this._loadedOwnerId || !this._name;
     this.dom.servershare.disabled = !ownerControlsEnabled;
     this.dom.serverunshare.disabled = !ownerControlsEnabled;
     this.dom.serversave.disabled = false;
@@ -900,6 +909,7 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
     if (this.check(code) && code >= 200 && code < 300) {
+        this._loadedOwnerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || "";
         this._serverModelState = "owned";
         this.updateServerModelControls();
     }
@@ -915,6 +925,7 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
     if (!this.fromXML(data)) {
         return;
     }
+    this._loadedOwnerId = headers && (headers["X-MODEL-OWNER-ID"] || headers["x-model-owner-id"]) || "";
     this._name = this._pendingName;
     this.name = this._pendingName;
     this._serverModelState = copyable ? "copyable" : "owned";
@@ -940,6 +951,7 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
     if (this.fromXML(data)) {
         this._serverModelState = "none";
         this._name = "";
+        this._loadedOwnerId = "";
         this.updateServerModelControls();
         this.owner.alignTables();
     }

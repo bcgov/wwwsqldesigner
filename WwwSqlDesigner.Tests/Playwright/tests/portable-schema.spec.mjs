@@ -221,9 +221,27 @@ test("exposes one-click server version loading controls", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();
     await expect(page.locator("#serverversions")).toHaveValue("Load version");
+    await expect(page.locator("#serverversions")).toBeDisabled();
     await expect(page.locator("#serverversionslist")).toBeHidden();
     await expect(page.locator("#serverversionslist")).toBeAttached();
     expect(await page.evaluate(() => typeof d.io.serverversions)).toBe("function");
+});
+
+test("requests versions for the loaded owner only", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    let request;
+    await page.route("**/backend/netcore-ef/versions/**", async (route) => {
+        request = route.request();
+        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    });
+    await page.evaluate(() => {
+        d.io._name = "Shared";
+        d.io._loadedOwnerId = "owner-b";
+        d.io.updateServerModelControls();
+    });
+    await page.locator("#serverversions").click();
+    await expect.poll(() => request && request.url()).toContain("ownerId=owner-b");
 });
 
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
