@@ -230,10 +230,23 @@ test("exposes one-click server version loading controls", async ({ page }) => {
 test("requests versions for the loaded owner only", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();
-    let request;
+    let versionsRequest;
+    let loadRequest;
     await page.route("**/backend/netcore-ef/versions/**", async (route) => {
-        request = route.request();
-        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+        versionsRequest = route.request();
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify([{ keyword: "Shared", version: 2, createdAt: "2026-08-21T12:00:00Z" }]),
+        });
+    });
+    await page.route("**/backend/netcore-ef/load/**", async (route) => {
+        loadRequest = route.request();
+        await route.fulfill({
+            status: 200,
+            contentType: "text/xml",
+            body: "<sql><datatypes db=\"mssql\" /></sql>",
+        });
     });
     await page.evaluate(() => {
         d.io._name = "Shared";
@@ -241,7 +254,11 @@ test("requests versions for the loaded owner only", async ({ page }) => {
         d.io.updateServerModelControls();
     });
     await page.locator("#serverversions").click();
-    await expect.poll(() => request && request.url()).toContain("ownerId=owner-b");
+    await expect.poll(() => versionsRequest && versionsRequest.url()).toContain("ownerId=owner-b");
+    await page.locator("#serverversionslist button").click();
+    await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
+    await expect.poll(() => loadRequest && loadRequest.url()).toContain("version=2");
+    await expect.poll(() => loadRequest && loadRequest.url()).toContain("ownerId=owner-b");
 });
 
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {

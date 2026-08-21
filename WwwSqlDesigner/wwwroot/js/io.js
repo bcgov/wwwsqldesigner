@@ -766,7 +766,7 @@ SQL.IO.prototype.serverversions = function () {
             button.type = "button";
             button.textContent = "v" + version.version + " (" + new Date(version.createdAt).toLocaleString() + ")";
             OZ.Event.add(button, "click", () => {
-                this.serverload(name, version.version, this._loadedOwnerId);
+                this.serverload(null, name, version.version, this._loadedOwnerId);
                 this.dom.serverversionslist.style.display = "none";
                 this.dom.serverversions.setAttribute("aria-expanded", "false");
             });
