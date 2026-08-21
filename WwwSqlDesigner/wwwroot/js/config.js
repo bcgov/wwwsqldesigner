@@ -1,16 +1,15 @@
 const CONFIG = {
-    AVAILABLE_DBS: [
-        "mysql",
-        "sqlite",
-        "web2py",
-        "mssql",
-        "postgresql",
-        "oracle",
-        "sqlalchemy",
-        "vfp9",
-        "cubrid",
-        "web2py",
-        "ef"
+    EXPORT_TARGETS: [
+        { id: "mssql", label: "Microsoft SQL Server" },
+        { id: "postgresql", label: "PostgreSQL" },
+        { id: "mysql", label: "MySQL" },
+        { id: "sqlite", label: "SQLite" },
+        { id: "oracle", label: "Oracle" },
+        { id: "cubrid", label: "CUBRID" },
+        { id: "vfp9", label: "Visual FoxPro 9" },
+        { id: "sqlalchemy", label: "SQLAlchemy" },
+        { id: "web2py", label: "web2py" },
+        { id: "ef", label: "Entity Framework 8" }
     ],
     DEFAULT_DB: "mssql",
     EF_DEFAULT_NAMESPACE: "WwwSqlDesigner.Data",

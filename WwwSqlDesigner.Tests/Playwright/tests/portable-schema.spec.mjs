@@ -35,6 +35,14 @@ test("imports specialized and unknown legacy types without a prompt", async ({ p
     await expect(page.locator("#iostatus")).toBeHidden();
 });
 
+test("uses the MSSQL fallback for metadata-free legacy XML", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await page.evaluate(() => d.setOption("db", "mysql"));
+    await load(page, '<sql><table name="Legacy"><row name="VersionStamp" null="0"><datatype>timestamp</datatype></row></table></sql>');
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>binary</datatype>");
+});
+
 test("maps every bundled source dialect deterministically", async ({ page }) => {
     await page.goto("/");
     const cases = [["mssql", "timestamp", "binary"], ["postgresql", "interval", "text"], ["mysql", "enum", "string"], ["sqlite", "none", "text"], ["oracle", "urowid", "string"], ["cubrid", "set", "text"], ["vfp9", "currency", "decimal"], ["sqlalchemy", "sa.Interval", "text"], ["web2py", "password", "string"]];
@@ -98,8 +106,24 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     expect(saved).toContain("<default>'hello'</default>");
     expect(saved).toContain("<default>12.50</default>");
     await page.locator("#saveload").click();
+    await expect(page.locator("#optiondb")).toHaveCount(0);
+    await expect(page.locator("#exporttarget option")).toHaveText([
+        "Microsoft SQL Server",
+        "PostgreSQL",
+        "MySQL",
+        "SQLite",
+        "Oracle",
+        "CUBRID",
+        "Visual FoxPro 9",
+        "SQLAlchemy",
+        "web2py",
+        "Entity Framework 8",
+    ]);
     await page.locator("#exporttarget").selectOption("postgresql");
-    await expect(page.locator("#clientsql")).toHaveValue(/postgresql/);
+    await expect(page.locator("#clientsql")).toHaveValue(/PostgreSQL/);
+    expect(await page.evaluate(() => d.getOption("lastExportTarget"))).toBe("postgresql");
+    await page.evaluate(() => d.io.click());
+    await expect(page.locator("#exporttarget")).toHaveValue("postgresql");
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
 });
 
@@ -158,6 +182,39 @@ test("sends sharing grants as JSON", async ({ page }) => {
     await page.locator("#servershare").click();
     await expect.poll(() => request && request.headers()["content-type"]).toBe("application/json");
     expect(request.postData()).toBe(JSON.stringify({ targetType: "User", targetId: "abc", permission: "View" }));
+});
+
+test("falls back to MSSQL when the saved export target is unavailable", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await page.evaluate(() => d.setOption("lastExportTarget", "removed-target"));
+    await page.locator("#saveload").click();
+    await expect(page.locator("#exporttarget")).toHaveValue("mssql");
+});
+
+test("runs every bundled export stylesheet against a portable model", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Entry"><row name="Id" null="0"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table></sql>');
+    const results = await page.evaluate(async () => {
+        const output = {};
+        for (const target of CONFIG.EXPORT_TARGETS) {
+            const response = await fetch("db/" + target.id + "/output.xsl");
+            if (!response.ok) {
+                output[target.id] = "";
+                continue;
+            }
+            output[target.id] = d.io.transformEf(
+                await response.text(),
+                d.io.getExportXml(target.id).xml,
+                target.id === "ef"
+            );
+        }
+        return output;
+    });
+    for (const [target, output] of Object.entries(results)) {
+        expect(output, target + " stylesheet output").not.toBe("");
+    }
 });
 
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {

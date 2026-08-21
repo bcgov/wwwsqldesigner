@@ -13,7 +13,6 @@ SQL.Options = function (owner) {
 
 SQL.Options.prototype.build = function () {
     this.dom.optionlocale = OZ.$("optionlocale");
-    this.dom.optiondb = OZ.$("optiondb");
     this.dom.optionefnamespace = OZ.$("optionefnamespace");
     this.dom.optionefcontext = OZ.$("optionefcontext");
     this.dom.optionsnap = OZ.$("optionsnap");
@@ -26,7 +25,6 @@ SQL.Options.prototype.build = function () {
 
     let ids = [
         "language",
-        "db",
         "efnamespace",
         "efcontext",
         "snap",
@@ -54,18 +52,6 @@ SQL.Options.prototype.build = function () {
         this.dom.optionlocale.appendChild(o);
         if (this.owner.getOption("locale") == ls[i]) {
             this.dom.optionlocale.selectedIndex = i;
-        }
-    }
-
-    const dbs = CONFIG.AVAILABLE_DBS;
-    OZ.DOM.clear(this.dom.optiondb);
-    for (let i = 0; i < dbs.length; i++) {
-        const o = OZ.DOM.elm("option");
-        o.value = dbs[i];
-        o.innerHTML = dbs[i];
-        this.dom.optiondb.appendChild(o);
-        if (this.owner.getOption("db") == dbs[i]) {
-            this.dom.optiondb.selectedIndex = i;
         }
     }
 
@@ -118,7 +104,6 @@ SQL.Options.prototype.save = function () {
     }
 
     this.owner.setOption("locale", this.dom.optionlocale.value);
-    this.owner.setOption("db", this.dom.optiondb.value);
     this.owner.setOption(
         "efnamespace",
         namespace || CONFIG.EF_DEFAULT_NAMESPACE

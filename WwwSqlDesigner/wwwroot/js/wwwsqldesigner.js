@@ -226,6 +226,8 @@ SQL.Designer.prototype.getOption = function (name) {
             return CONFIG.DEFAULT_LOCALE;
         case "db":
             return CONFIG.DEFAULT_DB;
+        case "lastExportTarget":
+            return CONFIG.DEFAULT_DB;
         case "efnamespace":
             return CONFIG.EF_DEFAULT_NAMESPACE;
         case "efcontext":
@@ -345,7 +347,7 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
     const copy = node.cloneNode(true);
     const types = copy.getElementsByTagName("datatypes");
     const currentDb = window.DATATYPES.getAttribute("db");
-    const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? this.getOption("db") : currentDb);
+    const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? CONFIG.DEFAULT_DB : currentDb);
     const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
     const diagnostics = [];
     for (const row of copy.getElementsByTagName("row")) {
