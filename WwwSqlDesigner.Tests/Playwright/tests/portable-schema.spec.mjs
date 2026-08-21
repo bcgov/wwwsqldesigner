@@ -35,6 +35,14 @@ test("imports specialized and unknown legacy types without a prompt", async ({ p
     await expect(page.locator("#iostatus")).toBeHidden();
 });
 
+test("uses the MSSQL fallback for metadata-free legacy XML", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await page.evaluate(() => d.setOption("db", "mysql"));
+    await load(page, '<sql><table name="Legacy"><row name="VersionStamp" null="0"><datatype>timestamp</datatype></row></table></sql>');
+    expect(await page.evaluate(() => d.toXML())).toContain("<datatype>binary</datatype>");
+});
+
 test("maps every bundled source dialect deterministically", async ({ page }) => {
     await page.goto("/");
     const cases = [["mssql", "timestamp", "binary"], ["postgresql", "interval", "text"], ["mysql", "enum", "string"], ["sqlite", "none", "text"], ["oracle", "urowid", "string"], ["cubrid", "set", "text"], ["vfp9", "currency", "decimal"], ["sqlalchemy", "sa.Interval", "text"], ["web2py", "password", "string"]];
