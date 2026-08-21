@@ -53,6 +53,14 @@ body {
     margin: auto;
 }
 
+#io input[type=button]:disabled {
+    color: #888;
+    background-color: #eee;
+    cursor: not-allowed;
+    opacity: .6;
+    box-shadow: none;
+}
+
 #bar input.small {
     width: 45%;
     display: inline;

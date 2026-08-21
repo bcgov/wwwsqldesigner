@@ -4,6 +4,7 @@ SQL.IO = function (owner) {
     this.lastUsedName =
         ""; /* last used name with local storage */
     this._csrfToken = "";
+    this._serverModelState = "none";
     this.dom = {
         container: OZ.$("io"),
     };
@@ -22,6 +23,8 @@ SQL.IO = function (owner) {
         "serversave",
         "serverload",
         "serverlist",
+        "servershare",
+        "serverunshare",
         "serverimport",
     ];
     for (let id of ids) {
@@ -48,6 +51,13 @@ SQL.IO = function (owner) {
     this.dom.statusdetails = OZ.$("iostatusdetails");
     this.dom.statuslist = OZ.$("iostatuslist");
     this.dom.statusdismiss = OZ.$("iostatusdismiss");
+    if (this.dom.servershare.value === "servershare") {
+        this.dom.servershare.value = "Share (view only)";
+    }
+    if (this.dom.serverunshare.value === "serverunshare") {
+        this.dom.serverunshare.value = "Remove share";
+    }
+    this.updateServerModelControls();
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -84,6 +94,8 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
     OZ.Event.add(this.dom.serverlist, "click", this.serverlist.bind(this));
+    OZ.Event.add(this.dom.servershare, "click", this.servershare.bind(this));
+    OZ.Event.add(this.dom.serverunshare, "click", this.serverunshare.bind(this));
     OZ.Event.add(this.dom.serverimport, "click", this.serverimport.bind(this));
     OZ.Event.add(document, "keydown", this.press.bind(this));
     this.build();
@@ -116,7 +128,9 @@ SQL.IO.prototype.ensureCsrfToken = function (callback, failure) {
             callback();
             return;
         }
-        failure();
+        if (failure) {
+            failure();
+        }
     }, { headers: h });
 };
 
@@ -201,9 +215,10 @@ SQL.IO.prototype.parseXml = function (xml) {
 SQL.IO.prototype.fromXMLText = function (xml) {
     try {
         const xmlDoc = this.parseXml(xml);
-        this.fromXML(xmlDoc);
+        return this.fromXML(xmlDoc);
     } catch (e) {
         alert(_("xmlerror") + ": " + e.message);
+        return false;
     }
 };
 
@@ -230,7 +245,11 @@ SQL.IO.prototype.clientload = function () {
         return;
     }
 
-    this.fromXMLText(xml);
+    if (this.fromXMLText(xml)) {
+        this._serverModelState = "none";
+        this._name = "";
+        this.updateServerModelControls();
+    }
 };
 
 SQL.IO.prototype.promptName = function (title, suffix) {
@@ -312,7 +331,11 @@ SQL.IO.prototype.clientlocalload = function () {
         return;
     }
 
-    this.fromXMLText(xml);
+    if (this.fromXMLText(xml)) {
+        this._serverModelState = "none";
+        this._name = "";
+        this.updateServerModelControls();
+    }
 };
 
 SQL.IO.prototype.clientlocallist = function () {
@@ -651,12 +674,11 @@ SQL.IO.prototype.quicksave = function (e) {
     this.serversave(e, this._name);
 };
 
-SQL.IO.prototype.serverload = function (e, keyword, version) {
+SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     const name = keyword || prompt(_("serverloadprompt"), this._name);
     if (!name) {
         return;
     }
-    this._name = name;
     const bp = this.owner.getOption("xhrpath");
     let url =
         bp +
@@ -667,9 +689,12 @@ SQL.IO.prototype.serverload = function (e, keyword, version) {
     if (version) {
         url += "&version=" + encodeURIComponent(version);
     }
+    if (ownerId) {
+        url += "&ownerId=" + encodeURIComponent(ownerId);
+    }
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
-    this.name = name;
+    this._pendingName = name;
     OZ.Request(url, this.loadresponse, { xml: true, headers: h });
 };
 
@@ -679,6 +704,92 @@ SQL.IO.prototype.serverlist = function (e) {
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     OZ.Request(url, this.listresponse, { headers: h });
+};
+
+SQL.IO.prototype.parseShareRecipient = function (value) {
+    const match = String(value || "").trim().match(/^(user|group):(.+)$/i);
+    if (!match || !match[2].trim()) {
+        return null;
+    }
+    return {
+        targetType: match[1].toLowerCase() === "user" ? "User" : "Group",
+        targetId: match[2].trim(),
+    };
+};
+
+SQL.IO.prototype.updateServerModelControls = function () {
+    const ownerControlsEnabled = this._serverModelState === "owned";
+    this.dom.servershare.disabled = !ownerControlsEnabled;
+    this.dom.serverunshare.disabled = !ownerControlsEnabled;
+    this.dom.serversave.disabled = false;
+    this.dom.quicksave.disabled = false;
+};
+
+SQL.IO.prototype.servershare = function () {
+    if (this._serverModelState !== "owned" || !this._name) {
+        return;
+    }
+
+    const recipient = this.parseShareRecipient(prompt("Share with (user:<subject> or group:<name>):", ""));
+    if (!recipient) {
+        alert("Enter a recipient as user:<subject> or group:<name>.");
+        return;
+    }
+
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/access/grant/?keyword=" + encodeURIComponent(this._name);
+    this.ensureCsrfToken(() => {
+        const headers = this.owner.getXhrHeaders();
+        headers["Content-type"] = "application/json";
+        if (this._csrfToken) {
+            headers["X-CSRF-TOKEN"] = this._csrfToken;
+        }
+        OZ.Request(url, (data, code, responseHeaders) => {
+            this.setCsrfToken(responseHeaders);
+            if (code === 204) {
+                alert("Read-only access granted.");
+            } else {
+                this.check(code);
+            }
+        }, {
+            method: "post",
+            data: JSON.stringify({ targetType: recipient.targetType, targetId: recipient.targetId, permission: "View" }),
+            headers: headers
+        });
+    }, () => {
+        alert("Unable to obtain a CSRF token. The share was not sent.");
+    });
+};
+
+SQL.IO.prototype.serverunshare = function () {
+    if (this._serverModelState !== "owned" || !this._name) {
+        return;
+    }
+
+    const recipient = this.parseShareRecipient(prompt("Remove share for (user:<subject> or group:<name>):", ""));
+    if (!recipient) {
+        alert("Enter a recipient as user:<subject> or group:<name>.");
+        return;
+    }
+
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/access/grant/?keyword="
+        + encodeURIComponent(this._name) + "&targetType=" + encodeURIComponent(recipient.targetType)
+        + "&targetId=" + encodeURIComponent(recipient.targetId);
+    this.ensureCsrfToken(() => {
+        const headers = this.owner.getXhrHeaders();
+        headers["X-CSRF-TOKEN"] = this._csrfToken;
+        OZ.Request(url, (data, code, responseHeaders) => {
+            this.setCsrfToken(responseHeaders);
+            if (code === 204) {
+                alert("Share removed.");
+            } else {
+                this.check(code);
+            }
+        }, { method: "delete", headers: headers });
+    }, () => {
+        alert("Unable to obtain a CSRF token. The share was not removed.");
+    });
 };
 
 SQL.IO.prototype.serverimport = function (e) {
@@ -700,6 +811,9 @@ SQL.IO.prototype.serverimport = function (e) {
 
 SQL.IO.prototype.check = function (code) {
     switch (code) {
+        case 403:
+            this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
+            return false;
         case 201:
         case 404:
         case 500:
@@ -716,16 +830,26 @@ SQL.IO.prototype.check = function (code) {
 SQL.IO.prototype.saveresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
-    this.check(code);
+    if (this.check(code) && code >= 200 && code < 300) {
+        this._serverModelState = "owned";
+        this.updateServerModelControls();
+    }
 };
 
 SQL.IO.prototype.loadresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
+    const copyable = headers && (headers["X-MODEL-COPYABLE"] || headers["x-model-copyable"]) === "true";
     this.owner.window.hideThrobber();
     if (!this.check(code)) {
         return;
     }
-    this.fromXML(data);
+    if (!this.fromXML(data)) {
+        return;
+    }
+    this._name = this._pendingName;
+    this.name = this._pendingName;
+    this._serverModelState = copyable ? "copyable" : "owned";
+    this.updateServerModelControls();
     this.owner.setTitle(this.name);
 };
 
@@ -745,6 +869,9 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
         return;
     }
     if (this.fromXML(data)) {
+        this._serverModelState = "none";
+        this._name = "";
+        this.updateServerModelControls();
         this.owner.alignTables();
     }
 };

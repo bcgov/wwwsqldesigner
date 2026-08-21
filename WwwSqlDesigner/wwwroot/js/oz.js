@@ -277,7 +277,8 @@ const OZ = {
             }
             callback(data, xhr.status, headers);
         };
-        if (o.method == "POST") {
+        const hasContentType = Object.keys(o.headers).some((name) => name.toLowerCase() === "content-type");
+        if (o.method == "POST" && !hasContentType) {
             xhr.setRequestHeader(
                 "Content-Type",
                 "application/x-www-form-urlencoded"

@@ -3,7 +3,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Security.Claims;
 using System.Text;
+using WwwSqlDesigner.Authentication;
+using WwwSqlDesigner.Data;
 
 namespace WwwSqlDesigner.Controllers.Tests
 {
@@ -18,10 +21,18 @@ namespace WwwSqlDesigner.Controllers.Tests
             _controller = InitializeController();
         }
 
-        private WwwSqlController InitializeController()
+        private WwwSqlController InitializeController(KeycloakSettings? settings = null, ClaimsPrincipal? user = null)
         {
             var logger = InitializeLogger<WwwSqlController>();
-            return new WwwSqlController(logger, _dbContext);
+            var controller = new WwwSqlController(logger, _dbContext, settings);
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = user ?? new ClaimsPrincipal(new ClaimsIdentity())
+                }
+            };
+            return controller;
         }
 
         private static DefaultHttpContext CreateHttpContextWithAntiforgery()
@@ -31,6 +42,15 @@ namespace WwwSqlDesigner.Controllers.Tests
             services.AddSingleton<IAntiforgery, TestAntiforgery>();
             httpContext.RequestServices = services.BuildServiceProvider();
             httpContext.Request.Headers["X-CSRF-TOKEN"] = "request-token";
+            return httpContext;
+        }
+
+        private static DefaultHttpContext CreateAuthenticatedHttpContext(string ownerId)
+        {
+            var httpContext = CreateHttpContextWithAntiforgery();
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                new[] { new Claim(ClaimTypes.NameIdentifier, ownerId) },
+                authenticationType: "Test"));
             return httpContext;
         }
 
@@ -200,6 +220,286 @@ namespace WwwSqlDesigner.Controllers.Tests
             var dbContent = _dbContext.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefault(x => x.Keyword == "Test1");
             Assert.IsNotNull(dbContent);
             Assert.AreNotEqual(oldVersion, dbContent.Version);
+        }
+
+        [TestMethod()]
+        public async Task ServerModelsAreScopedToOwner()
+        {
+            var settings = new KeycloakSettings
+            {
+                Enabled = true,
+                Authority = "https://login.example/realms/standard",
+                ClientId = "wwwsqldesigner",
+                ClientSecret = "test-secret"
+            };
+            var ownerA = new WwwSqlController(InitializeLogger<WwwSqlController>(), _dbContext, settings);
+            var ownerB = new WwwSqlController(InitializeLogger<WwwSqlController>(), _dbContext, settings);
+
+            var ownerAContext = CreateAuthenticatedHttpContext("owner-a");
+            using var ownerAStream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            ownerAContext.Request.Body = ownerAStream;
+            ownerA.ControllerContext = new ControllerContext { HttpContext = ownerAContext };
+            await ownerA.Save("SharedKeyword").ConfigureAwait(true);
+
+            var ownerBContext = CreateAuthenticatedHttpContext("owner-b");
+            using var ownerBStream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            ownerBContext.Request.Body = ownerBStream;
+            ownerB.ControllerContext = new ControllerContext { HttpContext = ownerBContext };
+            await ownerB.Save("SharedKeyword").ConfigureAwait(true);
+
+            var ownerAResult = await ownerA.Load("SharedKeyword", null).ConfigureAwait(true);
+            var ownerBResult = await ownerB.Load("SharedKeyword", null).ConfigureAwait(true);
+            var ownerOnlyContext = CreateAuthenticatedHttpContext("owner-a");
+            using var ownerOnlyStream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            ownerOnlyContext.Request.Body = ownerOnlyStream;
+            ownerA.ControllerContext = new ControllerContext { HttpContext = ownerOnlyContext };
+            await ownerA.Save("OwnerOnlyKeyword").ConfigureAwait(true);
+            var ownerOnlyList = await ownerA.List().ConfigureAwait(true);
+            var missingForOtherOwner = await ownerB.Load("OwnerOnlyKeyword", null).ConfigureAwait(true);
+            var ownerBList = await ownerB.List().ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(ownerAResult, typeof(ContentResult));
+            Assert.IsInstanceOfType(ownerBResult, typeof(ContentResult));
+            Assert.AreEqual(2, _dbContext.DataModels.Count(x => x.Keyword == "SharedKeyword"));
+            StringAssert.Contains(((ContentResult)ownerOnlyList).Content, "OwnerOnlyKeyword");
+            Assert.IsInstanceOfType(missingForOtherOwner, typeof(NotFoundResult));
+            Assert.IsFalse(((ContentResult)ownerBList).Content!.Contains("OwnerOnlyKeyword", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public async Task ListIncludesDirectAndGroupSharesButNotPrivateModels()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.AddRange(
+                new DataModel { OwnerId = "alice", Keyword = "Owned", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "bob", Keyword = "Private", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "bob", Keyword = "UserShared", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "bob", Keyword = "GroupShared", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow });
+            _dbContext.DataModelAccessGrants.AddRange(
+                new DataModelAccessGrant { OwnerId = "bob", Keyword = "UserShared", TargetType = "User", TargetId = "alice", Permission = "View" },
+                new DataModelAccessGrant { OwnerId = "bob", Keyword = "GroupShared", TargetType = "Group", TargetId = "team-a", Permission = "View" });
+            _dbContext.SaveChanges();
+
+            var controller = InitializeController(settings, User("alice", "team-a"));
+            var result = (ContentResult)await controller.List();
+
+            StringAssert.Contains(result.Content, "Owned");
+            StringAssert.Contains(result.Content, "UserShared");
+            StringAssert.Contains(result.Content, "GroupShared");
+            Assert.IsFalse(result.Content!.Contains("Private", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public async Task AuthenticatedUsersCanLoadUnownedModels()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = DataModel.UnownedOwnerId,
+                Keyword = "PublicLegacy",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.SaveChanges();
+
+            var controller = InitializeController(settings, User("viewer"));
+            var result = await controller.Load("PublicLegacy", null);
+
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.AreEqual("true", controller.Response.Headers["X-MODEL-COPYABLE"].ToString());
+        }
+
+        [TestMethod]
+        public async Task ListEncodesOwnerIdInModelLinks()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner&team",
+                Keyword = "Shared model",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.SaveChanges();
+
+            var controller = InitializeController(settings, User("owner&team"));
+            var result = (ContentResult)await controller.List();
+
+            StringAssert.Contains(result.Content, "keyword=Shared%20model");
+            StringAssert.Contains(result.Content, "ownerId=owner%26team");
+            Assert.IsFalse(result.Content!.Contains("ownerId=owner&team", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public async Task OwnerCanManageViewGrantButOtherUsersCannot()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner",
+                Keyword = "Shared",
+                Version = 0,
+                Data = FooBarModelXml,
+                CreatedAt = DateTime.UtcNow
+            });
+            _dbContext.SaveChanges();
+
+            var owner = InitializeController(settings, User("owner"));
+            Assert.IsInstanceOfType(
+                await owner.GrantAccess("Shared", new AccessGrantRequest("Group", "team-a", "View")),
+                typeof(NoContentResult));
+
+            var grants = (JsonResult)await owner.Access("Shared");
+            var values = (IEnumerable<AccessGrantResponse>)grants.Value!;
+            Assert.AreEqual("team-a", values.Single().TargetId);
+
+            var other = InitializeController(settings, User("other"));
+            Assert.IsInstanceOfType(await other.Access("Shared"), typeof(NotFoundResult));
+            Assert.IsInstanceOfType(
+                await other.GrantAccess("Shared", new AccessGrantRequest("User", "other", "View")),
+                typeof(NotFoundResult));
+            Assert.IsInstanceOfType(await owner.RevokeAccess("Shared", "Group", "team-a"), typeof(NoContentResult));
+        }
+
+        [TestMethod]
+        public async Task SharedViewerCanLoadAndSaveOwnCopy()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner",
+                Keyword = "Shared",
+                Version = 0,
+                Data = FooBarModelXml,
+                CreatedAt = DateTime.UtcNow
+            });
+            _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
+            {
+                OwnerId = "owner",
+                Keyword = "Shared",
+                TargetType = "User",
+                TargetId = "viewer",
+                Permission = "View"
+            });
+            _dbContext.SaveChanges();
+
+            var viewer = InitializeController(settings, User("viewer"));
+            Assert.IsInstanceOfType(await viewer.Load("Shared", null), typeof(ContentResult));
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
+            viewer.HttpContext.Request.Body = stream;
+            viewer.HttpContext.Request.ContentLength = stream.Length;
+            var saveResult = await viewer.Save("Shared");
+            Assert.IsInstanceOfType(saveResult, typeof(ContentResult));
+            Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "owner" && x.Keyword == "Shared"));
+            Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "viewer" && x.Keyword == "Shared"));
+        }
+
+        [TestMethod]
+        public async Task SharedModelsWithSameKeywordCanBeSelectedByOwner()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.AddRange(
+                new DataModel { OwnerId = "owner-a", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"A\" /></sql>", CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "owner-b", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"B\" /></sql>", CreatedAt = DateTime.UtcNow });
+            _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
+            {
+                OwnerId = "owner-b",
+                Keyword = "Shared",
+                TargetType = "User",
+                TargetId = "viewer",
+                Permission = "View"
+            });
+            _dbContext.SaveChanges();
+
+            var viewer = InitializeController(settings, User("viewer"));
+            var result = await viewer.Load("Shared", null, "owner-b");
+
+            var content = (ContentResult)result;
+            StringAssert.Contains(content.Content, "name=\"B\"");
+            Assert.AreEqual("true", viewer.Response.Headers["X-MODEL-COPYABLE"].ToString());
+        }
+
+        [TestMethod]
+        public async Task RoleClaimDoesNotGrantGroupAccess()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner",
+                Keyword = "RoleOnly",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
+            {
+                OwnerId = "owner",
+                Keyword = "RoleOnly",
+                TargetType = "Group",
+                TargetId = "team-a",
+                Permission = "View"
+            });
+            _dbContext.SaveChanges();
+
+            var roleOnlyUser = new ClaimsPrincipal(new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "viewer"),
+                    new Claim(ClaimTypes.Role, "team-a")
+                },
+                "Test"));
+
+            var result = await InitializeController(settings, roleOnlyUser).Load("RoleOnly", null);
+
+            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+        }
+
+        [TestMethod]
+        public async Task ConfiguredUserWithoutStableIdentityCannotLoadModels()
+        {
+            var settings = ConfiguredKeycloak();
+            var user = new ClaimsPrincipal(new ClaimsIdentity("Test"));
+
+            await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+                () => InitializeController(settings, user).Load("Missing", null));
+        }
+
+        [TestMethod]
+        public async Task EditPermissionIsRejected()
+        {
+            var settings = ConfiguredKeycloak();
+            _dbContext.DataModels.Add(new DataModel
+            {
+                OwnerId = "owner",
+                Keyword = "Shared",
+                Version = 0,
+                Data = FooBarModelXml
+            });
+            _dbContext.SaveChanges();
+
+            var owner = InitializeController(settings, User("owner"));
+            var result = await owner.GrantAccess(
+                "Shared",
+                new AccessGrantRequest("User", "viewer", "Edit"));
+
+            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+        }
+
+        private static KeycloakSettings ConfiguredKeycloak()
+        {
+            return new KeycloakSettings
+            {
+                Enabled = true,
+                Authority = "https://login.example/realms/standard",
+                ClientId = "wwwsqldesigner",
+                ClientSecret = "test-secret"
+            };
+        }
+
+        private static ClaimsPrincipal User(string subject, params string[] groups)
+        {
+            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, subject) };
+            claims.AddRange(groups.Select(group => new Claim("groups", group)));
+            return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
         }
 
         [TestMethod()]

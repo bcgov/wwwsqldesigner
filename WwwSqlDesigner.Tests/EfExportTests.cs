@@ -191,7 +191,7 @@ public class EfExportTests
 
         StringAssert.Contains(io, "let completed = false;");
         StringAssert.Contains(io, "const complete = (err, xslDoc) => {");
-        StringAssert.Contains(io, "this.owner.window.hideThrobber();\n            return;");
+        StringAssert.Contains(io, "this.owner.window.hideThrobber();" + Environment.NewLine + "            return;");
     }
 
     [TestMethod]

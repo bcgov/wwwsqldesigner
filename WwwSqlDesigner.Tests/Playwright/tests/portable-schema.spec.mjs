@@ -103,6 +103,63 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
 });
 
+test("exposes owner-only sharing controls for server models", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    await expect(page.locator("#servershare")).toHaveValue(/Share/);
+    await expect(page.locator("#serverunshare")).toHaveValue(/Remove share/);
+    await expect(page.locator("#servershare")).toBeDisabled();
+    await expect(page.locator("#serverunshare")).toBeDisabled();
+    await expect(page.locator("#servershare")).toHaveCSS("box-shadow", "none");
+    await expect(page.locator("#servershare")).toHaveCSS("cursor", "not-allowed");
+    expect(await page.evaluate(() => {
+        d.io._serverModelState = "copyable";
+        d.io.updateServerModelControls();
+        return {
+            saveDisabled: d.io.dom.serversave.disabled,
+            quickSaveDisabled: d.io.dom.quicksave.disabled,
+            shareDisabled: d.io.dom.servershare.disabled,
+            removeShareDisabled: d.io.dom.serverunshare.disabled,
+        };
+    })).toEqual({
+        saveDisabled: false,
+        quickSaveDisabled: false,
+        shareDisabled: true,
+        removeShareDisabled: true,
+    });
+    expect(await page.evaluate(() => typeof d.io.servershare)).toBe("function");
+    expect(await page.evaluate(() => typeof d.io.serverunshare)).toBe("function");
+    expect(await page.evaluate(() => d.io.parseShareRecipient("user:abc"))).toEqual({
+        targetType: "User",
+        targetId: "abc",
+    });
+    expect(await page.evaluate(() => d.io.parseShareRecipient("group:finance"))).toEqual({
+        targetType: "Group",
+        targetId: "finance",
+    });
+    expect(await page.evaluate(() => d.io.parseShareRecipient("finance"))).toBeNull();
+});
+
+test("sends sharing grants as JSON", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    let request;
+    await page.route("**/backend/netcore-ef/access/grant**", async (route) => {
+        request = route.request();
+        await route.fulfill({ status: 204 });
+    });
+    await page.evaluate(() => {
+        window.prompt = () => "user:abc";
+        d.io._name = "Saved";
+        d.io._csrfToken = "token";
+        d.io._serverModelState = "owned";
+        d.io.updateServerModelControls();
+    });
+    await page.locator("#servershare").click();
+    await expect.poll(() => request && request.headers()["content-type"]).toBe("application/json");
+    expect(request.postData()).toBe(JSON.stringify({ targetType: "User", targetId: "abc", permission: "View" }));
+});
+
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
     await page.goto("/");
     await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="Defaults"><row name="NullableText" null="1"><datatype>STRING(20)</datatype><default>NULL</default></row><row name="Id" null="0"><datatype>INTEGER</datatype></row></table></sql>');
