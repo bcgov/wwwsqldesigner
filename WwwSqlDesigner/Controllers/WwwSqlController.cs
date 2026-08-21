@@ -336,4 +336,3 @@ namespace WwwSqlDesigner.Controllers
     public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
     public sealed record ModelVersionResponse(string Keyword, int Version, DateTime CreatedAt);
 }
-}
