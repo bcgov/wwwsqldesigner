@@ -134,6 +134,25 @@ namespace WwwSqlDesigner.Controllers.Tests
             StringAssert.Contains(content, "Test2");
         }
 
+        [TestMethod]
+        public async Task ListLabelsCurrentOwnerWithNameAndEmail()
+        {
+            var settings = ConfiguredKeycloak();
+            var controller = InitializeController(settings, new ClaimsPrincipal(new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, "owner-id"),
+                    new Claim(ClaimTypes.Name, "Jacob Smith"),
+                    new Claim(ClaimTypes.Email, "jacob.smith@example.com")
+                },
+                "Test")));
+
+            await controller.List();
+
+            Assert.AreEqual("owner-id", controller.Response.Headers["X-MODEL-CURRENT-OWNER-ID"].ToString());
+            Assert.AreEqual("Jacob Smith (jacob.smith@example.com)", controller.Response.Headers["X-MODEL-CURRENT-OWNER-LABEL"].ToString());
+        }
+
         [TestMethod()]
         public async Task LoadTestNoKeyword()
         {

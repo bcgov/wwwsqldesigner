@@ -43,8 +43,11 @@ SQL.Window.prototype.open = function (title, content, callback) {
         this.dom.title.removeChild(this.dom.title.childNodes[1]);
     }
 
-    const txt = OZ.DOM.text(title);
-    this.dom.title.appendChild(txt);
+    if (title) {
+        const txt = OZ.DOM.text(title);
+        this.dom.title.appendChild(txt);
+    }
+    this.dom.title.style.display = title ? "" : "none";
     this.dom.background.style.visibility = "visible";
     OZ.DOM.clear(this.dom.content);
     this.dom.content.appendChild(content);

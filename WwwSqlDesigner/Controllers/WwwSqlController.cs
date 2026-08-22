@@ -28,9 +28,12 @@ namespace WwwSqlDesigner.Controllers
         [Route("backend/netcore-ef/list")]
         public async Task<IActionResult> List()
         {
+            Response.Headers["X-MODEL-CURRENT-OWNER-ID"] = GetEffectiveOwnerId();
+            Response.Headers["X-MODEL-CURRENT-OWNER-LABEL"] = GetOwnerDisplayLabel();
+            Response.Headers["X-MODEL-CURRENT-GROUPS"] = System.Text.Json.JsonSerializer.Serialize(GetCurrentGroupIds());
             var models = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
-                .OrderBy(x => x.Keyword)
-                .OrderByDescending(x => x.Version)
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Version)
                 .ToListAsync();
             var list = models.Select(x =>
                 x.Keyword + " v" + x.Version
@@ -265,6 +268,25 @@ namespace WwwSqlDesigner.Controllers
                 ?? throw new InvalidOperationException("The authenticated user has no stable owner identifier claim.");
         }
 
+        private string GetOwnerDisplayLabel()
+        {
+            if (!_keycloakSettings.IsConfigured)
+            {
+                return "Public models";
+            }
+
+            var name = User.FindFirstValue("name")
+                ?? User.FindFirstValue(ClaimTypes.Name);
+            var email = User.FindFirstValue(ClaimTypes.Email)
+                ?? User.FindFirstValue("email");
+            var username = User.FindFirstValue("preferred_username");
+            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(email))
+            {
+                return $"{name} ({email})";
+            }
+            return name ?? email ?? username ?? GetEffectiveOwnerId();
+        }
+
         private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query, bool includeGrants = true)
         {
             if (!_keycloakSettings.IsConfigured)
@@ -310,6 +332,7 @@ namespace WwwSqlDesigner.Controllers
         {
             return string.Equals(permission, "View", StringComparison.Ordinal);
         }
+
     }
 
     public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);

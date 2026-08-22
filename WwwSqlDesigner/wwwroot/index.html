@@ -177,9 +177,10 @@
         <table aria-label="IO" role="presentation">
             <tbody>
                 <tr>
-                    <td style="width: 60%">
-                        <fieldset>
-                            <legend id="client"></legend>
+                    <td style="width: 50%" class="io-client-column">
+                        <div class="io-client-content">
+                        <fieldset class="client-controls">
+                            <legend id="client" class="panel-title"></legend>
                             <div id="singlerow">
                                 <input type="button" id="clientsave" />
                                 <input type="button" id="clientload" />
@@ -205,43 +206,67 @@
                                 </details>
                             </div>
                         </fieldset>
-                    </td>
-                    <td style="width: 40%">
-                        <fieldset>
-                            <legend id="server"></legend>
-                            <label for="backend" id="backendlabel"></label>
-                            <select id="backend">
-                                <option></option>
-                            </select>
-                            <hr />
-                            <input type="button" id="serversave" />
-                            <input type="button" id="quicksave" />
-                            <input type="button" id="serverload" />
-                            <input type="button" id="serverlist" />
-                            <input type="button" id="servershare" disabled />
-                            <input type="button" id="serverunshare" disabled />
-                            <input type="button" id="serverimport" />
-                        </fieldset>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2">
-                        <fieldset>
-                            <legend id="output"></legend>
+                        <fieldset class="client-output">
+                            <legend id="output" class="panel-title"></legend>
                             <textarea id="textarea" rows="1" cols="1"></textarea>
                             <!--modified by javascript later-->
+                        </fieldset>
+                        </div>
+                    </td>
+                    <td style="width: 50%" class="io-server-column">
+                        <fieldset id="serverpanel">
+                            <legend class="panel-title"><span id="server"></span></legend>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="backend" id="backendlabel"></label></div>
+                                    <select id="backend"><option></option></select>
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="serverloadname">Model</label></div>
+                                    <input type="text" id="serverloadname" autocomplete="off" />
+                                    <input type="button" id="serversave" />
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="serverloadmodel">Model</label><button type="button" id="serverlist" title="Refresh models">Refresh</button></div>
+                                    <select id="serverloadmodel"><option value=""></option></select>
+                                </div>
+                                <div class="server-row" id="serverownercontrol">
+                                    <div class="server-label-row"><label for="serverowner">Owner</label></div>
+                                    <select id="serverowner"><option value=""></option></select>
+                                </div>
+                                <div class="server-row" id="serverversioncontrol">
+                                    <div class="server-label-row"><label for="serverloadversion">Version</label></div>
+                                    <select id="serverloadversion"><option value=""></option></select>
+                                    <input type="button" id="serverload" />
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="servergrantid">ID</label><button type="button" id="servercopyid" title="Copy your user ID">Copy</button></div>
+                                    <input type="text" id="servergrantid" autocomplete="off" />
+                                </div>
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="servergrantgroup">Group</label></div>
+                                    <select id="servergrantgroup"><option value=""></option></select>
+                                </div>
+                                <div class="server-row">
+                                    <input type="button" id="servershare" disabled />
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <input type="button" id="serverimport" />
+                                </div>
+                            </div>
                         </fieldset>
                     </td>
                 </tr>
             </tbody>
         </table>
-    </div>
-
-    <div id="serverloadform" style="display: none">
-        <label for="serverloadname">Model name</label>
-        <input type="text" id="serverloadname" required />
-        <label for="serverloadversion">Version (optional)</label>
-        <input type="number" id="serverloadversion" min="0" step="1" />
     </div>
 
     <div id="keys">
