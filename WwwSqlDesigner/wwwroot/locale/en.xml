@@ -100,6 +100,13 @@
     <string name="servercopytitle">Copy your user ID</string>
     <string name="serverrefreshed">Refreshed</string>
     <string name="servercopied">Copied</string>
+    <string name="servershare">Share</string>
+    <string name="serverunshare">Unshare</string>
+    <string name="serverrecipientrequired">Enter a user ID or select a group.</string>
+    <string name="serversharegranted">Read-only access granted.</string>
+    <string name="servershareremoved">Share removed.</string>
+    <string name="serversharecsrffailure">Unable to obtain a CSRF token. The share was not sent.</string>
+    <string name="serverunsharecsrffailure">Unable to obtain a CSRF token. The share was not removed.</string>
     <string name="serversave">Save</string>
     <string name="quicksave">Quicksave</string>
     <string name="serverload">Load</string>

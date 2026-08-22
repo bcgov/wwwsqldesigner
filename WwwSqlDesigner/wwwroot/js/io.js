@@ -789,7 +789,7 @@ SQL.IO.prototype.updateServerModelControls = function () {
     const isGranted = recipient && this._serverGrants.some((grant) =>
         grant.targetType === recipient.targetType && grant.targetId === recipient.targetId);
     this.dom.servershare.disabled = !ownerControlsEnabled || !recipient;
-    this.dom.servershare.value = isGranted ? "Unshare" : "Share";
+    this.dom.servershare.value = isGranted ? _("serverunshare") : _("servershare");
     this.dom.serverload.disabled = !hasLoadModel;
     this.dom.serversave.disabled = !hasName;
 };
@@ -918,7 +918,7 @@ SQL.IO.prototype.servershare = function () {
 
     const recipient = this.getShareRecipient();
     if (!recipient) {
-        alert("Enter a user ID or select a group.");
+        alert(_("serverrecipientrequired"));
         return;
     }
 
@@ -939,7 +939,7 @@ SQL.IO.prototype.servershare = function () {
         OZ.Request(url, (data, code, responseHeaders) => {
             this.setCsrfToken(responseHeaders);
             if (code === 204) {
-                alert("Read-only access granted.");
+                alert(_("serversharegranted"));
                 this.refreshShareState();
             } else {
                 this.check(code);
@@ -950,7 +950,7 @@ SQL.IO.prototype.servershare = function () {
             headers: headers
         });
     }, () => {
-        alert("Unable to obtain a CSRF token. The share was not sent.");
+        alert(_("serversharecsrffailure"));
     });
 };
 
@@ -961,7 +961,7 @@ SQL.IO.prototype.serverunshare = function () {
 
     const recipient = this.getShareRecipient();
     if (!recipient) {
-        alert("Enter a user ID or select a group.");
+        alert(_("serverrecipientrequired"));
         return;
     }
 
@@ -975,14 +975,14 @@ SQL.IO.prototype.serverunshare = function () {
         OZ.Request(url, (data, code, responseHeaders) => {
             this.setCsrfToken(responseHeaders);
             if (code === 204) {
-                alert("Share removed.");
+                alert(_("servershareremoved"));
                 this.refreshShareState();
             } else {
                 this.check(code);
             }
         }, { method: "delete", headers: headers });
     }, () => {
-        alert("Unable to obtain a CSRF token. The share was not removed.");
+        alert(_("serverunsharecsrffailure"));
     });
 };
 
