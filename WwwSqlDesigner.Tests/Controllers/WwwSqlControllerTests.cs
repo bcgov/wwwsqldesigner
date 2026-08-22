@@ -127,11 +127,10 @@ namespace WwwSqlDesigner.Controllers.Tests
         public async Task ListTest()
         {
             var result = await _controller.List().ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
-            string? content = ((ContentResult)result).Content;
-            Assert.IsNotNull(content);
-            StringAssert.Contains(content, "Test1");
-            StringAssert.Contains(content, "Test2");
+            Assert.IsInstanceOfType(result, typeof(JsonResult));
+            var content = (ModelListResponse)((JsonResult)result).Value!;
+            CollectionAssert.Contains(content.Models.Select(x => x.Keyword).ToArray(), "Test1");
+            CollectionAssert.Contains(content.Models.Select(x => x.Keyword).ToArray(), "Test2");
         }
 
         [TestMethod]
@@ -149,8 +148,10 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             await controller.List();
 
-            Assert.AreEqual("owner-id", controller.Response.Headers["X-MODEL-CURRENT-OWNER-ID"].ToString());
-            Assert.AreEqual("Jacob Smith (jacob.smith@example.com)", controller.Response.Headers["X-MODEL-CURRENT-OWNER-LABEL"].ToString());
+            var result = (JsonResult)await controller.List();
+            var content = (ModelListResponse)result.Value!;
+            Assert.AreEqual("owner-id", content.CurrentOwnerId);
+            Assert.AreEqual("Jacob Smith (jacob.smith@example.com)", content.CurrentOwnerLabel);
         }
 
         [TestMethod()]
@@ -280,9 +281,11 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.IsInstanceOfType(ownerAResult, typeof(ContentResult));
             Assert.IsInstanceOfType(ownerBResult, typeof(ContentResult));
             Assert.AreEqual(2, _dbContext.DataModels.Count(x => x.Keyword == "SharedKeyword"));
-            StringAssert.Contains(((ContentResult)ownerOnlyList).Content, "OwnerOnlyKeyword");
+            var ownerOnlyModels = ((ModelListResponse)((JsonResult)ownerOnlyList).Value!).Models;
+            CollectionAssert.Contains(ownerOnlyModels.Select(x => x.Keyword).ToArray(), "OwnerOnlyKeyword");
             Assert.IsInstanceOfType(missingForOtherOwner, typeof(NotFoundResult));
-            Assert.IsFalse(((ContentResult)ownerBList).Content!.Contains("OwnerOnlyKeyword", StringComparison.Ordinal));
+            var ownerBModels = ((ModelListResponse)((JsonResult)ownerBList).Value!).Models;
+            Assert.IsFalse(ownerBModels.Any(x => x.Keyword == "OwnerOnlyKeyword"));
         }
 
         [TestMethod]
@@ -300,12 +303,12 @@ namespace WwwSqlDesigner.Controllers.Tests
             _dbContext.SaveChanges();
 
             var controller = InitializeController(settings, User("alice", "team-a"));
-            var result = (ContentResult)await controller.List();
-
-            StringAssert.Contains(result.Content, "Owned");
-            StringAssert.Contains(result.Content, "UserShared");
-            StringAssert.Contains(result.Content, "GroupShared");
-            Assert.IsFalse(result.Content!.Contains("Private", StringComparison.Ordinal));
+            var result = (ModelListResponse)((JsonResult)await controller.List()).Value!;
+            var keywords = result.Models.Select(x => x.Keyword).ToArray();
+            CollectionAssert.Contains(keywords, "Owned");
+            CollectionAssert.Contains(keywords, "UserShared");
+            CollectionAssert.Contains(keywords, "GroupShared");
+            CollectionAssert.DoesNotContain(keywords, "Private");
         }
 
         [TestMethod]
@@ -342,11 +345,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             _dbContext.SaveChanges();
 
             var controller = InitializeController(settings, User("owner&team"));
-            var result = (ContentResult)await controller.List();
-
-            StringAssert.Contains(result.Content, "keyword=Shared%20model");
-            StringAssert.Contains(result.Content, "ownerId=owner%26team");
-            Assert.IsFalse(result.Content!.Contains("ownerId=owner&team", StringComparison.Ordinal));
+            var result = (JsonResult)await controller.List();
+            var content = (ModelListResponse)result.Value!;
+            var model = content.Models.Single(x => x.Keyword == "Shared model");
+            Assert.AreEqual("owner&team", model.OwnerId);
         }
 
         [TestMethod]

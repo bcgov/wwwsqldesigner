@@ -33,11 +33,15 @@ SQL.IO = function (owner) {
         this.dom[id] = elm;
         elm.value = _(id);
     }
-    ids = ["client", "server", "output", "backendlabel"];
+    ids = ["client", "server", "output", "backendlabel", "servermodellabel",
+        "serverloadmodellabel", "serverownerlabel", "serverversionlabel",
+        "serveridlabel", "servergrouplabel"];
     for (let id of ids) {
         let elm = OZ.$(id);
         elm.innerHTML = _(id);
     }
+    this.dom.serverlist.textContent = _("serverlist");
+    this.dom.serverlist.title = _("serverlisttitle");
 
     this.dom.ta = OZ.$("textarea");
     this.dom.backend = OZ.$("backend");
@@ -58,6 +62,8 @@ SQL.IO = function (owner) {
     this.dom.servergrantid = OZ.$("servergrantid");
     this.dom.servergrantgroup = OZ.$("servergrantgroup");
     this.dom.servercopyid = OZ.$("servercopyid");
+    this.dom.servercopyid.textContent = _("servercopyid");
+    this.dom.servercopyid.title = _("servercopytitle");
     this.dom.serverpanel = OZ.$("serverpanel");
     this.dom.clientcontent = document.querySelector(".io-client-content");
     this._actionLabelTimers = {};
@@ -128,14 +134,15 @@ SQL.IO.prototype.syncClientColumnHeight = function () {
 
 SQL.IO.prototype.setActionLabel = function (action, label) {
     const button = action === "servercopy" ? this.dom.servercopyid : this.dom.serverlist;
+    const defaultLabel = action === "servercopy" ? _("servercopyid") : _("serverlist");
     if (this._actionLabelTimers[action]) {
         clearTimeout(this._actionLabelTimers[action]);
         delete this._actionLabelTimers[action];
     }
-    button.textContent = label || (action === "servercopy" ? "Copy" : "Refresh");
+    button.textContent = label || defaultLabel;
     if (label) {
         this._actionLabelTimers[action] = setTimeout(() => {
-            button.textContent = action === "servercopy" ? "Copy" : "Refresh";
+            button.textContent = defaultLabel;
             delete this._actionLabelTimers[action];
         }, 1800);
     }
@@ -219,7 +226,7 @@ SQL.IO.prototype.click = function () {
     this.dom.ta.value = "";
     this.dom.serverloadname.value = this._name || "";
     this.refreshExportTargetLabel();
-    this.owner.window.open("", this.dom.container);
+    this.owner.window.open(_("saveload"), this.dom.container);
     this.dom.serverloadmodel.focus();
     this.syncClientColumnHeight();
     if (!this._serverModels.length) {
@@ -698,6 +705,7 @@ SQL.IO.prototype.serversave = function (e, keyword) {
     if (!name) {
         return;
     }
+    if (name !== this._name) this._serverGrants = [];
     this._name = name;
     this.dom.serverloadname.value = name;
     const xml = this.owner.toXML(true);
@@ -733,11 +741,12 @@ SQL.IO.prototype.quicksave = function (e) {
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     if (typeof keyword === "undefined") {
         keyword = this.dom.serverloadmodel.value;
-        if (!keyword) { this.dom.serverloadmodel.focus(); return; }
-        version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
-        ownerId = this.dom.serverowner.value || null;
+        if (keyword) {
+            version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
+            ownerId = this.dom.serverowner.value || null;
+        }
     }
-    const name = keyword || prompt(_("serverloadprompt"), this._name);
+    const name = keyword || prompt(_("serverloadprompt"), this.dom.serverloadname.value.trim() || this._name);
     if (!name) {
         return;
     }
@@ -768,16 +777,14 @@ SQL.IO.prototype.serverlist = function (e, preserveOutput) {
     const url = bp + "backend/" + this.dom.backend.value + "/list";
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
-    const callback = preserveOutput
-        ? (data, code, headers) => this.listresponse(data, code, headers, true)
-        : this.listresponse;
+    const callback = (data, code, headers) => this.listresponse(data, code, headers, true);
     OZ.Request(url, callback, { headers: h });
 };
 
 SQL.IO.prototype.updateServerModelControls = function () {
     const ownerControlsEnabled = this._serverModelState === "owned";
     const hasName = this.dom.serverloadname.value.trim().length > 0;
-    const hasLoadModel = this.dom.serverloadmodel.value !== "";
+    const hasLoadModel = this.dom.serverloadmodel.value !== "" || hasName;
     const recipient = this.getShareRecipient();
     const isGranted = recipient && this._serverGrants.some((grant) =>
         grant.targetType === recipient.targetType && grant.targetId === recipient.targetId);
@@ -811,7 +818,7 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     }
     OZ.DOM.clear(this.dom.serverloadversion);
     const latest = OZ.DOM.elm("option");
-    latest.value = ""; latest.textContent = "";
+    latest.value = ""; latest.textContent = _("serverlatest");
     this.dom.serverloadversion.appendChild(latest);
     for (const model of matches) {
         const option = OZ.DOM.elm("option");
@@ -877,7 +884,7 @@ SQL.IO.prototype.copyCurrentOwnerId = function () {
         alert("Your user ID is not available yet. Refresh the models first.");
         return;
     }
-    const copied = () => this.setActionLabel("servercopy", "Copied");
+    const copied = () => this.setActionLabel("servercopy", _("servercopied"));
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(this._currentOwnerId).then(copied).catch(() => {
             this.copyTextFallback(this._currentOwnerId, copied);
@@ -1020,6 +1027,7 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
     if (this.check(code) && code >= 200 && code < 300) {
         this._serverModelState = "owned";
         this.updateServerModelControls();
+        this.refreshShareState();
     }
 };
 
@@ -1051,15 +1059,14 @@ SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
     }
     if (!preserveOutput) {
         this.dom.ta.value = data;
+        return;
     }
-    if (preserveOutput) this.setActionLabel("serverlist", "Refreshed");
-    this._currentOwnerId = headers && (headers["X-MODEL-CURRENT-OWNER-ID"] || headers["x-model-current-owner-id"]) || "";
-    this._currentOwnerLabel = headers && (headers["X-MODEL-CURRENT-OWNER-LABEL"] || headers["x-model-current-owner-label"]) || "";
-    try {
-        this._currentGroups = JSON.parse(headers && (headers["X-MODEL-CURRENT-GROUPS"] || headers["x-model-current-groups"]) || "[]");
-    } catch (e) {
-        this._currentGroups = [];
-    }
+    if (preserveOutput) this.setActionLabel("serverlist", _("serverrefreshed"));
+    let list;
+    try { list = JSON.parse(data || "{}"); } catch (e) { return; }
+    this._currentOwnerId = list.currentOwnerId || "";
+    this._currentOwnerLabel = list.currentOwnerLabel || "";
+    this._currentGroups = Array.isArray(list.groups) ? list.groups : [];
     OZ.DOM.clear(this.dom.servergrantgroup);
     const groupPlaceholder = OZ.DOM.elm("option");
     groupPlaceholder.value = "";
@@ -1072,23 +1079,7 @@ SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
         this.dom.servergrantgroup.appendChild(option);
     }
     this.dom.servergrantgroup.disabled = this._currentGroups.length === 0;
-    this._serverModels = String(data || "").split(/\r?\n/).map((line) => {
-        const separator = line.indexOf(" - ");
-        if (separator < 0) return null;
-        const label = line.substring(0, separator);
-        const match = label.match(/^(.*) v(\d+)$/);
-        if (!match) return null;
-        try {
-            const url = new URL(line.substring(separator + 3).trim(), window.location.href);
-            return {
-                keyword: match[1],
-                version: Number(match[2]),
-                ownerId: url.searchParams.get("ownerId") || ""
-            };
-        } catch (_) {
-            return null;
-        }
-    }).filter(Boolean);
+    this._serverModels = Array.isArray(list.models) ? list.models : [];
     this.updateServerModelChoices();
     this.syncClientColumnHeight();
 };

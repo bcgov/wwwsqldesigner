@@ -252,7 +252,16 @@ test("loads the newest server model from the name and version form", async ({ pa
     await page.route("**/backend/netcore-ef/list", async (route) => {
         await route.fulfill({
             status: 200,
-            body: "Shared v2 - /?keyword=Shared&version=2&ownerId=owner\nShared v1 - /?keyword=Shared&version=1&ownerId=owner",
+            contentType: "application/json",
+            body: JSON.stringify({
+                models: [
+                    { keyword: "Shared", version: 2, ownerId: "owner" },
+                    { keyword: "Shared", version: 1, ownerId: "owner" },
+                ],
+                currentOwnerId: "owner",
+                currentOwnerLabel: "Owner",
+                groups: [],
+            }),
         });
     });
     await page.evaluate(() => d.io.serverlist());

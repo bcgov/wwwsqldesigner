@@ -28,19 +28,15 @@ namespace WwwSqlDesigner.Controllers
         [Route("backend/netcore-ef/list")]
         public async Task<IActionResult> List()
         {
-            Response.Headers["X-MODEL-CURRENT-OWNER-ID"] = GetEffectiveOwnerId();
-            Response.Headers["X-MODEL-CURRENT-OWNER-LABEL"] = GetOwnerDisplayLabel();
-            Response.Headers["X-MODEL-CURRENT-GROUPS"] = System.Text.Json.JsonSerializer.Serialize(GetCurrentGroupIds());
             var models = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
                 .OrderByDescending(x => x.CreatedAt)
                 .ThenByDescending(x => x.Version)
                 .ToListAsync();
-            var list = models.Select(x =>
-                x.Keyword + " v" + x.Version
-                + " - /?keyword=" + Uri.EscapeDataString(x.Keyword)
-                + "&version=" + Uri.EscapeDataString(x.Version.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                + "&ownerId=" + Uri.EscapeDataString(x.OwnerId));
-            return Content(string.Join("\n", list));
+            return new JsonResult(new ModelListResponse(
+                models.Select(x => new ModelListEntry(x.Keyword, x.Version, x.OwnerId)).ToArray(),
+                GetEffectiveOwnerId(),
+                GetOwnerDisplayLabel(),
+                GetCurrentGroupIds()));
         }
 
         [HttpGet]
@@ -337,4 +333,6 @@ namespace WwwSqlDesigner.Controllers
 
     public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);
     public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
+    public sealed record ModelListEntry(string Keyword, int Version, string OwnerId);
+    public sealed record ModelListResponse(ModelListEntry[] Models, string CurrentOwnerId, string CurrentOwnerLabel, string[] Groups);
 }

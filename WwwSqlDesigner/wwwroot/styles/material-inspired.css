@@ -124,7 +124,7 @@ legend {
     display: block;
     width: 100%;
     padding: 0;
-    margin-bottom: 0;
+    margin-bottom: 10px;
     font-size: 21px;
     color: rgba(0, 0, 0, .87);
     line-height: inherit;
