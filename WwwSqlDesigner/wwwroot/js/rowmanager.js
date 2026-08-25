@@ -16,33 +16,33 @@ SQL.RowManager = function (owner) {
         "foreigndisconnect",
     ];
     for (let id of ids) {
-        const elm = OZ.$(id);
+        const elm = SQL.dom.get(id);
         this.dom[id] = elm;
         elm.value = _(id);
     }
 
     this.select(false);
 
-    OZ.Event.add(this.dom.editrow, "click", this.edit.bind(this));
-    OZ.Event.add(this.dom.uprow, "click", this.up.bind(this));
-    OZ.Event.add(this.dom.downrow, "click", this.down.bind(this));
-    OZ.Event.add(this.dom.removerow, "click", this.remove.bind(this));
-    OZ.Event.add(
+    SQL.events.add(this.dom.editrow, "click", this.edit.bind(this));
+    SQL.events.add(this.dom.uprow, "click", this.up.bind(this));
+    SQL.events.add(this.dom.downrow, "click", this.down.bind(this));
+    SQL.events.add(this.dom.removerow, "click", this.remove.bind(this));
+    SQL.events.add(
         this.dom.foreigncreate,
         "click",
         this.foreigncreate.bind(this)
     );
-    OZ.Event.add(
+    SQL.events.add(
         this.dom.foreignconnect,
         "click",
         this.foreignconnect.bind(this)
     );
-    OZ.Event.add(
+    SQL.events.add(
         this.dom.foreigndisconnect,
         "click",
         this.foreigndisconnect.bind(this)
     );
-    OZ.Event.add(document, "keydown", this.press.bind(this));
+    SQL.events.add(document, "keydown", this.press.bind(this));
 
     SQL.subscribe("tableclick", this.tableClick.bind(this));
     SQL.subscribe("rowclick", this.rowClick.bind(this));
@@ -207,7 +207,7 @@ SQL.RowManager.prototype.press = function (e) {
         return;
     }
 
-    const target = OZ.Event.target(e).nodeName.toLowerCase();
+    const target = SQL.events.target(e).nodeName.toLowerCase();
     if (target == "textarea" || target == "input") {
         return;
     } /* not when in form field */
@@ -215,15 +215,15 @@ SQL.RowManager.prototype.press = function (e) {
     switch (e.keyCode) {
         case 38:
             this.up();
-            OZ.Event.prevent(e);
+            SQL.events.prevent(e);
             break;
         case 40:
             this.down();
-            OZ.Event.prevent(e);
+            SQL.events.prevent(e);
             break;
         case 46:
             this.remove();
-            OZ.Event.prevent(e);
+            SQL.events.prevent(e);
             break;
         case 13:
         case 27:

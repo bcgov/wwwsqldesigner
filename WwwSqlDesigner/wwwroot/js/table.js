@@ -20,36 +20,36 @@ SQL.Table = function (owner, name, x, y, z) {
 SQL.Table.prototype = Object.create(SQL.Visual.prototype);
 
 SQL.Table.prototype._build = function () {
-    this.dom.container = OZ.DOM.elm("div", { className: "table" });
-    this.dom.content = OZ.DOM.elm("table");
-    const thead = OZ.DOM.elm("thead");
-    const tr = OZ.DOM.elm("tr");
-    this.dom.title = OZ.DOM.elm("td", { className: "title", colSpan: 2 });
+    this.dom.container = SQL.dom.create("div", { className: "table" });
+    this.dom.content = SQL.dom.create("table");
+    const thead = SQL.dom.create("thead");
+    const tr = SQL.dom.create("tr");
+    this.dom.title = SQL.dom.create("td", { className: "title", colSpan: 2 });
 
-    OZ.DOM.append(
+    SQL.dom.append(
         [this.dom.container, this.dom.content],
         [this.dom.content, thead],
         [thead, tr],
         [tr, this.dom.title]
     );
 
-    this.dom.mini = OZ.DOM.elm("div", { className: "mini" });
+    this.dom.mini = SQL.dom.create("div", { className: "mini" });
     this.owner.map.dom.container.appendChild(this.dom.mini);
 
     this._ec.push(
-        OZ.Event.add(this.dom.container, "click", this.click.bind(this))
+        SQL.events.add(this.dom.container, "click", this.click.bind(this))
     );
     this._ec.push(
-        OZ.Event.add(this.dom.container, "dblclick", this.dblclick.bind(this))
+        SQL.events.add(this.dom.container, "dblclick", this.dblclick.bind(this))
     );
     this._ec.push(
-        OZ.Event.add(this.dom.container, "mousedown", this.down.bind(this))
+        SQL.events.add(this.dom.container, "mousedown", this.down.bind(this))
     );
     this._ec.push(
-        OZ.Event.add(this.dom.container, "touchstart", this.down.bind(this))
+        SQL.events.add(this.dom.container, "touchstart", this.down.bind(this))
     );
     this._ec.push(
-        OZ.Event.add(this.dom.container, "touchmove", OZ.Event.prevent)
+        SQL.events.add(this.dom.container, "touchmove", SQL.events.prevent)
     );
 };
 
@@ -96,8 +96,8 @@ SQL.Table.prototype.hideRelations = function () {
 };
 
 SQL.Table.prototype.click = function (e) {
-    OZ.Event.stop(e);
-    const t = OZ.Event.target(e);
+    SQL.events.stop(e);
+    const t = SQL.events.target(e);
     this.owner.tableManager.select(this);
 
     if (t != this.dom.title) {
@@ -109,7 +109,7 @@ SQL.Table.prototype.click = function (e) {
 };
 
 SQL.Table.prototype.dblclick = function (e) {
-    const t = OZ.Event.target(e);
+    const t = SQL.events.target(e);
     if (t == this.dom.title) {
         this.owner.tableManager.edit();
     }
@@ -120,8 +120,8 @@ SQL.Table.prototype.select = function () {
         return;
     }
     this.selected = true;
-    OZ.DOM.addClass(this.dom.container, "selected");
-    OZ.DOM.addClass(this.dom.mini, "mini_selected");
+    SQL.dom.addClass(this.dom.container, "selected");
+    SQL.dom.addClass(this.dom.mini, "mini_selected");
     this.redraw();
 };
 
@@ -130,8 +130,8 @@ SQL.Table.prototype.deselect = function () {
         return;
     }
     this.selected = false;
-    OZ.DOM.removeClass(this.dom.container, "selected");
-    OZ.DOM.removeClass(this.dom.mini, "mini_selected");
+    SQL.dom.removeClass(this.dom.container, "selected");
+    SQL.dom.removeClass(this.dom.mini, "mini_selected");
     this.redraw();
 };
 
@@ -226,8 +226,8 @@ SQL.Table.prototype.snap = function () {
 
 SQL.Table.prototype.down = function (e) {
     /* mousedown - start drag */
-    OZ.Event.stop(e);
-    let t = OZ.Event.target(e);
+    SQL.events.stop(e);
+    let t = SQL.events.target(e);
     if (t != this.dom.title) {
         return;
     } /* on a row */
@@ -268,8 +268,8 @@ SQL.Table.prototype.down = function (e) {
         }
     }
 
-    this.documentMove = OZ.Event.add(document, moveEvent, this.move.bind(this));
-    this.documentUp = OZ.Event.add(document, upEvent, this.up.bind(this));
+    this.documentMove = SQL.events.add(document, moveEvent, this.move.bind(this));
+    this.documentUp = SQL.events.add(document, upEvent, this.up.bind(this));
 };
 
 SQL.Table.prototype.toXML = function () {
@@ -377,8 +377,8 @@ SQL.Table.prototype.up = function (e) {
         }
     }
     t.active = false;
-    OZ.Event.remove(this.documentMove);
-    OZ.Event.remove(this.documentUp);
+    SQL.events.remove(this.documentMove);
+    SQL.events.remove(this.documentUp);
     this.owner.sync();
 };
 
@@ -388,5 +388,5 @@ SQL.Table.prototype.destroy = function () {
     while (this.rows.length) {
         this.removeRow(this.rows[0]);
     }
-    this._ec.forEach(OZ.Event.remove, OZ.Event);
+    this._ec.forEach(SQL.events.remove, SQL.events);
 };

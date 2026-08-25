@@ -6,37 +6,6 @@ function _(str) {
     return window.LOCALE[str];
 }
 
-if (typeof String.prototype.endsWith !== "function") {
-    String.prototype.endsWith = function (suffix) {
-        return this.indexOf(suffix, this.length - suffix.length) !== -1;
-    };
-}
-
-if (!String.prototype.trim) {
-    String.prototype.trim = function () {
-        return this.match(/^\s*([\s\S]*?)\s*$/)[1];
-    };
-}
-
-if (!String.trim) {
-    String.trim = function (obj) {
-        return String.prototype.trim.call(obj);
-    };
-}
-
-if (!Object.create) {
-    Object.create = function (o) {
-        if (arguments.length > 1) {
-            throw new Error(
-                "Object.create polyfill only accepts the first parameter"
-            );
-        }
-        const tmp = function () {};
-        tmp.prototype = o;
-        return new tmp();
-    };
-}
-
 var DATATYPES = false;
 var LOCALE = {};
 const SQL = {
@@ -75,6 +44,129 @@ const SQL = {
             .replace(/&/g, "&amp;")
             .replace(/>/g, "&gt;")
             .replace(/</g, "&lt;");
+    },
+
+    dom: {
+        get: function (id) {
+            return document.getElementById(id);
+        },
+
+        create: function (name, options) {
+            const element = document.createElement(name);
+            for (const property in options || {}) {
+                const value = options[property];
+                if (property === "class") {
+                    element.className = value;
+                } else if (property in element) {
+                    element[property] = value;
+                } else {
+                    $(element).css(property, value);
+                }
+            }
+            return element;
+        },
+
+        text: function (value) {
+            return document.createTextNode(value);
+        },
+
+        clear: function (element) {
+            while (element.firstChild) {
+                element.removeChild(element.firstChild);
+            }
+        },
+
+        append: function () {
+            if (arguments.length === 1) {
+                const group = arguments[0];
+                $(group[0]).append(group.slice(1));
+                return;
+            }
+            for (const group of arguments) {
+                SQL.dom.append(group);
+            }
+        },
+
+        pos: function (element) {
+            const rect = element.getBoundingClientRect();
+            return [rect.left, rect.top];
+        },
+
+        scroll: function () {
+            return [window.scrollX, window.scrollY];
+        },
+
+        win: function () {
+            return [document.documentElement.clientWidth, document.documentElement.clientHeight];
+        },
+
+        addClass: function (element, className) {
+            $(typeof element === "string" ? SQL.dom.get(element) : element).addClass(className);
+        },
+
+        removeClass: function (element, className) {
+            $(typeof element === "string" ? SQL.dom.get(element) : element).removeClass(className);
+        },
+    },
+
+    style: {
+        set: function (element, styles) {
+            $(element).css(styles);
+        },
+    },
+
+    events: {
+        add: function (target, event, handler) {
+            const element = typeof target === "string" ? SQL.dom.get(target) : target;
+            $(element).on(event, handler);
+            return { element, event, handler };
+        },
+
+        remove: function (registration) {
+            if (registration) {
+                $(registration.element).off(registration.event, registration.handler);
+            }
+        },
+
+        stop: function (event) {
+            event.stopPropagation();
+        },
+
+        prevent: function (event) {
+            event.preventDefault();
+        },
+
+        target: function (event) {
+            return event.target;
+        },
+    },
+
+    request: function (url, callback, options) {
+        const settings = options || {};
+        const request = $.ajax({
+            url: url,
+            method: (settings.method || "get").toUpperCase(),
+            data: settings.data || null,
+            headers: settings.headers || {},
+            dataType: settings.xml ? "xml" : undefined,
+        });
+        request.always(function () {
+            const headers = {};
+            const rawHeaders = request.getAllResponseHeaders();
+            if (rawHeaders) {
+                rawHeaders.split(/[\r\n]/).forEach(function (line) {
+                    const match = line.match(/^([^:]+): *(.*)$/);
+                    if (match) {
+                        headers[match[1]] = match[2];
+                    }
+                });
+            }
+            const data = settings.xml ? request.responseXML : request.responseText;
+            if (callback) {
+                callback(data, request.status, headers);
+            }
+        });
+        return request;
     },
 };
 

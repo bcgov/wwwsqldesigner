@@ -3,33 +3,33 @@
 SQL.Rubberband = function (owner) {
     this.owner = owner;
     SQL.Visual.apply(this);
-    this.dom.container = OZ.$("rubberband");
-    OZ.Event.add("area", "mousedown", this.down.bind(this));
+    this.dom.container = SQL.dom.get("rubberband");
+    SQL.events.add("area", "mousedown", this.down.bind(this));
 };
 SQL.Rubberband.prototype = Object.create(SQL.Visual.prototype);
 
 SQL.Rubberband.prototype.down = function (e) {
-    const target = OZ.Event.target(e);
+    const target = SQL.events.target(e);
     if (target && ((target.closest && target.closest(".diagram-legend")) || target.matches("input.relation-name-input"))) {
         return;
     }
-    OZ.Event.prevent(e);
-    const scroll = OZ.DOM.scroll();
+    SQL.events.prevent(e);
+    const scroll = SQL.dom.scroll();
     this.x = this.x0 = e.clientX + scroll[0];
     this.y = this.y0 = e.clientY + scroll[1];
     this.width = 0;
     this.height = 0;
     this.redraw();
-    this.documentMove = OZ.Event.add(
+    this.documentMove = SQL.events.add(
         document,
         "mousemove",
         this.move.bind(this)
     );
-    this.documentUp = OZ.Event.add(document, "mouseup", this.up.bind(this));
+    this.documentUp = SQL.events.add(document, "mouseup", this.up.bind(this));
 };
 
 SQL.Rubberband.prototype.move = function (e) {
-    const scroll = OZ.DOM.scroll();
+    const scroll = SQL.dom.scroll();
     const x = e.clientX + scroll[0];
     const y = e.clientY + scroll[1];
     this.width = Math.abs(x - this.x0);
@@ -49,10 +49,10 @@ SQL.Rubberband.prototype.move = function (e) {
 };
 
 SQL.Rubberband.prototype.up = function (e) {
-    OZ.Event.prevent(e);
+    SQL.events.prevent(e);
     this.dom.container.style.visibility = "hidden";
-    OZ.Event.remove(this.documentMove);
-    OZ.Event.remove(this.documentUp);
+    SQL.events.remove(this.documentMove);
+    SQL.events.remove(this.documentUp);
     this.owner.tableManager.selectRect(this.x, this.y, this.width, this.height);
 };
 

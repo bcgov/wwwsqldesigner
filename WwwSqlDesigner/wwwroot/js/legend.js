@@ -22,7 +22,7 @@ SQL.Legend = function (owner) {
     this.addInput("author", "legendauthor");
     this.addTimestamp("created", "legendcreated");
     this.addTimestamp("modified", "legendmodified");
-    OZ.$("maptoolcontent").appendChild(container);
+    SQL.dom.get("maptoolcontent").appendChild(container);
     this.redraw();
 };
 

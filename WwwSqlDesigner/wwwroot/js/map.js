@@ -3,22 +3,22 @@
 SQL.Map = function (owner) {
     this.owner = owner;
     SQL.Visual.apply(this);
-    this.dom.container = OZ.$("minimap");
+    this.dom.container = SQL.dom.get("minimap");
     this.width = this.dom.container.offsetWidth - 2;
     this.height = this.dom.container.offsetHeight - 2;
 
-    this.dom.port = OZ.DOM.elm("div", { className: "port", zIndex: 1 });
+    this.dom.port = SQL.dom.create("div", { className: "port", zIndex: 1 });
     this.dom.container.appendChild(this.dom.port);
     this.sync = this.sync.bind(this);
 
     this.flag = false;
     this.sync();
 
-    OZ.Event.add(window, "resize", this.sync);
-    OZ.Event.add(window, "scroll", this.sync);
-    OZ.Event.add(this.dom.container, "mousedown", this.down.bind(this));
-    OZ.Event.add(this.dom.container, "touchstart", this.down.bind(this));
-    OZ.Event.add(this.dom.container, "touchmove", OZ.Event.prevent);
+    SQL.events.add(window, "resize", this.sync);
+    SQL.events.add(window, "scroll", this.sync);
+    SQL.events.add(this.dom.container, "mousedown", this.down.bind(this));
+    SQL.events.add(this.dom.container, "touchstart", this.down.bind(this));
+    SQL.events.add(this.dom.container, "touchmove", SQL.events.prevent);
 };
 SQL.Map.prototype = Object.create(SQL.Visual.prototype);
 
@@ -26,7 +26,7 @@ SQL.Map.prototype.down = function (e) {
     /* mousedown - move view and start drag */
     this.flag = true;
     this.dom.container.style.cursor = "move";
-    const pos = OZ.DOM.pos(this.dom.container);
+    const pos = SQL.dom.pos(this.dom.container);
 
     this.x = Math.round(pos[0] + this.offsetX + this.l + this.w / 2);
     this.y = Math.round(pos[1] + this.offsetY + this.t + this.h / 2);
@@ -43,8 +43,8 @@ SQL.Map.prototype.down = function (e) {
         eventUp = "mouseup";
     }
 
-    this.documentMove = OZ.Event.add(document, eventMove, this.move.bind(this));
-    this.documentUp = OZ.Event.add(document, eventUp, this.up.bind(this));
+    this.documentMove = SQL.events.add(document, eventMove, this.move.bind(this));
+    this.documentUp = SQL.events.add(document, eventUp, this.up.bind(this));
 };
 
 SQL.Map.prototype.move = function (e) {
@@ -52,7 +52,7 @@ SQL.Map.prototype.move = function (e) {
     if (!this.flag) {
         return;
     }
-    OZ.Event.prevent(e);
+    SQL.events.prevent(e);
 
     let event;
     if (e.type.match(/touch/)) {
@@ -98,16 +98,16 @@ SQL.Map.prototype.up = function (e) {
     /* mouseup */
     this.flag = false;
     this.dom.container.style.cursor = "";
-    OZ.Event.remove(this.documentMove);
-    OZ.Event.remove(this.documentUp);
+    SQL.events.remove(this.documentMove);
+    SQL.events.remove(this.documentUp);
 };
 
 SQL.Map.prototype.sync = function () {
     /* when window changes, adjust map */
     this.width = this.dom.container.offsetWidth - 2;
     this.height = this.dom.container.offsetHeight - 2;
-    const dims = OZ.DOM.win();
-    const scroll = OZ.DOM.scroll();
+    const dims = SQL.dom.win();
+    const scroll = SQL.dom.scroll();
     this.scale = Math.min(this.width / this.owner.width, this.height / this.owner.height);
     this.mapWidth = this.owner.width * this.scale;
     this.mapHeight = this.owner.height * this.scale;

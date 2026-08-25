@@ -9,7 +9,7 @@ SQL.IO = function (owner) {
     this._currentOwnerId = "";
     this._currentOwnerLabel = "";
     this.dom = {
-        container: OZ.$("io"),
+        container: SQL.dom.get("io"),
     };
 
     let ids = [
@@ -29,7 +29,7 @@ SQL.IO = function (owner) {
         "serverimport",
     ];
     for (let id of ids) {
-        let elm = OZ.$(id);
+        let elm = SQL.dom.get(id);
         this.dom[id] = elm;
         elm.value = _(id);
     }
@@ -37,34 +37,34 @@ SQL.IO = function (owner) {
         "serverloadmodellabel", "serverownerlabel", "serverversionlabel",
         "serveridlabel", "servergrouplabel"];
     for (let id of ids) {
-        let elm = OZ.$(id);
+        let elm = SQL.dom.get(id);
         elm.innerHTML = _(id);
     }
     this.dom.serverlist.textContent = _("serverlist");
     this.dom.serverlist.title = _("serverlisttitle");
 
-    this.dom.ta = OZ.$("textarea");
-    this.dom.backend = OZ.$("backend");
-    this.dom.exporttarget = OZ.$("exporttarget");
-    this.dom.exporttargetlabel = OZ.$("exporttargetlabel");
+    this.dom.ta = SQL.dom.get("textarea");
+    this.dom.backend = SQL.dom.get("backend");
+    this.dom.exporttarget = SQL.dom.get("exporttarget");
+    this.dom.exporttargetlabel = SQL.dom.get("exporttargetlabel");
     const exportLabel = _("exporttarget"); this.dom.exporttargetlabel.textContent = exportLabel === "exporttarget" ? "Export target:" : exportLabel;
-    this.dom.status = OZ.$("iostatus");
-    this.dom.statusmessage = OZ.$("iostatusmessage");
-    this.dom.statusdetails = OZ.$("iostatusdetails");
-    this.dom.statuslist = OZ.$("iostatuslist");
-    this.dom.statusdismiss = OZ.$("iostatusdismiss");
-    this.dom.serverloadname = OZ.$("serverloadname");
-    this.dom.serverloadmodel = OZ.$("serverloadmodel");
-    this.dom.serverloadversion = OZ.$("serverloadversion");
-    this.dom.serverowner = OZ.$("serverowner");
-    this.dom.serverownercontrol = OZ.$("serverownercontrol");
-    this.dom.serverversioncontrol = OZ.$("serverversioncontrol");
-    this.dom.servergrantid = OZ.$("servergrantid");
-    this.dom.servergrantgroup = OZ.$("servergrantgroup");
-    this.dom.servercopyid = OZ.$("servercopyid");
+    this.dom.status = SQL.dom.get("iostatus");
+    this.dom.statusmessage = SQL.dom.get("iostatusmessage");
+    this.dom.statusdetails = SQL.dom.get("iostatusdetails");
+    this.dom.statuslist = SQL.dom.get("iostatuslist");
+    this.dom.statusdismiss = SQL.dom.get("iostatusdismiss");
+    this.dom.serverloadname = SQL.dom.get("serverloadname");
+    this.dom.serverloadmodel = SQL.dom.get("serverloadmodel");
+    this.dom.serverloadversion = SQL.dom.get("serverloadversion");
+    this.dom.serverowner = SQL.dom.get("serverowner");
+    this.dom.serverownercontrol = SQL.dom.get("serverownercontrol");
+    this.dom.serverversioncontrol = SQL.dom.get("serverversioncontrol");
+    this.dom.servergrantid = SQL.dom.get("servergrantid");
+    this.dom.servergrantgroup = SQL.dom.get("servergrantgroup");
+    this.dom.servercopyid = SQL.dom.get("servercopyid");
     this.dom.servercopyid.textContent = _("servercopyid");
     this.dom.servercopyid.title = _("servercopytitle");
-    this.dom.serverpanel = OZ.$("serverpanel");
+    this.dom.serverpanel = SQL.dom.get("serverpanel");
     this.dom.clientcontent = document.querySelector(".io-client-content");
     this._actionLabelTimers = {};
     this._currentGroups = [];
@@ -79,48 +79,48 @@ SQL.IO = function (owner) {
     this.listresponse = this.listresponse.bind(this);
     this.importresponse = this.importresponse.bind(this);
 
-    OZ.Event.add(this.dom.saveload, "click", this.click.bind(this));
-    OZ.Event.add(
+    SQL.events.add(this.dom.saveload, "click", this.click.bind(this));
+    SQL.events.add(
         this.dom.clientlocalsave,
         "click",
         this.clientlocalsave.bind(this)
     );
-    OZ.Event.add(this.dom.clientsave, "click", this.clientsave.bind(this));
-    OZ.Event.add(
+    SQL.events.add(this.dom.clientsave, "click", this.clientsave.bind(this));
+    SQL.events.add(
         this.dom.clientlocalload,
         "click",
         this.clientlocalload.bind(this)
     );
-    OZ.Event.add(
+    SQL.events.add(
         this.dom.clientlocallist,
         "click",
         this.clientlocallist.bind(this)
     );
-    OZ.Event.add(this.dom.clientload, "click", this.clientload.bind(this));
-    OZ.Event.add(this.dom.clientsql, "click", this.clientsql.bind(this));
-    OZ.Event.add(this.dom.statusdismiss, "click", this.hideStatus.bind(this));
-    OZ.Event.add(this.dom.exporttarget, "change", this.changeExportTarget.bind(this));
-    OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
-    OZ.Event.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
-    OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
-    OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
-    OZ.Event.add(this.dom.serverlist, "click", () => this.serverlist(null, true));
-    OZ.Event.add(this.dom.servershare, "click", this.servershare.bind(this));
-    OZ.Event.add(this.dom.servercopyid, "click", this.copyCurrentOwnerId.bind(this));
-    OZ.Event.add(this.dom.serverimport, "click", this.serverimport.bind(this));
-    OZ.Event.add(this.dom.serverloadname, "input", this.updateServerModelControls.bind(this));
-    OZ.Event.add(this.dom.serverloadmodel, "change", this.updateServerModelChoices.bind(this));
-    OZ.Event.add(this.dom.servergrantid, "input", () => {
+    SQL.events.add(this.dom.clientload, "click", this.clientload.bind(this));
+    SQL.events.add(this.dom.clientsql, "click", this.clientsql.bind(this));
+    SQL.events.add(this.dom.statusdismiss, "click", this.hideStatus.bind(this));
+    SQL.events.add(this.dom.exporttarget, "change", this.changeExportTarget.bind(this));
+    SQL.events.add(this.dom.clientef, "click", this.clientef.bind(this));
+    SQL.events.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
+    SQL.events.add(this.dom.serversave, "click", this.serversave.bind(this));
+    SQL.events.add(this.dom.serverload, "click", this.serverload.bind(this));
+    SQL.events.add(this.dom.serverlist, "click", () => this.serverlist(null, true));
+    SQL.events.add(this.dom.servershare, "click", this.servershare.bind(this));
+    SQL.events.add(this.dom.servercopyid, "click", this.copyCurrentOwnerId.bind(this));
+    SQL.events.add(this.dom.serverimport, "click", this.serverimport.bind(this));
+    SQL.events.add(this.dom.serverloadname, "input", this.updateServerModelControls.bind(this));
+    SQL.events.add(this.dom.serverloadmodel, "change", this.updateServerModelChoices.bind(this));
+    SQL.events.add(this.dom.servergrantid, "input", () => {
         if (this.dom.servergrantid.value) this.dom.servergrantgroup.value = "";
         this.updateServerModelControls();
     });
-    OZ.Event.add(this.dom.servergrantgroup, "change", () => {
+    SQL.events.add(this.dom.servergrantgroup, "change", () => {
         if (this.dom.servergrantgroup.value) this.dom.servergrantid.value = "";
         this.updateServerModelControls();
     });
-    OZ.Event.add(this.dom.serverowner, "change", () => this.updateServerModelChoices(true));
-    OZ.Event.add(this.dom.backend, "change", this.serverlist.bind(this));
-    OZ.Event.add(document, "keydown", this.press.bind(this));
+    SQL.events.add(this.dom.serverowner, "change", () => this.updateServerModelChoices(true));
+    SQL.events.add(this.dom.backend, "change", this.serverlist.bind(this));
+    SQL.events.add(document, "keydown", this.press.bind(this));
     this.build();
 };
 
@@ -165,7 +165,7 @@ SQL.IO.prototype.ensureCsrfToken = function (callback, failure) {
     const bp = this.owner.getOption("xhrpath");
     const url = bp + "backend/" + this.dom.backend.value + "/csrf";
     const h = this.owner.getXhrHeaders();
-    OZ.Request(url, (data, code, headers) => {
+    SQL.request(url, (data, code, headers) => {
         this.setCsrfToken(headers, data);
         if (code >= 200 && code < 300 && this._csrfToken) {
             callback();
@@ -181,13 +181,13 @@ SQL.IO.prototype.showStatus = function (diagnostics, operation) {
     const messages = Array.from(new Set(diagnostics || []));
     if (!messages.length) { this.hideStatus(); return; }
     this.dom.statusmessage.textContent = (operation || "Operation") + " reported " + messages.length + " conversion warning" + (messages.length === 1 ? "." : "s.");
-    OZ.DOM.clear(this.dom.statuslist);
-    messages.forEach((message) => { const item = OZ.DOM.elm("li"); item.textContent = message; this.dom.statuslist.appendChild(item); });
+    SQL.dom.clear(this.dom.statuslist);
+    messages.forEach((message) => { const item = SQL.dom.create("li"); item.textContent = message; this.dom.statuslist.appendChild(item); });
     this.dom.statusdetails.style.display = "";
     this.dom.status.style.display = "block";
 };
 SQL.IO.prototype.build = function () {
-    OZ.DOM.clear(this.dom.backend);
+    SQL.dom.clear(this.dom.backend);
 
     const bs = CONFIG.AVAILABLE_BACKENDS;
     let be = CONFIG.DEFAULT_BACKEND;
@@ -199,7 +199,7 @@ SQL.IO.prototype.build = function () {
         }
     }
     for (let i = 0; i < bs.length; i++) {
-        let o = OZ.DOM.elm("option");
+        let o = SQL.dom.create("option");
         o.value = bs[i];
         o.innerHTML = bs[i];
         this.dom.backend.appendChild(o);
@@ -209,9 +209,9 @@ SQL.IO.prototype.build = function () {
     }
 
     const selectedTarget = this.getExportTarget();
-    OZ.DOM.clear(this.dom.exporttarget);
+    SQL.dom.clear(this.dom.exporttarget);
     for (const target of CONFIG.EXPORT_TARGETS) {
-        const option = OZ.DOM.elm("option");
+        const option = SQL.dom.create("option");
         option.value = target.id;
         option.textContent = target.label;
         option.selected = target.id === selectedTarget;
@@ -438,7 +438,7 @@ SQL.IO.prototype.clientsql = function () {
     const h = this.owner.getXhrHeaders();
     h['transformation'] = target;
     this.owner.window.showThrobber();
-    OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
+    SQL.request(path, this.finish.bind(this), { xml: true, headers: h });
 };
 
 SQL.IO.prototype.clientef = function () {
@@ -447,7 +447,7 @@ SQL.IO.prototype.clientef = function () {
     const h = this.owner.getXhrHeaders();
     h['transformation'] = 'ef';
     this.owner.window.showThrobber();
-    OZ.Request(path, this.finish.bind(this), { xml: true, headers: h });
+    SQL.request(path, this.finish.bind(this), { xml: true, headers: h });
 };
 
 SQL.IO.prototype.getExportTarget = function () {
@@ -722,7 +722,7 @@ SQL.IO.prototype.serversave = function (e, keyword) {
         const h = this.owner.getXhrHeaders();
         h["X-CSRF-TOKEN"] = this._csrfToken;
         h["Content-type"] = "application/xml";
-        OZ.Request(url, this.saveresponse, {
+        SQL.request(url, this.saveresponse, {
             xml: true,
             method: "post",
             data: xml,
@@ -766,7 +766,7 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     this._pendingName = name;
-    OZ.Request(url, this.loadresponse, { xml: true, headers: h });
+    SQL.request(url, this.loadresponse, { xml: true, headers: h });
 };
 
 SQL.IO.prototype.serverlist = function (e, preserveOutput) {
@@ -778,7 +778,7 @@ SQL.IO.prototype.serverlist = function (e, preserveOutput) {
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
     const callback = (data, code, headers) => this.listresponse(data, code, headers, true);
-    OZ.Request(url, callback, { headers: h });
+    SQL.request(url, callback, { headers: h });
 };
 
 SQL.IO.prototype.updateServerModelControls = function () {
@@ -804,34 +804,34 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
             ? this._currentOwnerId
             : (ownerIds.length ? ownerIds[0] : ""));
     const matches = allMatches.filter((model) => !selectedOwner || model.ownerId === selectedOwner);
-    OZ.DOM.clear(this.dom.serverloadmodel);
+    SQL.dom.clear(this.dom.serverloadmodel);
     const modelNames = Array.from(new Set(this._serverModels.map((model) => model.keyword)));
-    const placeholder = OZ.DOM.elm("option");
+    const placeholder = SQL.dom.create("option");
     placeholder.value = ""; placeholder.textContent = "";
     this.dom.serverloadmodel.appendChild(placeholder);
     for (const modelName of modelNames) {
-        const option = OZ.DOM.elm("option");
+        const option = SQL.dom.create("option");
         option.value = modelName;
         option.textContent = modelName;
         option.selected = modelName === name;
         this.dom.serverloadmodel.appendChild(option);
     }
-    OZ.DOM.clear(this.dom.serverloadversion);
-    const latest = OZ.DOM.elm("option");
+    SQL.dom.clear(this.dom.serverloadversion);
+    const latest = SQL.dom.create("option");
     latest.value = ""; latest.textContent = _("serverlatest");
     this.dom.serverloadversion.appendChild(latest);
     for (const model of matches) {
-        const option = OZ.DOM.elm("option");
+        const option = SQL.dom.create("option");
         option.value = model.version; option.textContent = "v" + model.version;
         this.dom.serverloadversion.appendChild(option);
     }
-    OZ.DOM.clear(this.dom.serverowner);
-    const ownerPlaceholder = OZ.DOM.elm("option");
+    SQL.dom.clear(this.dom.serverowner);
+    const ownerPlaceholder = SQL.dom.create("option");
     ownerPlaceholder.value = "";
     ownerPlaceholder.textContent = "";
     this.dom.serverowner.appendChild(ownerPlaceholder);
     for (const ownerId of ownerIds) {
-        const option = OZ.DOM.elm("option");
+        const option = SQL.dom.create("option");
         option.value = ownerId;
         option.textContent = ownerId === this._currentOwnerId
             ? this._currentOwnerLabel
@@ -863,7 +863,7 @@ SQL.IO.prototype.refreshShareState = function () {
     }
     const bp = this.owner.getOption("xhrpath");
     const url = bp + "backend/" + this.dom.backend.value + "/access?keyword=" + encodeURIComponent(this._name);
-    OZ.Request(url, (data, code) => {
+    SQL.request(url, (data, code) => {
         if (code < 200 || code >= 300) {
             this._serverGrants = [];
             this.updateServerModelControls();
@@ -936,7 +936,7 @@ SQL.IO.prototype.servershare = function () {
         if (this._csrfToken) {
             headers["X-CSRF-TOKEN"] = this._csrfToken;
         }
-        OZ.Request(url, (data, code, responseHeaders) => {
+        SQL.request(url, (data, code, responseHeaders) => {
             this.setCsrfToken(responseHeaders);
             if (code === 204) {
                 alert(_("serversharegranted"));
@@ -972,7 +972,7 @@ SQL.IO.prototype.serverunshare = function () {
     this.ensureCsrfToken(() => {
         const headers = this.owner.getXhrHeaders();
         headers["X-CSRF-TOKEN"] = this._csrfToken;
-        OZ.Request(url, (data, code, responseHeaders) => {
+        SQL.request(url, (data, code, responseHeaders) => {
             this.setCsrfToken(responseHeaders);
             if (code === 204) {
                 alert(_("servershareremoved"));
@@ -1000,7 +1000,7 @@ SQL.IO.prototype.serverimport = function (e) {
         name;
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
-    OZ.Request(url, this.importresponse, { xml: true, headers: h });
+    SQL.request(url, this.importresponse, { xml: true, headers: h });
 };
 
 SQL.IO.prototype.check = function (code) {
@@ -1067,13 +1067,13 @@ SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
     this._currentOwnerId = list.currentOwnerId || "";
     this._currentOwnerLabel = list.currentOwnerLabel || "";
     this._currentGroups = Array.isArray(list.groups) ? list.groups : [];
-    OZ.DOM.clear(this.dom.servergrantgroup);
-    const groupPlaceholder = OZ.DOM.elm("option");
+    SQL.dom.clear(this.dom.servergrantgroup);
+    const groupPlaceholder = SQL.dom.create("option");
     groupPlaceholder.value = "";
     groupPlaceholder.textContent = "";
     this.dom.servergrantgroup.appendChild(groupPlaceholder);
     for (const group of this._currentGroups) {
-        const option = OZ.DOM.elm("option");
+        const option = SQL.dom.create("option");
         option.value = group;
         option.textContent = group;
         this.dom.servergrantgroup.appendChild(option);
@@ -1102,9 +1102,6 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
 
 SQL.IO.prototype.press = function (e) {
     if (e.keyCode == 113) {
-        if (OZ.opera) {
-            e.preventDefault();
-        }
         this.quicksave(e);
     }
 };

@@ -3,7 +3,7 @@
 SQL.Toggle = function (elm) {
     this._state = null;
     this._elm = elm;
-    OZ.Event.add(elm, "click", this._click.bind(this));
+    SQL.events.add(elm, "click", this._click.bind(this));
 
     let defaultState = true;
     if (document.location.href.match(/toolbar=hidden/)) {
@@ -19,14 +19,14 @@ SQL.Toggle.prototype._click = function (e) {
 SQL.Toggle.prototype._switch = function (state) {
     this._state = state;
     if (this._state) {
-        OZ.$("bar").style.maxHeight = "";
-        OZ.$("bar").style.overflow = "";
+        SQL.dom.get("bar").style.maxHeight = "";
+        SQL.dom.get("bar").style.overflow = "";
         if (SQL.Designer.mapTools) {
             SQL.Designer.mapTools.close();
         }
     } else {
-        OZ.$("bar").style.overflow = "hidden";
-        OZ.$("bar").style.maxHeight = this._elm.offsetHeight + "px";
+        SQL.dom.get("bar").style.overflow = "hidden";
+        SQL.dom.get("bar").style.maxHeight = this._elm.offsetHeight + "px";
     }
     this._elm.className = this._state ? "on" : "off";
 };
