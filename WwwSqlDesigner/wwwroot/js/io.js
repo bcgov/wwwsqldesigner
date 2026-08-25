@@ -5,6 +5,9 @@ SQL.IO = function (owner) {
         ""; /* last used name with local storage */
     this._csrfToken = "";
     this._serverModelState = "none";
+    this._serverModels = [];
+    this._currentOwnerId = "";
+    this._currentOwnerLabel = "";
     this.dom = {
         container: OZ.$("io"),
     };
@@ -19,12 +22,10 @@ SQL.IO = function (owner) {
         "clientsql",
         "clientef",
         "clientefzip",
-        "quicksave",
         "serversave",
         "serverload",
         "serverlist",
         "servershare",
-        "serverunshare",
         "serverimport",
     ];
     for (let id of ids) {
@@ -32,14 +33,15 @@ SQL.IO = function (owner) {
         this.dom[id] = elm;
         elm.value = _(id);
     }
-
-    this.dom.quicksave.value += " (F2)";
-
-    ids = ["client", "server", "output", "backendlabel"];
+    ids = ["client", "server", "output", "backendlabel", "servermodellabel",
+        "serverloadmodellabel", "serverownerlabel", "serverversionlabel",
+        "serveridlabel", "servergrouplabel"];
     for (let id of ids) {
         let elm = OZ.$(id);
         elm.innerHTML = _(id);
     }
+    this.dom.serverlist.textContent = _("serverlist");
+    this.dom.serverlist.title = _("serverlisttitle");
 
     this.dom.ta = OZ.$("textarea");
     this.dom.backend = OZ.$("backend");
@@ -51,12 +53,22 @@ SQL.IO = function (owner) {
     this.dom.statusdetails = OZ.$("iostatusdetails");
     this.dom.statuslist = OZ.$("iostatuslist");
     this.dom.statusdismiss = OZ.$("iostatusdismiss");
-    if (this.dom.servershare.value === "servershare") {
-        this.dom.servershare.value = "Share (view only)";
-    }
-    if (this.dom.serverunshare.value === "serverunshare") {
-        this.dom.serverunshare.value = "Remove share";
-    }
+    this.dom.serverloadname = OZ.$("serverloadname");
+    this.dom.serverloadmodel = OZ.$("serverloadmodel");
+    this.dom.serverloadversion = OZ.$("serverloadversion");
+    this.dom.serverowner = OZ.$("serverowner");
+    this.dom.serverownercontrol = OZ.$("serverownercontrol");
+    this.dom.serverversioncontrol = OZ.$("serverversioncontrol");
+    this.dom.servergrantid = OZ.$("servergrantid");
+    this.dom.servergrantgroup = OZ.$("servergrantgroup");
+    this.dom.servercopyid = OZ.$("servercopyid");
+    this.dom.servercopyid.textContent = _("servercopyid");
+    this.dom.servercopyid.title = _("servercopytitle");
+    this.dom.serverpanel = OZ.$("serverpanel");
+    this.dom.clientcontent = document.querySelector(".io-client-content");
+    this._actionLabelTimers = {};
+    this._currentGroups = [];
+    this._serverGrants = [];
     this.updateServerModelControls();
 
     this.dom.container.parentNode.removeChild(this.dom.container);
@@ -90,19 +102,50 @@ SQL.IO = function (owner) {
     OZ.Event.add(this.dom.exporttarget, "change", this.changeExportTarget.bind(this));
     OZ.Event.add(this.dom.clientef, "click", this.clientef.bind(this));
     OZ.Event.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
-    OZ.Event.add(this.dom.quicksave, "click", this.quicksave.bind(this));
     OZ.Event.add(this.dom.serversave, "click", this.serversave.bind(this));
     OZ.Event.add(this.dom.serverload, "click", this.serverload.bind(this));
-    OZ.Event.add(this.dom.serverlist, "click", this.serverlist.bind(this));
+    OZ.Event.add(this.dom.serverlist, "click", () => this.serverlist(null, true));
     OZ.Event.add(this.dom.servershare, "click", this.servershare.bind(this));
-    OZ.Event.add(this.dom.serverunshare, "click", this.serverunshare.bind(this));
+    OZ.Event.add(this.dom.servercopyid, "click", this.copyCurrentOwnerId.bind(this));
     OZ.Event.add(this.dom.serverimport, "click", this.serverimport.bind(this));
+    OZ.Event.add(this.dom.serverloadname, "input", this.updateServerModelControls.bind(this));
+    OZ.Event.add(this.dom.serverloadmodel, "change", this.updateServerModelChoices.bind(this));
+    OZ.Event.add(this.dom.servergrantid, "input", () => {
+        if (this.dom.servergrantid.value) this.dom.servergrantgroup.value = "";
+        this.updateServerModelControls();
+    });
+    OZ.Event.add(this.dom.servergrantgroup, "change", () => {
+        if (this.dom.servergrantgroup.value) this.dom.servergrantid.value = "";
+        this.updateServerModelControls();
+    });
+    OZ.Event.add(this.dom.serverowner, "change", () => this.updateServerModelChoices(true));
+    OZ.Event.add(this.dom.backend, "change", this.serverlist.bind(this));
     OZ.Event.add(document, "keydown", this.press.bind(this));
     this.build();
 };
 
 SQL.IO.prototype.hideStatus = function () {
     this.dom.status.style.display = "none";
+};
+
+SQL.IO.prototype.syncClientColumnHeight = function () {
+    this.dom.clientcontent.style.height = this.dom.serverpanel.getBoundingClientRect().height + "px";
+};
+
+SQL.IO.prototype.setActionLabel = function (action, label) {
+    const button = action === "servercopy" ? this.dom.servercopyid : this.dom.serverlist;
+    const defaultLabel = action === "servercopy" ? _("servercopyid") : _("serverlist");
+    if (this._actionLabelTimers[action]) {
+        clearTimeout(this._actionLabelTimers[action]);
+        delete this._actionLabelTimers[action];
+    }
+    button.textContent = label || defaultLabel;
+    if (label) {
+        this._actionLabelTimers[action] = setTimeout(() => {
+            button.textContent = defaultLabel;
+            delete this._actionLabelTimers[action];
+        }, 1800);
+    }
 };
 
 SQL.IO.prototype.setCsrfToken = function (headers, data) {
@@ -181,8 +224,14 @@ SQL.IO.prototype.click = function () {
     this.build();
     this.hideStatus();
     this.dom.ta.value = "";
+    this.dom.serverloadname.value = this._name || "";
     this.refreshExportTargetLabel();
     this.owner.window.open(_("saveload"), this.dom.container);
+    this.dom.serverloadmodel.focus();
+    this.syncClientColumnHeight();
+    if (!this._serverModels.length) {
+        this.serverlist(null, true);
+    }
 };
 
 SQL.IO.prototype.refreshExportTargetLabel = function () {
@@ -253,6 +302,7 @@ SQL.IO.prototype.clientload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
+        this.dom.serverloadname.value = "";
         this.updateServerModelControls();
     }
 };
@@ -339,6 +389,7 @@ SQL.IO.prototype.clientlocalload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
+        this.dom.serverloadname.value = "";
         this.updateServerModelControls();
     }
 };
@@ -650,11 +701,13 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {
-    const name = keyword || prompt(_("serversaveprompt"), this._name);
+    const name = keyword || this.dom.serverloadname.value.trim() || prompt(_("serversaveprompt"), this._name);
     if (!name) {
         return;
     }
+    if (name !== this._name) this._serverGrants = [];
     this._name = name;
+    this.dom.serverloadname.value = name;
     const xml = this.owner.toXML(true);
     const bp = this.owner.getOption("xhrpath");
     const url =
@@ -686,7 +739,14 @@ SQL.IO.prototype.quicksave = function (e) {
 };
 
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
-    const name = keyword || prompt(_("serverloadprompt"), this._name);
+    if (typeof keyword === "undefined") {
+        keyword = this.dom.serverloadmodel.value;
+        if (keyword) {
+            version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
+            ownerId = this.dom.serverowner.value || null;
+        }
+    }
+    const name = keyword || prompt(_("serverloadprompt"), this.dom.serverloadname.value.trim() || this._name);
     if (!name) {
         return;
     }
@@ -697,7 +757,7 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
         this.dom.backend.value +
         "/load/?keyword=" +
         encodeURIComponent(name);
-    if (version) {
+    if (version !== null && version !== undefined) {
         url += "&version=" + encodeURIComponent(version);
     }
     if (ownerId) {
@@ -709,31 +769,146 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     OZ.Request(url, this.loadresponse, { xml: true, headers: h });
 };
 
-SQL.IO.prototype.serverlist = function (e) {
+SQL.IO.prototype.serverlist = function (e, preserveOutput) {
+    if (preserveOutput) {
+        this.setActionLabel("serverlist", "");
+    }
     const bp = this.owner.getOption("xhrpath");
     const url = bp + "backend/" + this.dom.backend.value + "/list";
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
-    OZ.Request(url, this.listresponse, { headers: h });
-};
-
-SQL.IO.prototype.parseShareRecipient = function (value) {
-    const match = String(value || "").trim().match(/^(user|group):(.+)$/i);
-    if (!match || !match[2].trim()) {
-        return null;
-    }
-    return {
-        targetType: match[1].toLowerCase() === "user" ? "User" : "Group",
-        targetId: match[2].trim(),
-    };
+    const callback = (data, code, headers) => this.listresponse(data, code, headers, true);
+    OZ.Request(url, callback, { headers: h });
 };
 
 SQL.IO.prototype.updateServerModelControls = function () {
     const ownerControlsEnabled = this._serverModelState === "owned";
-    this.dom.servershare.disabled = !ownerControlsEnabled;
-    this.dom.serverunshare.disabled = !ownerControlsEnabled;
-    this.dom.serversave.disabled = false;
-    this.dom.quicksave.disabled = false;
+    const hasName = this.dom.serverloadname.value.trim().length > 0;
+    const hasLoadModel = this.dom.serverloadmodel.value !== "" || hasName;
+    const recipient = this.getShareRecipient();
+    const isGranted = recipient && this._serverGrants.some((grant) =>
+        grant.targetType === recipient.targetType && grant.targetId === recipient.targetId);
+    this.dom.servershare.disabled = !ownerControlsEnabled || !recipient;
+    this.dom.servershare.value = isGranted ? _("serverunshare") : _("servershare");
+    this.dom.serverload.disabled = !hasLoadModel;
+    this.dom.serversave.disabled = !hasName;
+};
+
+SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
+    const name = this.dom.serverloadmodel.value || "";
+    const allMatches = this._serverModels.filter((model) => model.keyword === name);
+    const ownerIds = Array.from(new Set(allMatches.map((model) => model.ownerId)));
+    const selectedOwner = preferSelectedOwner && ownerIds.indexOf(this.dom.serverowner.value) !== -1
+        ? this.dom.serverowner.value
+        : (ownerIds.indexOf(this._currentOwnerId) !== -1
+            ? this._currentOwnerId
+            : (ownerIds.length ? ownerIds[0] : ""));
+    const matches = allMatches.filter((model) => !selectedOwner || model.ownerId === selectedOwner);
+    OZ.DOM.clear(this.dom.serverloadmodel);
+    const modelNames = Array.from(new Set(this._serverModels.map((model) => model.keyword)));
+    const placeholder = OZ.DOM.elm("option");
+    placeholder.value = ""; placeholder.textContent = "";
+    this.dom.serverloadmodel.appendChild(placeholder);
+    for (const modelName of modelNames) {
+        const option = OZ.DOM.elm("option");
+        option.value = modelName;
+        option.textContent = modelName;
+        option.selected = modelName === name;
+        this.dom.serverloadmodel.appendChild(option);
+    }
+    OZ.DOM.clear(this.dom.serverloadversion);
+    const latest = OZ.DOM.elm("option");
+    latest.value = ""; latest.textContent = _("serverlatest");
+    this.dom.serverloadversion.appendChild(latest);
+    for (const model of matches) {
+        const option = OZ.DOM.elm("option");
+        option.value = model.version; option.textContent = "v" + model.version;
+        this.dom.serverloadversion.appendChild(option);
+    }
+    OZ.DOM.clear(this.dom.serverowner);
+    const ownerPlaceholder = OZ.DOM.elm("option");
+    ownerPlaceholder.value = "";
+    ownerPlaceholder.textContent = "";
+    this.dom.serverowner.appendChild(ownerPlaceholder);
+    for (const ownerId of ownerIds) {
+        const option = OZ.DOM.elm("option");
+        option.value = ownerId;
+        option.textContent = ownerId === this._currentOwnerId
+            ? this._currentOwnerLabel
+            : (ownerId || "Public models");
+        option.selected = ownerId === selectedOwner && selectedOwner !== "";
+        this.dom.serverowner.appendChild(option);
+    }
+    this.dom.serverversioncontrol.style.display = "";
+    this.dom.serverownercontrol.style.display = "";
+    this.dom.serverversioncontrol.querySelector("select").disabled = matches.length === 0;
+    this.dom.serverownercontrol.querySelector("select").disabled = ownerIds.length === 0;
+    this.dom.serverloadmodel.value = name;
+    this.updateServerModelControls();
+};
+
+SQL.IO.prototype.getShareRecipient = function () {
+    const userId = this.dom.servergrantid.value.trim();
+    const group = this.dom.servergrantgroup.value.trim();
+    if (userId) return { targetType: "User", targetId: userId };
+    if (group) return { targetType: "Group", targetId: group };
+    return null;
+};
+
+SQL.IO.prototype.refreshShareState = function () {
+    if (this._serverModelState !== "owned" || !this._name) {
+        this._serverGrants = [];
+        this.updateServerModelControls();
+        return;
+    }
+    const bp = this.owner.getOption("xhrpath");
+    const url = bp + "backend/" + this.dom.backend.value + "/access?keyword=" + encodeURIComponent(this._name);
+    OZ.Request(url, (data, code) => {
+        if (code < 200 || code >= 300) {
+            this._serverGrants = [];
+            this.updateServerModelControls();
+            return;
+        }
+        try {
+            this._serverGrants = JSON.parse(data || "[]");
+        } catch (e) {
+            this._serverGrants = [];
+        }
+        this.updateServerModelControls();
+    }, { headers: this.owner.getXhrHeaders() });
+};
+
+SQL.IO.prototype.copyCurrentOwnerId = function () {
+    this.setActionLabel("servercopy", "");
+    if (!this._currentOwnerId) {
+        alert("Your user ID is not available yet. Refresh the models first.");
+        return;
+    }
+    const copied = () => this.setActionLabel("servercopy", _("servercopied"));
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(this._currentOwnerId).then(copied).catch(() => {
+            this.copyTextFallback(this._currentOwnerId, copied);
+        });
+        return;
+    }
+    this.copyTextFallback(this._currentOwnerId, copied);
+};
+
+SQL.IO.prototype.copyTextFallback = function (value, callback) {
+    const input = document.createElement("textarea");
+    input.value = value;
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.focus();
+    input.select();
+    const copied = document.execCommand("copy");
+    input.remove();
+    if (copied) {
+        callback();
+    } else {
+        alert("Unable to copy the user ID.");
+    }
 };
 
 SQL.IO.prototype.servershare = function () {
@@ -741,13 +916,19 @@ SQL.IO.prototype.servershare = function () {
         return;
     }
 
-    const recipient = this.parseShareRecipient(prompt("Share with (user:<subject> or group:<name>):", ""));
+    const recipient = this.getShareRecipient();
     if (!recipient) {
-        alert("Enter a recipient as user:<subject> or group:<name>.");
+        alert(_("serverrecipientrequired"));
         return;
     }
 
     const bp = this.owner.getOption("xhrpath");
+    const isGranted = this._serverGrants.some((grant) =>
+        grant.targetType === recipient.targetType && grant.targetId === recipient.targetId);
+    if (isGranted) {
+        this.serverunshare();
+        return;
+    }
     const url = bp + "backend/" + this.dom.backend.value + "/access/grant/?keyword=" + encodeURIComponent(this._name);
     this.ensureCsrfToken(() => {
         const headers = this.owner.getXhrHeaders();
@@ -758,7 +939,8 @@ SQL.IO.prototype.servershare = function () {
         OZ.Request(url, (data, code, responseHeaders) => {
             this.setCsrfToken(responseHeaders);
             if (code === 204) {
-                alert("Read-only access granted.");
+                alert(_("serversharegranted"));
+                this.refreshShareState();
             } else {
                 this.check(code);
             }
@@ -768,7 +950,7 @@ SQL.IO.prototype.servershare = function () {
             headers: headers
         });
     }, () => {
-        alert("Unable to obtain a CSRF token. The share was not sent.");
+        alert(_("serversharecsrffailure"));
     });
 };
 
@@ -777,9 +959,9 @@ SQL.IO.prototype.serverunshare = function () {
         return;
     }
 
-    const recipient = this.parseShareRecipient(prompt("Remove share for (user:<subject> or group:<name>):", ""));
+    const recipient = this.getShareRecipient();
     if (!recipient) {
-        alert("Enter a recipient as user:<subject> or group:<name>.");
+        alert(_("serverrecipientrequired"));
         return;
     }
 
@@ -793,13 +975,14 @@ SQL.IO.prototype.serverunshare = function () {
         OZ.Request(url, (data, code, responseHeaders) => {
             this.setCsrfToken(responseHeaders);
             if (code === 204) {
-                alert("Share removed.");
+                alert(_("servershareremoved"));
+                this.refreshShareState();
             } else {
                 this.check(code);
             }
         }, { method: "delete", headers: headers });
     }, () => {
-        alert("Unable to obtain a CSRF token. The share was not removed.");
+        alert(_("serverunsharecsrffailure"));
     });
 };
 
@@ -844,6 +1027,7 @@ SQL.IO.prototype.saveresponse = function (data, code, headers) {
     if (this.check(code) && code >= 200 && code < 300) {
         this._serverModelState = "owned";
         this.updateServerModelControls();
+        this.refreshShareState();
     }
 };
 
@@ -859,18 +1043,45 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
     }
     this._name = this._pendingName;
     this.name = this._pendingName;
+    this.dom.serverloadname.value = this._pendingName;
+    this.dom.serverloadmodel.value = this._pendingName;
     this._serverModelState = copyable ? "copyable" : "owned";
     this.updateServerModelControls();
     this.owner.setTitle(this.name);
+    this.refreshShareState();
 };
 
-SQL.IO.prototype.listresponse = function (data, code, headers) {
+SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
     this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
-    if (!this.check(code)) {
+    if (preserveOutput ? code < 200 || code >= 300 : !this.check(code)) {
         return;
     }
-    this.dom.ta.value = data;
+    if (!preserveOutput) {
+        this.dom.ta.value = data;
+        return;
+    }
+    if (preserveOutput) this.setActionLabel("serverlist", _("serverrefreshed"));
+    let list;
+    try { list = JSON.parse(data || "{}"); } catch (e) { return; }
+    this._currentOwnerId = list.currentOwnerId || "";
+    this._currentOwnerLabel = list.currentOwnerLabel || "";
+    this._currentGroups = Array.isArray(list.groups) ? list.groups : [];
+    OZ.DOM.clear(this.dom.servergrantgroup);
+    const groupPlaceholder = OZ.DOM.elm("option");
+    groupPlaceholder.value = "";
+    groupPlaceholder.textContent = "";
+    this.dom.servergrantgroup.appendChild(groupPlaceholder);
+    for (const group of this._currentGroups) {
+        const option = OZ.DOM.elm("option");
+        option.value = group;
+        option.textContent = group;
+        this.dom.servergrantgroup.appendChild(option);
+    }
+    this.dom.servergrantgroup.disabled = this._currentGroups.length === 0;
+    this._serverModels = Array.isArray(list.models) ? list.models : [];
+    this.updateServerModelChoices();
+    this.syncClientColumnHeight();
 };
 
 SQL.IO.prototype.importresponse = function (data, code, headers) {
@@ -882,6 +1093,8 @@ SQL.IO.prototype.importresponse = function (data, code, headers) {
     if (this.fromXML(data)) {
         this._serverModelState = "none";
         this._name = "";
+        this.dom.serverloadname.value = "";
+        this.dom.serverloadmodel.value = "";
         this.updateServerModelControls();
         this.owner.alignTables();
     }

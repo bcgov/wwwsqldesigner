@@ -177,9 +177,10 @@
         <table aria-label="IO" role="presentation">
             <tbody>
                 <tr>
-                    <td style="width: 60%">
-                        <fieldset>
-                            <legend id="client"></legend>
+                    <td style="width: 50%" class="io-client-column">
+                        <div class="io-client-content">
+                        <fieldset class="client-controls">
+                            <legend id="client" class="panel-title"></legend>
                             <div id="singlerow">
                                 <input type="button" id="clientsave" />
                                 <input type="button" id="clientload" />
@@ -205,31 +206,62 @@
                                 </details>
                             </div>
                         </fieldset>
-                    </td>
-                    <td style="width: 40%">
-                        <fieldset>
-                            <legend id="server"></legend>
-                            <label for="backend" id="backendlabel"></label>
-                            <select id="backend">
-                                <option></option>
-                            </select>
-                            <hr />
-                            <input type="button" id="serversave" />
-                            <input type="button" id="quicksave" />
-                            <input type="button" id="serverload" />
-                            <input type="button" id="serverlist" />
-                            <input type="button" id="servershare" disabled />
-                            <input type="button" id="serverunshare" disabled />
-                            <input type="button" id="serverimport" />
-                        </fieldset>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2">
-                        <fieldset>
-                            <legend id="output"></legend>
+                        <fieldset class="client-output">
+                            <legend id="output" class="panel-title"></legend>
                             <textarea id="textarea" rows="1" cols="1"></textarea>
                             <!--modified by javascript later-->
+                        </fieldset>
+                        </div>
+                    </td>
+                    <td style="width: 50%" class="io-server-column">
+                        <fieldset id="serverpanel">
+                            <legend class="panel-title"><span id="server"></span></legend>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="backend" id="backendlabel"></label></div>
+                                    <select id="backend"><option></option></select>
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="serverloadname" id="servermodellabel"></label></div>
+                                    <input type="text" id="serverloadname" autocomplete="off" />
+                                    <input type="button" id="serversave" />
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="serverloadmodel" id="serverloadmodellabel"></label><button type="button" id="serverlist"></button></div>
+                                    <select id="serverloadmodel"><option value=""></option></select>
+                                </div>
+                                <div class="server-row" id="serverownercontrol">
+                                    <div class="server-label-row"><label for="serverowner" id="serverownerlabel"></label></div>
+                                    <select id="serverowner"><option value=""></option></select>
+                                </div>
+                                <div class="server-row" id="serverversioncontrol">
+                                    <div class="server-label-row"><label for="serverloadversion" id="serverversionlabel"></label></div>
+                                    <select id="serverloadversion"><option value=""></option></select>
+                                    <input type="button" id="serverload" />
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="servergrantid" id="serveridlabel"></label><button type="button" id="servercopyid"></button></div>
+                                    <input type="text" id="servergrantid" autocomplete="off" />
+                                </div>
+                                <div class="server-row">
+                                    <div class="server-label-row"><label for="servergrantgroup" id="servergrouplabel"></label></div>
+                                    <select id="servergrantgroup"><option value=""></option></select>
+                                </div>
+                                <div class="server-row">
+                                    <input type="button" id="servershare" disabled />
+                                </div>
+                            </div>
+                            <div class="server-section">
+                                <div class="server-row">
+                                    <input type="button" id="serverimport" />
+                                </div>
+                            </div>
                         </fieldset>
                     </td>
                 </tr>

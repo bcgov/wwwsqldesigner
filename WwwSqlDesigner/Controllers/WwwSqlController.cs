@@ -29,15 +29,14 @@ namespace WwwSqlDesigner.Controllers
         public async Task<IActionResult> List()
         {
             var models = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
-                .OrderBy(x => x.Keyword)
-                .OrderByDescending(x => x.Version)
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Version)
                 .ToListAsync();
-            var list = models.Select(x =>
-                x.Keyword + " v" + x.Version
-                + " - /?keyword=" + Uri.EscapeDataString(x.Keyword)
-                + "&version=" + Uri.EscapeDataString(x.Version.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                + "&ownerId=" + Uri.EscapeDataString(x.OwnerId));
-            return Content(string.Join("\n", list));
+            return new JsonResult(new ModelListResponse(
+                models.Select(x => new ModelListEntry(x.Keyword, x.Version, x.OwnerId)).ToArray(),
+                GetEffectiveOwnerId(),
+                GetOwnerDisplayLabel(),
+                GetCurrentGroupIds()));
         }
 
         [HttpGet]
@@ -59,7 +58,10 @@ namespace WwwSqlDesigner.Controllers
             }
             else
             {
-                model = await query.FirstOrDefaultAsync(x => x.Keyword == keyword && x.Version == version);
+                model = await query
+                    .Where(x => x.Keyword == keyword && x.Version == version)
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync();
             }
             if (null == model)
             {
@@ -262,6 +264,25 @@ namespace WwwSqlDesigner.Controllers
                 ?? throw new InvalidOperationException("The authenticated user has no stable owner identifier claim.");
         }
 
+        private string GetOwnerDisplayLabel()
+        {
+            if (!_keycloakSettings.IsConfigured)
+            {
+                return "Public models";
+            }
+
+            var name = User.FindFirstValue("name")
+                ?? User.FindFirstValue(ClaimTypes.Name);
+            var email = User.FindFirstValue(ClaimTypes.Email)
+                ?? User.FindFirstValue("email");
+            var username = User.FindFirstValue("preferred_username");
+            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(email))
+            {
+                return $"{name} ({email})";
+            }
+            return name ?? email ?? username ?? GetEffectiveOwnerId();
+        }
+
         private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query, bool includeGrants = true)
         {
             if (!_keycloakSettings.IsConfigured)
@@ -307,8 +328,11 @@ namespace WwwSqlDesigner.Controllers
         {
             return string.Equals(permission, "View", StringComparison.Ordinal);
         }
+
     }
 
     public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);
     public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
+    public sealed record ModelListEntry(string Keyword, int Version, string OwnerId);
+    public sealed record ModelListResponse(ModelListEntry[] Models, string CurrentOwnerId, string CurrentOwnerLabel, string[] Groups);
 }
