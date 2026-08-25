@@ -163,10 +163,11 @@ label, input, select {
 }
 
 #background {
-    position: absolute;
+    position: fixed;
     background-color: #000;
     opacity: 0.5;
     visibility: hidden;
+    z-index: 1999;
 }
 
 /* Main menu */
@@ -190,6 +191,7 @@ label, input, select {
     border-radius: 0px;
     box-shadow: rgba(0, 0, 0, 0.16) 0px 3px 6px 0px, rgba(0, 0, 0, 0.23) 0px 3px 6px 0px;
     box-sizing: border-box;
+    z-index: 1001;
     max-height: 600px;
     overflow-x: hidden;
     overflow-y: auto;
@@ -413,26 +415,34 @@ label, input, select {
 /* Window */
 
 #window {
-    position: absolute;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     visibility: hidden;
     background-color: #fff;
     box-shadow: 0 10px 20px rgba(0, 0, 0, .19), 0 6px 6px rgba(0, 0, 0, .23);
     padding: 15px;
+    z-index: 2000;
 }
 
 #windowtitle {
     font-size: x-large;
-    margin: 15px 15px 24px 15px;
-    padding-left: 15px;
-    padding-right: 15px;
+    margin: 0 0 12px;
+    padding: 0;
 }
 
 #windowcontent {
-    padding: 1em;
+    padding: 0;
 }
 
 #windowok {
     color: #FF4081;
+}
+
+#windowbuttons {
+    display: flow-root;
+    margin-top: 12px;
 }
 
 #windowok, #windowcancel {

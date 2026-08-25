@@ -31,6 +31,7 @@ body {
     position: fixed;
     top: 0px;
     right: 0px;
+    z-index: 1001;
     width: 150px;
     padding: 0px 5px 5px;
     overflow-x: hidden;
@@ -222,17 +223,22 @@ body {
 }
 
 #background {
-    position: absolute;
+    position: fixed;
     background-color: #000;
     opacity: 0.5;
     visibility: hidden;
+    z-index: 1999;
 }
 
 #window {
-    position: absolute;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     visibility: hidden;
     background-color: #fff;
     border: 6px double #333;
+    z-index: 2000;
 }
 
 #windowtitle {
@@ -245,6 +251,10 @@ body {
 
 #windowcontent {
     padding: 1em;
+}
+
+#windowbuttons {
+    display: flow-root;
 }
 
 #windowok, #windowcancel {
