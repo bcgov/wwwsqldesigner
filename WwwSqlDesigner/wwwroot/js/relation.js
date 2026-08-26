@@ -59,7 +59,7 @@ SQL.Relation = function (owner, row1, row2) {
         this.owner.dom.svg.appendChild(this.dom.handle);
     } else {
         for (let i = 0; i < 3; i++) {
-            const div = OZ.DOM.elm("div", {
+            const div = SQL.dom.create("div", {
                 position: "absolute",
                 className: "relation",
                 backgroundColor: this.color,
@@ -67,18 +67,18 @@ SQL.Relation = function (owner, row1, row2) {
             this.dom.push(div);
             if (i & 1) {
                 /* middle */
-                OZ.Style.set(div, { width: CONFIG.RELATION_THICKNESS + "px" });
+                SQL.style.set(div, { width: CONFIG.RELATION_THICKNESS + "px" });
             } else {
                 /* first & last */
-                OZ.Style.set(div, { height: CONFIG.RELATION_THICKNESS + "px" });
+                SQL.style.set(div, { height: CONFIG.RELATION_THICKNESS + "px" });
             }
             this.owner.dom.container.appendChild(div);
         }
-        this.dom.handle = OZ.DOM.elm("div", {
+        this.dom.handle = SQL.dom.create("div", {
             position: "absolute",
             className: "relation-handle",
         });
-        OZ.Style.set(this.dom.handle, {
+        SQL.style.set(this.dom.handle, {
             border: "2px solid " + this.color,
             borderRadius: "6px",
             backgroundColor: "#fff",
@@ -193,10 +193,10 @@ SQL.Relation.prototype.keydownName = function (e) {
     if (!this.editing && (e.key === "Enter" || e.key === " ")) {
         this.editName(e);
     } else if (e.key === "Enter") {
-        OZ.Event.prevent(e);
+        SQL.events.prevent(e);
         this.finishName(false);
     } else if (e.key === "Escape") {
-        OZ.Event.prevent(e);
+        SQL.events.prevent(e);
         this.finishName(true);
     }
 };

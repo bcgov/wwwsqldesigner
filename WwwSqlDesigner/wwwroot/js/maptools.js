@@ -1,13 +1,13 @@
 SQL.MapTools = function (owner) {
     this.owner = owner;
     this.dom = {
-        container: OZ.$("maptools"),
-        details: OZ.$("legendtools"),
-        content: OZ.$("maptoolcontent"),
-        toggle: OZ.$("maptoggle"),
+        container: SQL.dom.get("maptools"),
+        details: SQL.dom.get("legendtools"),
+        content: SQL.dom.get("maptoolcontent"),
+        toggle: SQL.dom.get("maptoggle"),
     };
     this.animating = false;
-    OZ.Event.add(this.dom.toggle, "click", this.click.bind(this));
+    SQL.events.add(this.dom.toggle, "click", this.click.bind(this));
 };
 
 SQL.MapTools.prototype.sync = function () {

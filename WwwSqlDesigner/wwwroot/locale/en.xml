@@ -89,6 +89,7 @@
     <string name="efcontext">EF context name</string>
     <string name="backendlabel">Backend</string>
     <string name="servermodellabel">Model</string>
+    <string name="serverloadmodellabel">Model</string>
     <string name="serverownerlabel">Owner</string>
     <string name="serverversionlabel">Version</string>
     <string name="serveridlabel">ID</string>

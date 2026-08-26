@@ -3,24 +3,24 @@
 SQL.KeyManager = function (owner) {
     this.owner = owner;
     this.dom = {
-        container: OZ.$("keys"),
+        container: SQL.dom.get("keys"),
     };
     this.build();
 };
 
 SQL.KeyManager.prototype.build = function () {
-    this.dom.list = OZ.$("keyslist");
-    this.dom.type = OZ.$("keytype");
-    this.dom.name = OZ.$("keyname");
-    this.dom.left = OZ.$("keyleft");
-    this.dom.right = OZ.$("keyright");
-    this.dom.fields = OZ.$("keyfields");
-    this.dom.avail = OZ.$("keyavail");
-    this.dom.listlabel = OZ.$("keyslistlabel");
+    this.dom.list = SQL.dom.get("keyslist");
+    this.dom.type = SQL.dom.get("keytype");
+    this.dom.name = SQL.dom.get("keyname");
+    this.dom.left = SQL.dom.get("keyleft");
+    this.dom.right = SQL.dom.get("keyright");
+    this.dom.fields = SQL.dom.get("keyfields");
+    this.dom.avail = SQL.dom.get("keyavail");
+    this.dom.listlabel = SQL.dom.get("keyslistlabel");
 
     let ids = ["keyadd", "keyremove"];
     for (let id of ids) {
-        const elm = OZ.$(id);
+        const elm = SQL.dom.get(id);
         this.dom[id] = elm;
         elm.value = _(id);
     }
@@ -33,14 +33,14 @@ SQL.KeyManager.prototype.build = function () {
         "keyavaillabel",
     ];
     for (let id of ids) {
-        const elm = OZ.$(id);
+        const elm = SQL.dom.get(id);
         elm.innerHTML = _(id);
     }
 
     const types = ["PRIMARY", "INDEX", "UNIQUE", "FULLTEXT"];
-    OZ.DOM.clear(this.dom.type);
+    SQL.dom.clear(this.dom.type);
     for (let type of types) {
-        const o = OZ.DOM.elm("option");
+        const o = SQL.dom.create("option");
         o.innerHTML = type;
         o.value = type;
         this.dom.type.appendChild(o);
@@ -48,13 +48,13 @@ SQL.KeyManager.prototype.build = function () {
 
     this.purge = this.purge.bind(this);
 
-    OZ.Event.add(this.dom.list, "change", this.listchange.bind(this));
-    OZ.Event.add(this.dom.type, "change", this.typechange.bind(this));
-    OZ.Event.add(this.dom.name, "keyup", this.namechange.bind(this));
-    OZ.Event.add(this.dom.keyadd, "click", this.add.bind(this));
-    OZ.Event.add(this.dom.keyremove, "click", this.remove.bind(this));
-    OZ.Event.add(this.dom.left, "click", this.left.bind(this));
-    OZ.Event.add(this.dom.right, "click", this.right.bind(this));
+    SQL.events.add(this.dom.list, "change", this.listchange.bind(this));
+    SQL.events.add(this.dom.type, "change", this.typechange.bind(this));
+    SQL.events.add(this.dom.name, "keyup", this.namechange.bind(this));
+    SQL.events.add(this.dom.keyadd, "click", this.add.bind(this));
+    SQL.events.add(this.dom.keyremove, "click", this.remove.bind(this));
+    SQL.events.add(this.dom.left, "click", this.left.bind(this));
+    SQL.events.add(this.dom.right, "click", this.right.bind(this));
 
     this.dom.container.parentNode.removeChild(this.dom.container);
 };
@@ -108,10 +108,10 @@ SQL.KeyManager.prototype.sync = function (table) {
         table.getTitle()
     );
 
-    OZ.DOM.clear(this.dom.list);
+    SQL.dom.clear(this.dom.list);
     for (let i = 0; i < table.keys.length; i++) {
         const k = table.keys[i];
-        const o = OZ.DOM.elm("option");
+        const o = SQL.dom.create("option");
         this.dom.list.appendChild(o);
         const str = i + 1 + ": " + k.getLabel();
         o.textContent = str;
@@ -145,20 +145,20 @@ SQL.KeyManager.prototype.switchTo = function (index) {
         }
     }
 
-    OZ.DOM.clear(this.dom.fields);
+    SQL.dom.clear(this.dom.fields);
     for (let row of k.rows) {
-        const o = OZ.DOM.elm("option");
+        const o = SQL.dom.create("option");
         o.textContent = row.getTitle();
         o.value = row.getTitle();
         this.dom.fields.appendChild(o);
     }
 
-    OZ.DOM.clear(this.dom.avail);
+    SQL.dom.clear(this.dom.avail);
     for (let row of this.table.rows) {
         if (k.rows.indexOf(row) != -1) {
             continue;
         }
-        const o = OZ.DOM.elm("option");
+        const o = SQL.dom.create("option");
         o.textContent = row.getTitle();
         o.value = row.getTitle();
         this.dom.avail.appendChild(o);
@@ -166,8 +166,8 @@ SQL.KeyManager.prototype.switchTo = function (index) {
 };
 
 SQL.KeyManager.prototype.disable = function () {
-    OZ.DOM.clear(this.dom.fields);
-    OZ.DOM.clear(this.dom.avail);
+    SQL.dom.clear(this.dom.fields);
+    SQL.dom.clear(this.dom.avail);
     this.dom.keyremove.disabled = true;
     this.dom.left.disabled = true;
     this.dom.right.disabled = true;

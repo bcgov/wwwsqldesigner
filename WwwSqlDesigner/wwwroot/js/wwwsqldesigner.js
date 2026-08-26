@@ -7,9 +7,9 @@ SQL.Designer = function () {
     this.title = document.title;
 
     SQL.Visual.apply(this);
-    this.toolbarToggle = new SQL.Toggle(OZ.$("toggle"));
+    this.toolbarToggle = new SQL.Toggle(SQL.dom.get("toggle"));
 
-    this.dom.container = OZ.$("area");
+    this.dom.container = SQL.dom.get("area");
     this.minSize = [
         this.dom.container.offsetWidth,
         this.dom.container.offsetHeight,
@@ -28,7 +28,7 @@ SQL.Designer = function () {
     }
 
     this.flag = 2;
-    this.requestLanguage();
+    this.requestEnglishLanguage();
     this.requestDB();
     this.applyStyle();
 };
@@ -58,13 +58,28 @@ SQL.Designer.prototype.requestLanguage = function () {
     const lang = this.getOption("locale");
     const bp = this.getOption("staticpath");
     const url = bp + "locale/" + lang + ".xml";
-    OZ.Request(url, this.languageResponse.bind(this), {
+    SQL.request(url, this.languageResponse.bind(this), {
         method: "get",
         xml: true,
     });
 };
 
-SQL.Designer.prototype.languageResponse = function (xmlDoc) {
+SQL.Designer.prototype.requestEnglishLanguage = function () {
+    if (this.getOption("locale") === CONFIG.DEFAULT_LOCALE) {
+        this.requestLanguage();
+        return;
+    }
+    const bp = this.getOption("staticpath");
+    SQL.request(bp + "locale/" + CONFIG.DEFAULT_LOCALE + ".xml", (xmlDoc) => {
+        this.loadLanguage(xmlDoc);
+        this.requestLanguage();
+    }, {
+            method: "get",
+            xml: true,
+        });
+};
+
+SQL.Designer.prototype.loadLanguage = function (xmlDoc) {
     if (xmlDoc) {
         const strings = xmlDoc.getElementsByTagName("string");
         for (let string of strings) {
@@ -73,6 +88,10 @@ SQL.Designer.prototype.languageResponse = function (xmlDoc) {
             window.LOCALE[n] = v;
         }
     }
+};
+
+SQL.Designer.prototype.languageResponse = function (xmlDoc) {
+    this.loadLanguage(xmlDoc);
     this.flag--;
     if (!this.flag) {
         this.init2();
@@ -123,7 +142,7 @@ SQL.Designer.prototype.init2 = function () {
 
     this.sync();
 
-    OZ.$("docs").value = _("docs");
+    SQL.dom.get("docs").value = _("docs");
 
     const url = window.location.href;
     const regexKeyword = url.match(/keyword=([^&]+)/);
@@ -149,7 +168,7 @@ SQL.Designer.prototype.getMaxZ = function () {
             max = z;
         }
     }
-    OZ.$("controls").style.zIndex = max + 5;
+    SQL.dom.get("controls").style.zIndex = max + 5;
     return max;
 };
 
@@ -294,8 +313,8 @@ SQL.Designer.prototype.clearTables = function () {
 };
 
 SQL.Designer.prototype.alignTables = function () {
-    const win = OZ.DOM.win();
-    const avail = win[0] - OZ.$("bar").offsetWidth;
+    const win = SQL.dom.win();
+    const avail = win[0] - SQL.dom.get("bar").offsetWidth;
     let x = 10;
     let y = 10;
     let max = 0;

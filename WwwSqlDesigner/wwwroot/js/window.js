@@ -3,25 +3,25 @@
 SQL.Window = function (owner) {
     this.owner = owner;
     this.dom = {
-        container: OZ.$("window"),
-        background: OZ.$("background"),
-        ok: OZ.$("windowok"),
-        cancel: OZ.$("windowcancel"),
-        title: OZ.$("windowtitle"),
-        content: OZ.$("windowcontent"),
-        throbber: OZ.$("throbber"),
+        container: SQL.dom.get("window"),
+        background: SQL.dom.get("background"),
+        ok: SQL.dom.get("windowok"),
+        cancel: SQL.dom.get("windowcancel"),
+        title: SQL.dom.get("windowtitle"),
+        content: SQL.dom.get("windowcontent"),
+        throbber: SQL.dom.get("throbber"),
     };
     this.dom.ok.value = _("windowok");
     this.dom.cancel.value = _("windowcancel");
     this.dom.throbber.alt = this.dom.throbber.title = _("throbber");
-    OZ.Event.add(this.dom.ok, "click", this.ok.bind(this));
-    OZ.Event.add(this.dom.cancel, "click", this.close.bind(this));
-    OZ.Event.add(document, "keydown", this.key.bind(this));
+    SQL.events.add(this.dom.ok, "click", this.ok.bind(this));
+    SQL.events.add(this.dom.cancel, "click", this.close.bind(this));
+    SQL.events.add(document, "keydown", this.key.bind(this));
 
     this.sync = this.sync.bind(this);
 
-    OZ.Event.add(window, "scroll", this.sync);
-    OZ.Event.add(window, "resize", this.sync);
+    SQL.events.add(window, "scroll", this.sync);
+    SQL.events.add(window, "resize", this.sync);
     this.state = 0;
     this.hideThrobber();
 
@@ -44,16 +44,16 @@ SQL.Window.prototype.open = function (title, content, callback) {
     }
 
     if (title) {
-        const txt = OZ.DOM.text(title);
+        const txt = SQL.dom.text(title);
         this.dom.title.appendChild(txt);
     }
     this.dom.title.style.display = title ? "" : "none";
     this.dom.background.style.visibility = "visible";
-    OZ.DOM.clear(this.dom.content);
+    SQL.dom.clear(this.dom.content);
     this.dom.content.appendChild(content);
 
-    const win = OZ.DOM.win();
-    const scroll = OZ.DOM.scroll();
+    const win = SQL.dom.win();
+    const scroll = SQL.dom.scroll();
     this.dom.container.style.left =
         Math.round(scroll[0] + (win[0] - this.dom.container.offsetWidth) / 2) +
         "px";
@@ -102,9 +102,8 @@ SQL.Window.prototype.close = function () {
 };
 
 SQL.Window.prototype.sync = function () {
-    /* adjust background position */
-    const dims = OZ.DOM.win();
-    const scroll = OZ.DOM.scroll();
+    const dims = SQL.dom.win();
+    const scroll = SQL.dom.scroll();
     this.dom.background.style.width = dims[0] + "px";
     this.dom.background.style.height = dims[1] + "px";
     this.dom.background.style.left = scroll[0] + "px";

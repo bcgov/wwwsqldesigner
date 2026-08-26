@@ -2,7 +2,7 @@
 # WWW SQL Designer
 WWW SQL Designer allows users to create database models directly in their browser, without the need for local tools.
 
-The original WWW SQL Designer was created by [Ondrej Zara](http://ondras.zarovi.cz/) and is built atop the [oz.js](http://code.google.com/p/oz-js/) JavaScript module. It is distributed under the BSD 3-clause license and available here: https://github.com/ondras/wwwsqldesigner
+The original WWW SQL Designer was created by [Ondrej Zara](http://ondras.zarovi.cz/) and is distributed under the BSD 3-clause license. The browser designer vendors jQuery 3.7.1 locally for DOM, event, and request handling. The original project is available here: https://github.com/ondras/wwwsqldesigner
 
 This repository replaces the backend with a .NET 6 / EF Core version and expands the featureset.
 
