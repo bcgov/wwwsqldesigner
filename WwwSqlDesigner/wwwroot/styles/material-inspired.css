@@ -194,7 +194,14 @@ label, input, select {
     z-index: 1001;
     max-height: calc(100vh - 20px);
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
+}
+
+@media (max-height: 475px) {
+    #bar {
+        max-height: calc(100vh - 20px);
+        overflow-y: auto;
+    }
 }
 
 #bar input {

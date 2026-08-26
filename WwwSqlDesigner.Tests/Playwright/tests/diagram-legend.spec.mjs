@@ -125,7 +125,7 @@ test("only scrolls the expanded menu when it exceeds the viewport", async ({ pag
         overflowY: getComputedStyle(bar).overflowY,
     }));
     expect(normal.scrollHeight).toBeLessThanOrEqual(normal.clientHeight);
-    expect(normal.overflowY).toBe("auto");
+    expect(normal.overflowY).toBe("hidden");
 
     await page.setViewportSize({ width: 360, height: 240 });
     await page.reload();
