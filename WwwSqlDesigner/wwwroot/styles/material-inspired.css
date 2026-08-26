@@ -67,7 +67,6 @@ input[type=text] {
 }
 
 textarea {
-    min-width: 500px;
     font-family: verdana, sans-serif;
     min-height: 64px;
     display: block;
@@ -163,6 +162,7 @@ label, input, select {
 }
 
 #background {
+    box-sizing: border-box;
     position: fixed;
     background-color: #000;
     opacity: 0.5;
@@ -415,15 +415,21 @@ label, input, select {
 /* Window */
 
 #window {
+    box-sizing: border-box;
     position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     visibility: hidden;
+    z-index: 2000;
+}
+
+#windowpanel {
+    box-sizing: border-box;
     background-color: #fff;
     box-shadow: 0 10px 20px rgba(0, 0, 0, .19), 0 6px 6px rgba(0, 0, 0, .23);
     padding: 15px;
-    z-index: 2000;
 }
 
 #windowtitle {
@@ -433,6 +439,7 @@ label, input, select {
 }
 
 #windowcontent {
+    box-sizing: border-box;
     padding: 0;
 }
 
@@ -461,142 +468,141 @@ label, input, select {
 
 /* Save / Load */
 
-#io {
+#loadsavepanel {
     box-sizing: border-box;
-    max-width: calc(100vw - 60px);
-    width: min(860px, calc(100vw - 60px));
 }
 
-#io hr {
-    visibility: hidden;
+#loadsavepanel .io-columns {
+    display: flex;
+    gap: 1.25em;
 }
 
-#io table {
-    table-layout: fixed;
+#loadsavepanel .io-column {
+    flex: 0 0 auto;
+}
+
+#loadsavepanel #iopanel {
+    box-sizing: border-box;
+    margin: 0;
     width: 100%;
 }
 
-#io table tr:first-child > td {
-    vertical-align: top;
-}
-
-#io .io-client-content {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-}
-
-#io .client-output {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    margin: 0.75em 0 0;
-    min-height: 0;
-}
-
-#io .panel-title {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    margin: 0 0 0.4em;
-    min-height: 2em;
-    position: relative;
-}
-
-#io .client-output textarea {
-    flex: 1;
-    min-height: 0;
-    min-width: 0;
-    resize: vertical;
-}
-
-#serverpanel {
-    vertical-align: top;
-}
-
-#serverpanel .server-section {
-    margin: 0 0 1.25em;
+#ioshare {
+    box-sizing: border-box;
+    display: block;
+    border: 0;
+    margin-bottom: 0;
     padding: 0;
 }
 
-#serverpanel .server-section:last-child {
-    margin-bottom: 0;
+#ioshare > input[type=button],
+#ioshare .io-form-group input[type=button] {
+    width: 100%;
 }
 
-#serverpanel .server-row {
+#loadsavepanel input,
+#loadsavepanel select,
+#loadsavepanel button,
+#ioshare input,
+#ioshare select,
+#ioshare button {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+#loadsavepanel .io-form-group,
+#ioshare .io-form-group {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.2em;
-    margin: 0.35em 0;
+    flex-direction: row;
+    gap: 0.35em;
+    margin: 0 0 1em;
 }
 
-#serverpanel .server-label-row {
+#loadsavepanel .io-form-group > input[type=text],
+#loadsavepanel .io-form-group > select,
+#ioshare .io-form-group > input[type=text],
+ #ioshare .io-form-group > select {
+    flex: 1;
+    min-width: 0;
+}
+
+#loadsavepanel .io-form-group label,
+#ioshare .io-form-group label {
+    font-size: 0.95em;
+    font-weight: 500;
+}
+
+#loadsavepanel .io-form-row,
+#ioshare .io-form-row {
+    display: flex;
+    gap: 0.35em;
+    margin: 0 0 1em;
+}
+
+#loadsavepanel .io-label-row,
+#ioshare .io-label-row {
     align-items: center;
     display: flex;
     justify-content: space-between;
 }
 
-#serverpanel .server-label-row button {
+#loadsavepanel .io-label-row button,
+#ioshare .io-label-row button {
     background: transparent;
     border: 0;
     box-shadow: none;
     cursor: pointer;
     font-size: 11px;
-    line-height: 1.5;
     padding: 0;
 }
 
-#serverpanel input[type=text],
-#serverpanel select {
-    box-sizing: border-box;
-    flex: 1;
-    max-width: 100%;
-    min-width: 0;
-}
 
-#serverpanel label {
-    font-size: 0.95em;
-    font-weight: 500;
-}
-
-#serverpanel .server-row input[type=button],
-#serverpanel .server-row button {
-    margin: 0;
-}
-
-#serverpanel #serverownercontrol,
-#serverpanel #serverversioncontrol {
-    display: flex;
-}
-
-#serverpanel .server-label-row button:active {
-    background-color: transparent;
-    text-decoration: underline;
-}
-
-#serverpanel .sharing-grants {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-#serverpanel .sharing-grants:empty {
+#loadsavepanel #iotype {
     display: none;
 }
 
-#serverpanel .sharing-grants li {
-    margin-top: 0.35em;
+#loadsavepanel .io-source-button {
+    background: #f5f5f5;
+    border: 0;
+    box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 2px 2px rgba(0, 0, 0, .2);
+    cursor: pointer;
+    flex: 1;
+    margin: 0;
+    padding: 0.65em;
 }
 
-#io input[type=button] {
+#loadsavepanel .io-source-button.selected {
+    background: #1976d2;
+    color: #fff;
+}
+
+#loadsavepanel .io-form-group,
+#ioshare .io-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    margin: 0 0 1em;
+}
+
+#loadsavepanel .io-form-row > input[type=text],
+#loadsavepanel .io-form-row > select,
+#loadsavepanel .io-form-row > input[type=button],
+#ioshare .io-form-row > input[type=text],
+#ioshare .io-form-row > select,
+#ioshare .io-form-row > input[type=button] {
+    flex: 1;
+    margin: 0;
+}
+
+#loadsavepanel input[type=button],
+#ioshare input[type=button] {
     box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 2px 2px rgba(0, 0, 0, .2);
 }
 
-#io input[type=button]:disabled,
-#io button:disabled,
-#io select:disabled {
+#loadsavepanel input[type=button]:disabled,
+#ioshare input[type=button]:disabled,
+#loadsavepanel button:disabled,
+#loadsavepanel select:disabled {
     color: rgba(0, 0, 0, .38);
     background-color: #f5f5f5;
     cursor: not-allowed;
@@ -604,31 +610,9 @@ label, input, select {
     box-shadow: none;
 }
 
-#io input[type=button]:active {
+#loadsavepanel input[type=button]:active {
     background-color: #f2f2f2;
     transition: all .2s ease-out;
-}
-
-#io #clientsql {
-    color: #FFF;
-    background-color: #FF4081;
-}
-
-#io #clientsql:hover {
-    transition: all .2s ease-in-out;
-    box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 2px 2px rgba(0, 0, 0, .2);
-    background-color: #ff5a92;
-}
-
-#io #clientef {
-    color: #FFF;
-    background-color: #059142;
-}
-
-#io #clientef:hover {
-    transition: all .2s ease-in-out;
-    box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 2px 2px rgba(0, 0, 0, .2);
-    background-color: #06b753;
 }
 
 #textarea {
@@ -640,20 +624,20 @@ label, input, select {
 
 /* Options */
 
-#opts {
+#optionspanel {
     width: 700px;
 }
 
-#opts td {
+#optionspanel td {
     padding-top: 15px;
     margin-bottom: 20px;
 }
 
-#opts #optionsnotice {
+#optionspanel #optionsnotice {
     opacity: 0.7;
 }
 
-#opts hr {
+#optionspanel hr {
     background-color: #ddd;
     height: 1px;
     border: none;

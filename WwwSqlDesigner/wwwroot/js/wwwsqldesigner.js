@@ -142,8 +142,6 @@ SQL.Designer.prototype.init2 = function () {
 
     this.sync();
 
-    SQL.dom.get("docs").value = _("docs");
-
     const url = window.location.href;
     const regexKeyword = url.match(/keyword=([^&]+)/);
     const regexVersion = url.match(/version=([^&]+)/);

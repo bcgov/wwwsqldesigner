@@ -54,7 +54,7 @@ body {
     margin: auto;
 }
 
-#io input[type=button]:disabled {
+#loadsavepanel input[type=button]:disabled {
     color: #888;
     background-color: #eee;
     cursor: not-allowed;
@@ -265,12 +265,7 @@ body {
     font-size: 85%;
 }
 
-#textarea {
-    width: 650px;
-    height: 200px;
-}
-
-#opts {
+#optionspanel {
     width: 700px;
 }
 
@@ -453,3 +448,4 @@ input.relation-name-input::placeholder {
     color: inherit;
     opacity: 1;
 }
+
