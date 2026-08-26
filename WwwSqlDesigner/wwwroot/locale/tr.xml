@@ -99,8 +99,6 @@
     <!-- misc -->
     <string name="xmlerror">XML hatası</string>
     <string name="docs">Belgeleme</string>
-
-    <string name="clientefzip">EF ZIP oluştur</string>
     <string name="efzipexportempty">EF ZIP dışa aktarmadan önce en az bir tablo ekleyin.</string>
     <string name="efzipexporterror">EF ZIP dışa aktarma oluşturulamadı.</string>
 </locale>

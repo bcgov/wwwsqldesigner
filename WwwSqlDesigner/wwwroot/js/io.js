@@ -38,7 +38,6 @@ SQL.IO = function (owner) {
     this.dom.serverlist.title = _("serverlisttitle");
     this.dom.serverunshare.value = _("serverunshare");
 
-    this.dom.ta = document.createElement("textarea");
     this.dom.iosave.value = _("clientsave");
     this.dom.ioload.value = _("clientload");
     this.dom.iotype = SQL.dom.get("iotype");
@@ -74,6 +73,7 @@ SQL.IO = function (owner) {
     this._actionLabelTimers = {};
     this._currentGroups = [];
     this._serverGrants = [];
+    this._clientModelNames = [];
     this.updateServerModelControls();
 
     this.dom.container.parentNode.removeChild(this.dom.container);
@@ -139,10 +139,6 @@ SQL.IO.prototype.shareclick = function () {
     this.owner.window.open(_("saveload"), this.dom.container);
 };
 
-SQL.IO.prototype.hideStatus = function () {
-    return;
-};
-
 SQL.IO.prototype.syncClientColumnHeight = function () {
     return;
 };
@@ -192,15 +188,6 @@ SQL.IO.prototype.ensureCsrfToken = function (callback, failure) {
     }, { headers: h });
 };
 
-SQL.IO.prototype.showStatus = function (diagnostics, operation) {
-    const messages = Array.from(new Set(diagnostics || []));
-    if (!messages.length) { this.hideStatus(); return; }
-    this.dom.statusmessage.textContent = (operation || "Operation") + " reported " + messages.length + " conversion warning" + (messages.length === 1 ? "." : "s.");
-    SQL.dom.clear(this.dom.statuslist);
-    messages.forEach((message) => { const item = SQL.dom.create("li"); item.textContent = message; this.dom.statuslist.appendChild(item); });
-    this.dom.statusdetails.style.display = "";
-    this.dom.status.style.display = "block";
-};
 SQL.IO.prototype.build = function () {
     SQL.dom.clear(this.dom.backend);
 
@@ -280,6 +267,11 @@ SQL.IO.prototype.updateIoType = function () {
     this.dom.serverowner.disabled = !server;
     this.dom.serverloadversion.disabled = !server;
     this.dom.serverlist.disabled = this.dom.serverloadmodel.disabled;
+    if (browser) {
+        this.renderClientModelChoices();
+    } else if (server) {
+        this.updateServerModelChoices();
+    }
     this.dom.iosave.disabled = !this.dom.serverloadname.value.trim();
     this.dom.ioload.disabled = type === "server"
         ? !this.dom.serverloadmodel.value && !this.dom.serverloadname.value
@@ -483,7 +475,6 @@ SQL.IO.prototype.clientlocalload = function () {
 };
 
 SQL.IO.prototype.refreshClientStorageModels = function () {
-    SQL.dom.clear(this.dom.clientlocalmodel);
     const prefix = "wwwsqldesigner_databases_";
     const names = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -493,11 +484,19 @@ SQL.IO.prototype.refreshClientStorageModels = function () {
         }
     }
     names.sort((a, b) => a.localeCompare(b));
+    this._clientModelNames = names;
+    if (this.dom.iotype.value === "browser") {
+        this.renderClientModelChoices();
+    }
+};
+
+SQL.IO.prototype.renderClientModelChoices = function () {
     const placeholder = SQL.dom.create("option");
     placeholder.value = "";
     placeholder.textContent = "";
+    SQL.dom.clear(this.dom.clientlocalmodel);
     this.dom.clientlocalmodel.appendChild(placeholder);
-    names.forEach((name) => {
+    this._clientModelNames.forEach((name) => {
         const option = SQL.dom.create("option");
         option.value = name;
         option.textContent = name;
@@ -693,7 +692,7 @@ SQL.IO.prototype.finish = function () {
     // Get XSL content and invoke transformation
     this.getXSL(xslPath, (err, doc) => {
         if (err) {
-            console.error(err.message);
+            alert(_("xmlerror") + ": " + err.message);
             this.owner.window.hideThrobber();
             return;
         }
@@ -707,7 +706,11 @@ SQL.IO.prototype.finish = function () {
 
 SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
     try {
-        this.dom.ta.value = this.transformEf(xslDoc, xml, this.owner.getXhrHeaders().transformation === "ef");
+        const target = this.owner.getXhrHeaders().transformation;
+        const extension = target === "ef" ? "cs" : "sql";
+        this.downloadTextFile(
+            this.transformEf(xslDoc, xml, target === "ef"),
+            (this._name || "database") + "." + extension);
     } catch (e) {
         alert(_("xmlerror") + ": " + e.message);
     }
@@ -1163,7 +1166,7 @@ SQL.IO.prototype.serverimport = function (e) {
 SQL.IO.prototype.check = function (code) {
     switch (code) {
         case 403:
-            this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
+            alert(_("httpresponse") + ": HTTP 403 - access denied");
             return false;
         case 201:
         case 404:
@@ -1171,7 +1174,7 @@ SQL.IO.prototype.check = function (code) {
         case 501:
         case 503:
             const lang = "http" + code;
-            this.dom.ta.value = _("httpresponse") + ": " + _(lang);
+            alert(_("httpresponse") + ": " + _(lang));
             return false;
         default:
             return true;
@@ -1215,12 +1218,16 @@ SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
         return;
     }
     if (!preserveOutput) {
-        this.dom.ta.value = data;
         return;
     }
     if (preserveOutput) this.setActionLabel("serverlist", _("serverrefreshed"));
     let list;
-    try { list = JSON.parse(data || "{}"); } catch (e) { return; }
+    try {
+        list = JSON.parse(data || "{}");
+    } catch (e) {
+        alert(_("httpresponse") + ": " + e.message);
+        return;
+    }
     this._currentOwnerId = list.currentOwnerId || "";
     this._currentOwnerLabel = list.currentOwnerLabel || "";
     this._currentGroups = Array.isArray(list.groups) ? list.groups : [];

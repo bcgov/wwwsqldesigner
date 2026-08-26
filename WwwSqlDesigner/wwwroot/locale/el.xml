@@ -94,8 +94,6 @@
     <!-- misc -->
     <string name="xmlerror">Σφάλμα XML</string>
     <string name="docs">Οδηγίες</string>
-
-    <string name="clientefzip">Δημιουργία ZIP EF</string>
     <string name="efzipexportempty">Προσθέστε τουλάχιστον έναν πίνακα πριν από την εξαγωγή ZIP EF.</string>
     <string name="efzipexporterror">Δεν ήταν δυνατή η δημιουργία της εξαγωγής ZIP EF.</string>
 </locale>

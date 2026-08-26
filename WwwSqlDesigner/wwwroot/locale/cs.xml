@@ -98,8 +98,6 @@
     <!-- misc -->
     <string name="xmlerror">XML chyba</string>
     <string name="docs">Dokumentace</string>
-
-    <string name="clientefzip">Generovat EF ZIP</string>
     <string name="efzipexportempty">Před exportem EF ZIP přidejte alespoň jednu tabulku.</string>
     <string name="efzipexporterror">Export EF ZIP nelze vytvořit.</string>
 </locale>

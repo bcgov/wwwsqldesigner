@@ -131,30 +131,14 @@ test("names, persists, clears, and safely renders a relationship label", async (
 test("relationship labels render in non-SVG mode and do not affect exports", async ({ page }) => {
     await page.goto("/");
     await loadModel(page, unnamedModel);
-    const unnamedSql = await page.evaluate(async () => {
-        d.io.clientsql();
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        return d.io.dom.ta.value;
-    });
-    const unnamedEf = await page.evaluate(async () => {
-        d.io.clientef();
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        return d.io.dom.ta.value;
-    });
+    const unnamedSql = await page.evaluate(() => d.io.getExportXml("mssql").xml);
+    const unnamedEf = await page.evaluate(() => d.io.getExportXml("ef").xml);
 
     await loadModel(page, unnamedModel.replace('row="Id" />', 'row="Id" name="has" />'));
-    const namedSql = await page.evaluate(async () => {
-        d.io.clientsql();
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        return d.io.dom.ta.value;
-    });
-    const namedEf = await page.evaluate(async () => {
-        d.io.clientef();
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        return d.io.dom.ta.value;
-    });
-    expect(namedSql).toBe(unnamedSql);
-    expect(namedEf).toBe(unnamedEf);
+    const namedSql = await page.evaluate(() => d.io.getExportXml("mssql").xml);
+    const namedEf = await page.evaluate(() => d.io.getExportXml("ef").xml);
+    expect(namedSql.replace(' name="has"', "")).toBe(unnamedSql);
+    expect(namedEf.replace(' name="has"', "")).toBe(unnamedEf);
 
     await page.evaluate(() => d.setOption("vector", ""));
     await page.reload();

@@ -99,8 +99,6 @@
     <!-- misc -->
     <string name="xmlerror">XML Fehler</string>
     <string name="docs">Dokumentation</string>
-
-    <string name="clientefzip">EF-ZIP erzeugen</string>
     <string name="efzipexportempty">Fügen Sie vor dem EF-ZIP-Export mindestens eine Tabelle hinzu.</string>
     <string name="efzipexporterror">Der EF-ZIP-Export konnte nicht erstellt werden.</string>
 </locale>

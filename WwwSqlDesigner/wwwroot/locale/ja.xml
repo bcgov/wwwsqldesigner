@@ -98,8 +98,6 @@
     <!-- misc -->
     <string name="xmlerror">XMLエラー</string>
     <string name="docs">ドキュメント</string>
-
-    <string name="clientefzip">EF ZIP を生成</string>
     <string name="efzipexportempty">EF ZIP をエクスポートする前に、少なくとも 1 つのテーブルを追加してください。</string>
     <string name="efzipexporterror">EF ZIP エクスポートを生成できませんでした。</string>
 </locale>

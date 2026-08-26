@@ -99,8 +99,6 @@
     <!-- misc -->
     <string name="xmlerror">Error XML</string>
     <string name="docs">Documentación</string>
-
-    <string name="clientefzip">Generar ZIP de EF</string>
     <string name="efzipexportempty">Agregue al menos una tabla antes de exportar el ZIP de EF.</string>
     <string name="efzipexporterror">No se pudo generar la exportación ZIP de EF.</string>
 </locale>

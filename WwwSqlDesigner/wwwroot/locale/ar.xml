@@ -93,8 +93,6 @@
     <!-- misc -->
     <string name="xmlerror">خطأ في نموذح XML</string>
     <string name="docs">التوثيق</string>
-
-    <string name="clientefzip">تصدير EF ZIP</string>
     <string name="efzipexportempty">أضف جدولاً واحداً على الأقل قبل تصدير EF ZIP.</string>
     <string name="efzipexporterror">تعذر إنشاء تصدير EF ZIP.</string>
 </locale>

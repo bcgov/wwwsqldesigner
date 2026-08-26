@@ -404,7 +404,6 @@ SQL.Designer.prototype.fromXML = function (node) {
     }
     this.sync();
     this.legend.rememberSaved(this.toXML());
-    if (this.io) { this.io.showStatus(prepared.diagnostics, "Import"); }
     return true;
 };
 SQL.Designer.prototype.setTitle = function (t) {

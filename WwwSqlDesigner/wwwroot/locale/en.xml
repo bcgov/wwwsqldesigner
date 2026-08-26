@@ -85,7 +85,6 @@
     <string name="clientsql">Export</string>
     <string name="clientexport">Export</string>
     <string name="clientef">Generate EF</string>
-    <string name="clientefzip">Generate EF ZIP</string>
     <string name="exporttarget">Format</string>
     <string name="efzipexportempty">Add at least one table before exporting an EF ZIP.</string>
     <string name="efzipexporterror">Unable to generate the EF ZIP export.</string>
