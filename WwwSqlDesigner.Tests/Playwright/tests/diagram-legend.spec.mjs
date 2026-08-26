@@ -116,3 +116,24 @@ test("preserves aspect ratio for tall diagrams in the square minimap", async ({ 
     expect(map.offsetX).toBeCloseTo(map.width / 4);
     expect(map.offsetY).toBeCloseTo(0);
 });
+
+test("only scrolls the expanded menu when it exceeds the viewport", async ({ page }) => {
+    await page.goto("/");
+    const normal = await page.locator("#bar").evaluate((bar) => ({
+        scrollHeight: bar.scrollHeight,
+        clientHeight: bar.clientHeight,
+        overflowY: getComputedStyle(bar).overflowY,
+    }));
+    expect(normal.scrollHeight).toBeLessThanOrEqual(normal.clientHeight);
+    expect(normal.overflowY).toBe("auto");
+
+    await page.setViewportSize({ width: 360, height: 240 });
+    await page.reload();
+    const short = await page.locator("#bar").evaluate((bar) => ({
+        scrollHeight: bar.scrollHeight,
+        clientHeight: bar.clientHeight,
+        overflowY: getComputedStyle(bar).overflowY,
+    }));
+    expect(short.scrollHeight).toBeGreaterThan(short.clientHeight);
+    expect(short.overflowY).toBe("auto");
+});
