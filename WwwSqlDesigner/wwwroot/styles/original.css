@@ -222,7 +222,7 @@ body {
 }
 
 #background {
-    position: fixed;
+    position: absolute;
     background-color: #000;
     opacity: 0.5;
     visibility: hidden;

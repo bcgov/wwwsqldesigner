@@ -6,7 +6,7 @@ test("uses the vendored jQuery runtime without the legacy OZ dependency", async 
 
     await expect.poll(() => page.evaluate(() => ({
         jquery: window.jQuery && window.jQuery.fn.jquery,
-        legacy: typeof window.OZ,
+        legacy: typeof OZ,
     }))).toEqual({
         jquery: "3.7.1",
         legacy: "undefined",

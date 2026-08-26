@@ -5,3 +5,29 @@
 The browser bundle at `js/jszip-3.10.1.min.js` is from [JSZip](https://stuk.github.io/jszip/), copyright (c) 2009-2016 Stuart Knightley and contributors.
 
 JSZip is dual licensed under the MIT License or GPLv3. This application uses it under the MIT License. The distributed bundle retains its upstream license notice and also includes pako, which is MIT licensed.
+
+## jQuery 3.7.1
+
+The browser bundle at `js/jquery-3.7.1.min.js` is from [jQuery](https://jquery.com/), copyright OpenJS Foundation and other contributors.
+
+jQuery is released under the MIT License:
+
+Copyright OpenJS Foundation and other contributors, https://openjsf.org/
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

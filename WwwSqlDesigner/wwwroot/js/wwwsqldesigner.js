@@ -28,7 +28,7 @@ SQL.Designer = function () {
     }
 
     this.flag = 2;
-    this.requestLanguage();
+    this.requestEnglishLanguage();
     this.requestDB();
     this.applyStyle();
 };
@@ -64,7 +64,22 @@ SQL.Designer.prototype.requestLanguage = function () {
     });
 };
 
-SQL.Designer.prototype.languageResponse = function (xmlDoc) {
+SQL.Designer.prototype.requestEnglishLanguage = function () {
+    if (this.getOption("locale") === CONFIG.DEFAULT_LOCALE) {
+        this.requestLanguage();
+        return;
+    }
+    const bp = this.getOption("staticpath");
+    SQL.request(bp + "locale/" + CONFIG.DEFAULT_LOCALE + ".xml", (xmlDoc) => {
+        this.loadLanguage(xmlDoc);
+        this.requestLanguage();
+    }, {
+            method: "get",
+            xml: true,
+        });
+};
+
+SQL.Designer.prototype.loadLanguage = function (xmlDoc) {
     if (xmlDoc) {
         const strings = xmlDoc.getElementsByTagName("string");
         for (let string of strings) {
@@ -73,6 +88,10 @@ SQL.Designer.prototype.languageResponse = function (xmlDoc) {
             window.LOCALE[n] = v;
         }
     }
+};
+
+SQL.Designer.prototype.languageResponse = function (xmlDoc) {
+    this.loadLanguage(xmlDoc);
     this.flag--;
     if (!this.flag) {
         this.init2();
