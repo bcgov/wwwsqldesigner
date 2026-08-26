@@ -18,14 +18,8 @@ SQL.Window = function (owner) {
     SQL.events.add(this.dom.cancel, "click", this.close.bind(this));
     SQL.events.add(document, "keydown", this.key.bind(this));
 
-    this.sync = this.sync.bind(this);
-
-    SQL.events.add(window, "scroll", this.sync);
-    SQL.events.add(window, "resize", this.sync);
     this.state = 0;
     this.hideThrobber();
-
-    this.sync();
 };
 
 SQL.Window.prototype.showThrobber = function () {
@@ -51,15 +45,6 @@ SQL.Window.prototype.open = function (title, content, callback) {
     this.dom.background.style.visibility = "visible";
     SQL.dom.clear(this.dom.content);
     this.dom.content.appendChild(content);
-
-    const win = SQL.dom.win();
-    const scroll = SQL.dom.scroll();
-    this.dom.container.style.left =
-        Math.round(scroll[0] + (win[0] - this.dom.container.offsetWidth) / 2) +
-        "px";
-    this.dom.container.style.top =
-        Math.round(scroll[1] + (win[1] - this.dom.container.offsetHeight) / 2) +
-        "px";
 
     this.dom.cancel.style.visibility = this.callback ? "" : "hidden";
     this.dom.container.style.visibility = "visible";
@@ -99,13 +84,4 @@ SQL.Window.prototype.close = function () {
     this.state = 0;
     this.dom.background.style.visibility = "hidden";
     this.dom.container.style.visibility = "hidden";
-};
-
-SQL.Window.prototype.sync = function () {
-    const dims = SQL.dom.win();
-    const scroll = SQL.dom.scroll();
-    this.dom.background.style.width = dims[0] + "px";
-    this.dom.background.style.height = dims[1] + "px";
-    this.dom.background.style.left = scroll[0] + "px";
-    this.dom.background.style.top = scroll[1] + "px";
 };

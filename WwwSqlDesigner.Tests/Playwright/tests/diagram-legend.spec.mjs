@@ -91,8 +91,15 @@ test("adds timestamps when an older model is first saved", async ({ page }) => {
     await page.evaluate(() => {
         d.fromXML(new DOMParser().parseFromString("<sql />", "text/xml").documentElement);
     });
-    const xml = await page.evaluate(() => d.toXML());
-    expect(xml).toMatch(/<legend[^>]* created="" modified=""/);
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="xml"]').click();
+    await page.locator("#serverloadname").fill("first-save");
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("#iosave").click();
+    const download = await downloadPromise;
+    const xml = await readFile(await download.path(), "utf8");
+    expect(xml).toMatch(/<legend[^>]* created="[^"]+" modified="[^"]+"/);
+    expect(await page.evaluate(() => d.toXML(true))).toBe(xml);
 });
 
 test("preserves aspect ratio for tall diagrams in the square minimap", async ({ page }) => {

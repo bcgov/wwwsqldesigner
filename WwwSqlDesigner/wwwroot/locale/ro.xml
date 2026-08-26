@@ -71,6 +71,8 @@
     <string name="saveload">Salveaza / Incarca</string>
     <string name="empty">Introduceti codul XML si re-incercati.</string>
     <string name="client">Client</string>
+    <string name="clientfile">Fișier</string>
+    <string name="iosourcelabel">Sursă de stocare</string>
     <string name="server">Server</string>
     <string name="output">Input / Output</string>
     <string name="clientsave">Genereaza XML</string>

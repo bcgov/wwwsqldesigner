@@ -67,6 +67,10 @@ test("export warnings use the compact status line", async ({ page }) => {
     const saved = await page.evaluate(() => d.toXML());
     await page.locator("#saveload").click();
     expect(await page.evaluate(() => d.io.getSafeExportXml("sqlite"))).toContain("<datatype>text</datatype>");
+    await expect(page.locator("#iostatus")).toContainText("Export warnings");
+    await expect(page.locator("#iostatus")).toContainText("Time-zone semantics are not preserved by sqlite.");
+    expect(await page.evaluate(() => d.io.getSafeExportXml("unsupported"))).toBeNull();
+    await expect(page.locator("#iostatus")).toContainText("no download was created");
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });
 
@@ -170,6 +174,14 @@ test("keeps the IO modal reachable on narrow screens", async ({ page }) => {
     expect(bounds.top).toBeGreaterThanOrEqual(0);
     expect(bounds.bottom).toBeLessThanOrEqual(640);
     await expect(page.locator("#serverimport")).toBeVisible();
+    await page.setViewportSize({ width: 900, height: 800 });
+    const resized = await page.locator("#windowpanel").evaluate((panel) => {
+        const rect = panel.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, width: rect.width };
+    });
+    expect(resized.width).toBeGreaterThan(0);
+    expect(resized.left).toBeGreaterThanOrEqual(0);
+    expect(resized.right).toBeLessThanOrEqual(900);
 });
 
 test("exposes owner-only sharing controls for server models", async ({ page }) => {
@@ -179,6 +191,10 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     await expect(page.locator("#servershare")).toBeDisabled();
     await expect(page.locator("#servergrantid")).toHaveCount(1);
     await expect(page.locator("#servergrantgroup")).toHaveCount(1);
+    await expect(page.locator("#servergrantid")).toBeDisabled();
+    await expect(page.locator("#servergrantgroup")).toBeDisabled();
+    await expect(page.locator("#serverknownuser")).toBeDisabled();
+    await expect(page.locator("#serverknowngroup")).toBeDisabled();
     await expect(page.locator("#servercopyid")).toHaveText("Copy");
     await expect(page.locator("#serverlist")).toHaveCSS("box-shadow", "none");
     await expect(page.locator("#servercopyid")).toHaveCSS("border-top-width", "0px");
@@ -189,6 +205,14 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     await expect(page.locator("#servergrantgroup")).toHaveValue("");
     await page.evaluate(() => {
         d.io._currentOwnerId = "owner-id";
+        d.io._serverModelState = "owned";
+        d.io._currentGroups = ["finance"];
+        d.io._serverGrants = [
+            { targetType: "User", targetId: "existing-user" },
+            { targetType: "Group", targetId: "existing-group" },
+        ];
+        d.io.refreshGrantChoices();
+        d.io.updateServerModelControls();
         Object.defineProperty(navigator, "clipboard", {
             configurable: true,
             value: { writeText: async () => {} },
@@ -197,6 +221,10 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     await page.locator("#servercopyid").click();
     await expect(page.locator("#servercopyid")).toHaveText("Copied");
     await expect(page.locator("#servercopyid")).toHaveText("Copy", { timeout: 3000 });
+    await expect(page.locator("#servergrantid")).toBeEnabled();
+    await expect(page.locator("#servergrantgroup")).toBeEnabled();
+    await expect(page.locator("#serverknownuser")).toBeEnabled();
+    await expect(page.locator("#serverknowngroup")).toBeEnabled();
     await expect(page.locator("#servershare")).toHaveCSS("box-shadow", "none");
     await expect(page.locator("#servershare")).toHaveCSS("cursor", "not-allowed");
     expect(await page.evaluate(() => {

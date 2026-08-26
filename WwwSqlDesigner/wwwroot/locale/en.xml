@@ -73,6 +73,8 @@
     <string name="saveload">Load / Save</string>
     <string name="empty">Please paste XML data into the text area below and try again.</string>
     <string name="client">Client</string>
+    <string name="clientfile">File</string>
+    <string name="iosourcelabel">Storage source</string>
     <string name="clientxml">XML</string>
     <string name="clientlocalnamelabel">Model</string>
     <string name="clientlocalmodellabel">Model</string>
@@ -86,6 +88,8 @@
     <string name="clientexport">Export</string>
     <string name="clientef">Generate EF</string>
     <string name="exporttarget">Format</string>
+    <string name="exportwarning">Export warnings</string>
+    <string name="exportunsafe">Export unavailable; no download was created</string>
     <string name="efzipexportempty">Add at least one table before exporting an EF ZIP.</string>
     <string name="efzipexporterror">Unable to generate the EF ZIP export.</string>
     <string name="efnamespace">EF namespace</string>

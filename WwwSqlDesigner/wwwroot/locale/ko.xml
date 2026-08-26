@@ -72,6 +72,8 @@
     <string name="saveload">저장 / 불러오기</string>
     <string name="empty">불러오려고 하는 XML 데이터를 아래 텍스트 영역에 붙여 넣고 다시 시도해 주세요.</string>
     <string name="client">클라이언트</string>
+    <string name="clientfile">파일</string>
+    <string name="iosourcelabel">저장소 원본</string>
     <string name="server">서버</string>
     <string name="output">입력 / 출력</string>
     <string name="clientsave">XML 저장</string>

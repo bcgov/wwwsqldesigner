@@ -71,6 +71,8 @@
     <string name="saveload">保存／読み込み</string>
     <string name="empty">下の入出力欄にXMLデータを貼りつけてから実行してください。</string>
     <string name="client">クライアント</string>
+    <string name="clientfile">ファイル</string>
+    <string name="iosourcelabel">保存先</string>
     <string name="server">サーバ</string>
     <string name="output">入出力欄</string>
     <string name="clientsave">XMLを出力</string>

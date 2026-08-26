@@ -44,10 +44,17 @@ SQL.IO = function (owner) {
     this.dom.iopanel = SQL.dom.get("iopanel");
     this.dom.sharepanel = SQL.dom.get("ioshare");
     this.dom.iosourcebuttons = Array.from(document.querySelectorAll("#iosourcebuttons .io-source-button"));
+    const sourceLabels = { browser: "client", xml: "clientfile", server: "server" };
+    this.dom.iosourcebuttons.forEach((button) => {
+        const source = button.getAttribute("data-source");
+        button.textContent = _(sourceLabels[source] || source);
+    });
+    SQL.dom.get("iosourcebuttons").setAttribute("aria-label", _("iosourcelabel"));
     this.dom.backend = SQL.dom.get("backend");
     this.dom.exporttarget = SQL.dom.get("exporttarget");
     this.dom.serverimportdatabase = SQL.dom.get("serverimportdatabase");
     this.dom.exporttargetlabel = SQL.dom.get("exporttargetlabel");
+    this.dom.status = SQL.dom.get("iostatus");
     const exportLabel = _("exporttarget"); this.dom.exporttargetlabel.textContent = exportLabel === "exporttarget" ? "Format" : exportLabel;
     this.dom.serverloadname = SQL.dom.get("serverloadname");
     this.dom.clientlocalname = this.dom.serverloadname;
@@ -581,17 +588,18 @@ SQL.IO.prototype.clientef = function () {
             const files = this.createEfZipFiles(source, this.getEfSettings().context, tableCount);
             if (files.length === 1) {
                 this.downloadTextFile(files[0].contents, files[0].name);
+                this.owner.window.hideThrobber();
             } else {
                 const zip = new JSZip();
                 files.forEach((file) => zip.file(file.name, file.contents));
                 zip.generateAsync({ type: "blob", compression: "DEFLATE" })
                     .then((archive) => this.downloadEfZip(archive, files.contextName))
-                    .catch(() => alert(_("efzipexporterror")));
+                    .catch(() => alert(_("efzipexporterror")))
+                    .finally(() => this.owner.window.hideThrobber());
             }
         } catch (e) {
-            alert(_("efzipexporterror"));
-        } finally {
             this.owner.window.hideThrobber();
+            alert(_("efzipexporterror"));
         }
     });
 };
@@ -626,6 +634,22 @@ SQL.IO.prototype.getExportXml = function (target) {
 
 SQL.IO.prototype.getSafeExportXml = function (target) {
     const mapped = this.getExportXml(target);
+    const diagnostics = Array.from(new Set(mapped.diagnostics || []));
+    SQL.dom.clear(this.dom.status);
+    this.dom.status.hidden = diagnostics.length === 0;
+    this.dom.status.classList.toggle("unsafe", !mapped.safe);
+    if (diagnostics.length) {
+        const heading = SQL.dom.create("strong");
+        heading.textContent = mapped.safe ? _("exportwarning") : _("exportunsafe");
+        this.dom.status.appendChild(heading);
+        const list = SQL.dom.create("ul");
+        diagnostics.forEach((message) => {
+            const item = SQL.dom.create("li");
+            item.textContent = message;
+            list.appendChild(item);
+        });
+        this.dom.status.appendChild(list);
+    }
     return mapped.safe ? mapped.xml : null;
 };
 
@@ -914,6 +938,12 @@ SQL.IO.prototype.updateServerModelControls = function () {
         this.dom.serverknownuser.value || this.dom.serverknowngroup.value);
     this.dom.servershare.disabled = !ownerControlsEnabled || !recipient;
     this.dom.serverunshare.disabled = !ownerControlsEnabled || !hasKnownRecipient;
+    this.dom.servergrantid.disabled = !ownerControlsEnabled;
+    this.dom.servergrantgroup.disabled = !ownerControlsEnabled || this._currentGroups.length === 0;
+    this.dom.serverknownuser.disabled = !ownerControlsEnabled
+        || !this._serverGrants.some((grant) => grant.targetType === "User");
+    this.dom.serverknowngroup.disabled = !ownerControlsEnabled
+        || !this._serverGrants.some((grant) => grant.targetType === "Group");
     this.dom.ioload.disabled = !hasLoadModel;
     this.dom.iosave.disabled = !hasName;
 };
@@ -1008,7 +1038,6 @@ SQL.IO.prototype.refreshShareState = function () {
             this._serverGrants = [];
         }
         this.refreshGrantChoices();
-        this.refreshGrantChoices();
         this.updateServerModelControls();
     }, { headers: this.owner.getXhrHeaders() });
 };
@@ -1028,7 +1057,8 @@ SQL.IO.prototype.refreshGrantChoices = function () {
             option.textContent = grant.targetId;
             select.appendChild(option);
         });
-        select.disabled = !this._serverGrants.some((grant) => grant.targetType === type);
+        select.disabled = this._serverModelState !== "owned"
+            || !this._serverGrants.some((grant) => grant.targetType === type);
     }
 };
 
@@ -1119,7 +1149,7 @@ SQL.IO.prototype.serverunshare = function () {
         return;
     }
 
-    const recipient = this.getShareRecipient();
+    const recipient = this.getKnownShareRecipient();
     if (!recipient) {
         alert(_("serverrecipientrequired"));
         return;

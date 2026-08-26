@@ -164,6 +164,7 @@ label, input, select {
 #background {
     box-sizing: border-box;
     position: fixed;
+    inset: 0;
     background-color: #000;
     opacity: 0.5;
     visibility: hidden;
@@ -434,6 +435,7 @@ label, input, select {
 
 #windowpanel {
     box-sizing: border-box;
+    position: relative;
     max-width: calc(100vw - 2em);
     max-height: calc(100vh - 2em);
     overflow: auto;
@@ -491,13 +493,21 @@ label, input, select {
     flex: 0 0 auto;
 }
 
-@media (max-width: 700px) {
-    #window {
-        align-items: flex-start;
-        padding: 1em 0;
-        overflow: auto;
-    }
+#iostatus {
+    margin-top: 8px;
+    max-width: 34em;
+    padding: 6px 8px;
+    color: #795548;
+    background: #fff8e1;
+    white-space: pre-line;
+}
 
+#iostatus.unsafe {
+    color: #b71c1c;
+    background: #ffebee;
+}
+
+@media (max-width: 700px) {
     #windowpanel {
         max-width: calc(100vw - 1em);
         max-height: calc(100vh - 1em);

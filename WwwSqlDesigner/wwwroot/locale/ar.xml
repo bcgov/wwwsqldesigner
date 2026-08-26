@@ -70,6 +70,8 @@
     <string name="saveload">حفظ / تحميل</string>
     <string name="empty">قم بوضع بيانات نموذج XML في المربع أدناه، ثم حاول مرّة أخرى.</string>
     <string name="client">العميل</string>
+    <string name="clientfile">ملف</string>
+    <string name="iosourcelabel">مصدر التخزين</string>
     <string name="server">الخادم</string>
     <string name="output">المدخلات / المخرجات</string>
     <string name="clientsave">حفظ كنموذح XML</string>

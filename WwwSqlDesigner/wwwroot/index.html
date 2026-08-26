@@ -181,9 +181,9 @@
             <fieldset id="iopanel">
             <div class="io-form-group">
                 <div id="iosourcebuttons" class="io-form-row" role="group" aria-label="Storage source">
-                    <button type="button" class="io-source-button" data-source="browser">Client</button>
-                    <button type="button" class="io-source-button" data-source="xml">File</button>
-                    <button type="button" class="io-source-button" data-source="server">Server</button>
+                    <button type="button" class="io-source-button" data-source="browser"></button>
+                    <button type="button" class="io-source-button" data-source="xml"></button>
+                    <button type="button" class="io-source-button" data-source="server"></button>
                 </div>
             </div>
             <select id="iotype" aria-hidden="true" tabindex="-1">
@@ -279,6 +279,7 @@
                     <div class="io-form-row">
                         <input type="button" id="clientsql" />
                     </div>
+                    <div id="iostatus" role="status" aria-live="polite" hidden></div>
                 </div>
                 <div class="io-form-group">
                     <div class="io-label-row">

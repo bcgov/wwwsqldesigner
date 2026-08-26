@@ -1,4 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+const JSZip = require(fileURLToPath(new URL("../../../WwwSqlDesigner/wwwroot/js/jszip-3.10.1.min.js", import.meta.url)));
 
 const unnamedModel = `<sql>
   <table x="20" y="20" name="Parent"><row name="Id" null="0"><datatype>int</datatype></row><key type="PRIMARY"><part>Id</part></key></table>
@@ -11,6 +17,24 @@ async function loadModel(page, xml) {
         window.DATATYPES = new DOMParser().parseFromString(datatypes, "text/xml").documentElement;
         d.fromXML(new DOMParser().parseFromString(model, "text/xml").documentElement);
     }, xml);
+}
+
+async function exportDownload(page, target) {
+    await page.locator("#saveload").click();
+    await page.locator("#exporttarget").selectOption(target);
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("#clientsql").click();
+    const download = await downloadPromise;
+    return readFile(await download.path());
+}
+
+async function exportEfSources(page) {
+    const archive = await JSZip.loadAsync(await exportDownload(page, "ef"));
+    const result = {};
+    for (const name of Object.keys(archive.files).sort()) {
+        result[name] = await archive.file(name).async("string");
+    }
+    return result;
 }
 
 test("names, persists, clears, and safely renders a relationship label", async ({ page }) => {
@@ -131,14 +155,19 @@ test("names, persists, clears, and safely renders a relationship label", async (
 test("relationship labels render in non-SVG mode and do not affect exports", async ({ page }) => {
     await page.goto("/");
     await loadModel(page, unnamedModel);
-    const unnamedSql = await page.evaluate(() => d.io.getExportXml("mssql").xml);
-    const unnamedEf = await page.evaluate(() => d.io.getExportXml("ef").xml);
+    const unnamedSql = await exportDownload(page, "mssql");
+    await page.evaluate(() => d.window.close());
+    const unnamedEf = await exportEfSources(page);
+    await page.evaluate(() => d.window.close());
 
     await loadModel(page, unnamedModel.replace('row="Id" />', 'row="Id" name="has" />'));
-    const namedSql = await page.evaluate(() => d.io.getExportXml("mssql").xml);
-    const namedEf = await page.evaluate(() => d.io.getExportXml("ef").xml);
-    expect(namedSql.replace(' name="has"', "")).toBe(unnamedSql);
-    expect(namedEf.replace(' name="has"', "")).toBe(unnamedEf);
+    const namedSql = await exportDownload(page, "mssql");
+    expect(namedSql.toString()).toContain("ALTER TABLE [Child] ADD FOREIGN KEY (ParentId) REFERENCES [Parent] ([Id])");
+    expect(namedSql).toEqual(unnamedSql);
+    await page.evaluate(() => d.window.close());
+    const namedEf = await exportEfSources(page);
+    expect(namedEf["ApplicationDbContext.cs"]).toContain("HasOne<Parent>().WithMany().HasForeignKey(e => e.ParentId)");
+    expect(namedEf).toEqual(unnamedEf);
 
     await page.evaluate(() => d.setOption("vector", ""));
     await page.reload();

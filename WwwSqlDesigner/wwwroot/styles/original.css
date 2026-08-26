@@ -232,6 +232,7 @@ body {
 
 #background {
     position: fixed;
+    inset: 0;
     background-color: #000;
     opacity: 0.5;
     visibility: hidden;
@@ -240,13 +241,21 @@ body {
 
 #window {
     position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     visibility: hidden;
+}
+
+#windowpanel {
+    box-sizing: border-box;
+    position: relative;
     background-color: #fff;
     border: 6px double #333;
-    z-index: 2000;
+    max-width: calc(100vw - 2em);
+    max-height: calc(100vh - 2em);
+    overflow: auto;
 }
 
 #windowtitle {
@@ -263,6 +272,20 @@ body {
 
 #windowbuttons {
     display: flow-root;
+}
+
+#iostatus {
+    margin-top: 8px;
+    max-width: 34em;
+    padding: 6px 8px;
+    color: #795548;
+    background: #fff8e1;
+    white-space: pre-line;
+}
+
+#iostatus.unsafe {
+    color: #b71c1c;
+    background: #ffebee;
 }
 
 #windowok, #windowcancel {
