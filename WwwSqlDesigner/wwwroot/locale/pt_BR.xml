@@ -71,6 +71,8 @@
     <string name="saveload">Salvar / Carregar</string>
     <string name="empty">Por favor cole os dados XML na área de texto abaixo e tente novamente.</string>
     <string name="client">Cliente</string>
+    <string name="clientfile">Arquivo</string>
+    <string name="iosourcelabel">Origem do armazenamento</string>
     <string name="server">Servidor</string>
     <string name="output">Entrada / Saída</string>
     <string name="clientsave">Salvar XML</string>
@@ -94,8 +96,6 @@
     <!-- misc -->
     <string name="xmlerror">Erro de XML</string>
     <string name="docs">Documentação</string>
-
-    <string name="clientefzip">Gerar ZIP do EF</string>
     <string name="efzipexportempty">Adicione pelo menos uma tabela antes de exportar o ZIP do EF.</string>
     <string name="efzipexporterror">Não foi possível gerar a exportação ZIP do EF.</string>
 </locale>

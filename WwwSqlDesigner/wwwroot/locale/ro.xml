@@ -71,6 +71,8 @@
     <string name="saveload">Salveaza / Incarca</string>
     <string name="empty">Introduceti codul XML si re-incercati.</string>
     <string name="client">Client</string>
+    <string name="clientfile">Fișier</string>
+    <string name="iosourcelabel">Sursă de stocare</string>
     <string name="server">Server</string>
     <string name="output">Input / Output</string>
     <string name="clientsave">Genereaza XML</string>
@@ -94,8 +96,6 @@
     <!-- diverse -->
     <string name="xmlerror">Eroare XML</string>
     <string name="docs">Documentatie</string>
-
-    <string name="clientefzip">Generează ZIP EF</string>
     <string name="efzipexportempty">Adăugați cel puțin un tabel înainte de a exporta ZIP-ul EF.</string>
     <string name="efzipexporterror">Nu s-a putut genera exportul ZIP EF.</string>
 </locale>

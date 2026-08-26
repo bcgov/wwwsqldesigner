@@ -67,8 +67,6 @@
             <hr />
 
             <input type="button" id="options" />
-            <a href="https://github.com/ondras/wwwsqldesigner/wiki" target="_blank" rel="noopener"><input type="button" id="docs"
-                    value="" /></a>
         </div>
 
         <div id="rubberband"></div>
@@ -84,17 +82,21 @@
         <div id="background"></div>
 
         <div id="window">
-            <div id="windowtitle">
-                <img id="throbber" src="images/throbber.gif" alt="" title="" />
+            <div id="windowpanel">
+                <div id="windowtitle">
+                    <img id="throbber" src="images/throbber.gif" alt="" title="" />
+                </div>
+                <div id="windowcontent"></div>
+                <div id="windowbuttons">
+                    <input type="button" id="windowok" />
+                    <input type="button" id="windowcancel" />
+                </div>
             </div>
-            <div id="windowcontent"></div>
-            <input type="button" id="windowok" />
-            <input type="button" id="windowcancel" />
         </div>
     </div>
     <!-- #controls -->
 
-    <div id="opts">
+    <div id="optionspanel">
         <table aria-label="Options" role="presentation">
             <tbody>
                 <tr>
@@ -173,100 +175,125 @@
         * <span class="small" id="optionsnotice"></span>
     </div>
 
-    <div id="io">
-        <table aria-label="IO" role="presentation">
-            <tbody>
-                <tr>
-                    <td style="width: 50%" class="io-client-column">
-                        <div class="io-client-content">
-                        <fieldset class="client-controls">
-                            <legend id="client" class="panel-title"></legend>
-                            <div id="singlerow">
-                                <input type="button" id="clientsave" />
-                                <input type="button" id="clientload" />
-                            </div>
-                            <div id="singlerow">
-                                <input type="button" id="clientlocalsave" />
-                                <input type="button" id="clientlocalload" />
-                                <input type="button" id="clientlocallist" />
-                            </div>
-                            <hr />
-                            <label for="exporttarget" id="exporttargetlabel">Export target:</label>
-                            <select id="exporttarget"></select>
-                            <br />
-                            <input type="button" id="clientsql" />
-                            <input type="button" id="clientef" />
-                            <input type="button" id="clientefzip" />
-                            <div id="iostatus" style="display: none; margin-top: 0.5em">
-                                <span id="iostatusmessage" role="status" aria-live="polite"></span>
-                                <button type="button" id="iostatusdismiss" aria-label="Dismiss conversion warnings">Dismiss</button>
-                                <details id="iostatusdetails">
-                                    <summary>Details</summary>
-                                    <ul id="iostatuslist"></ul>
-                                </details>
-                            </div>
-                        </fieldset>
-                        <fieldset class="client-output">
-                            <legend id="output" class="panel-title"></legend>
-                            <textarea id="textarea" rows="1" cols="1"></textarea>
-                            <!--modified by javascript later-->
-                        </fieldset>
-                        </div>
-                    </td>
-                    <td style="width: 50%" class="io-server-column">
-                        <fieldset id="serverpanel">
-                            <legend class="panel-title"><span id="server"></span></legend>
-                            <div class="server-section">
-                                <div class="server-row">
-                                    <div class="server-label-row"><label for="backend" id="backendlabel"></label></div>
-                                    <select id="backend"><option></option></select>
-                                </div>
-                            </div>
-                            <div class="server-section">
-                                <div class="server-row">
-                                    <div class="server-label-row"><label for="serverloadname" id="servermodellabel"></label></div>
-                                    <input type="text" id="serverloadname" autocomplete="off" />
-                                    <input type="button" id="serversave" />
-                                </div>
-                            </div>
-                            <div class="server-section">
-                                <div class="server-row">
-                                    <div class="server-label-row"><label for="serverloadmodel" id="serverloadmodellabel"></label><button type="button" id="serverlist"></button></div>
-                                    <select id="serverloadmodel"><option value=""></option></select>
-                                </div>
-                                <div class="server-row" id="serverownercontrol">
-                                    <div class="server-label-row"><label for="serverowner" id="serverownerlabel"></label></div>
-                                    <select id="serverowner"><option value=""></option></select>
-                                </div>
-                                <div class="server-row" id="serverversioncontrol">
-                                    <div class="server-label-row"><label for="serverloadversion" id="serverversionlabel"></label></div>
-                                    <select id="serverloadversion"><option value=""></option></select>
-                                    <input type="button" id="serverload" />
-                                </div>
-                            </div>
-                            <div class="server-section">
-                                <div class="server-row">
-                                    <div class="server-label-row"><label for="servergrantid" id="serveridlabel"></label><button type="button" id="servercopyid"></button></div>
-                                    <input type="text" id="servergrantid" autocomplete="off" />
-                                </div>
-                                <div class="server-row">
-                                    <div class="server-label-row"><label for="servergrantgroup" id="servergrouplabel"></label></div>
-                                    <select id="servergrantgroup"><option value=""></option></select>
-                                </div>
-                                <div class="server-row">
-                                    <input type="button" id="servershare" disabled />
-                                </div>
-                            </div>
-                            <div class="server-section">
-                                <div class="server-row">
-                                    <input type="button" id="serverimport" />
-                                </div>
-                            </div>
-                        </fieldset>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div id="loadsavepanel">
+        <div class="io-columns">
+            <div class="io-column">
+            <fieldset id="iopanel">
+            <div class="io-form-group">
+                <div id="iosourcebuttons" class="io-form-row" role="group" aria-label="Storage source">
+                    <button type="button" class="io-source-button" data-source="browser"></button>
+                    <button type="button" class="io-source-button" data-source="xml"></button>
+                    <button type="button" class="io-source-button" data-source="server"></button>
+                </div>
+            </div>
+            <select id="iotype" aria-hidden="true" tabindex="-1">
+                <option value="browser">Client</option>
+                <option value="xml">File</option>
+                <option value="server">Server</option>
+            </select>
+            <input type="hidden" id="backend" value="netcore-ef" />
+            <div class="io-form-group" id="server-save-row">
+                <div class="io-label-row">
+                    <label for="serverloadname" id="servermodellabel"></label>
+                </div>
+                <div class="io-form-row">
+                    <input type="text" id="serverloadname" autocomplete="off" />
+                </div>
+                <div class="io-form-row">
+                    <input type="button" id="iosave" value="Save" />
+                </div>
+            </div>
+            <div class="io-form-group" id="server-load-row">
+                <div class="io-label-row">
+                    <label for="serverloadmodel" id="serverloadmodellabel"></label>
+                    <button type="button" id="serverlist"></button>
+                </div>
+                <div class="io-form-row">
+                    <select id="serverloadmodel"><option value=""></option></select>
+                </div>
+                <div class="io-label-row">
+                    <label for="serverowner" id="serverownerlabel"></label>
+                </div>
+                <div class="io-form-row">
+                    <select id="serverowner"><option value=""></option></select>
+                </div>
+                <div class="io-label-row">
+                    <label for="serverloadversion" id="serverversionlabel"></label>
+                </div>
+                <div class="io-form-row">
+                    <select id="serverloadversion"><option value=""></option></select>
+                </div>
+                <div class="io-form-row">
+                    <input type="button" id="ioload" value="Load" />
+                </div>
+            </div>
+            </fieldset>
+            </div>
+            <div class="io-column">
+            <fieldset id="ioshare">
+                <div class="io-form-group">
+                    <div class="io-label-row">
+                        <label for="servergrantid" id="serveridlabel"></label>
+                        <button type="button" id="servercopyid"></button>
+                    </div>
+                    <div class="io-form-row">
+                        <input type="text" id="servergrantid" autocomplete="off" />
+                    </div>
+                    <div class="io-label-row">
+                        <label for="servergrantgroup" id="servergrouplabel"></label>
+                    </div>
+                    <div class="io-form-row">
+                        <select id="servergrantgroup"><option value=""></option></select>
+                    </div>
+                    <div class="io-form-row">
+                        <input type="button" id="servershare" disabled />
+                    </div>
+                </div>
+                <div class="io-form-group">
+                    <div class="io-label-row">
+                        <label for="serverknownuser">User</label>
+                    </div>
+                    <div class="io-form-row">
+                        <select id="serverknownuser"><option value=""></option></select>
+                    </div>
+                    <div class="io-label-row">
+                        <label for="serverknowngroup">Group</label>
+                    </div>
+                    <div class="io-form-row">
+                        <select id="serverknowngroup"><option value=""></option></select>
+                    </div>
+                    <div class="io-form-row">
+                        <input type="button" id="serverunshare" disabled />
+                    </div>
+                </div>
+            </fieldset>
+            </div>
+            <div class="io-column">
+                <div class="io-form-group">
+                    <div class="io-label-row">
+                        <label for="exporttarget" id="exporttargetlabel">Format</label>
+                    </div>
+                    <div class="io-form-row">
+                        <select id="exporttarget"></select>
+                    </div>
+                    <div class="io-form-row">
+                        <input type="button" id="clientsql" />
+                    </div>
+                    <div id="iostatus" role="status" aria-live="polite" hidden></div>
+                </div>
+                <div class="io-form-group">
+                    <div class="io-label-row">
+                        <label for="serverimportdatabase" id="serverimportdatabaselabel"></label>
+                    </div>
+                    <div class="io-form-row">
+                        <input type="text" id="serverimportdatabase" />
+                    </div>
+                    <div class="io-form-row">
+                        <input type="button" id="serverimport" />
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="keys">

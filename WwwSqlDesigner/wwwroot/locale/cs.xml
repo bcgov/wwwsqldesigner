@@ -72,6 +72,8 @@
     <string name="saveload">Uložit / Načíst</string>
     <string name="empty">Prosím vložte XML data do textového pole níže.</string>
     <string name="client">Klient</string>
+    <string name="clientfile">Soubor</string>
+    <string name="iosourcelabel">Zdroj úložiště</string>
     <string name="server">Server</string>
     <string name="output">Vstup / Výstup</string>
     <string name="clientsave">Uložit XML</string>
@@ -98,8 +100,6 @@
     <!-- misc -->
     <string name="xmlerror">XML chyba</string>
     <string name="docs">Dokumentace</string>
-
-    <string name="clientefzip">Generovat EF ZIP</string>
     <string name="efzipexportempty">Před exportem EF ZIP přidejte alespoň jednu tabulku.</string>
     <string name="efzipexporterror">Export EF ZIP nelze vytvořit.</string>
 </locale>

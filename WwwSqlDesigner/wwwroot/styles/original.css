@@ -31,10 +31,12 @@ body {
     position: fixed;
     top: 0px;
     right: 0px;
+    z-index: 1001;
     width: 150px;
     padding: 0px 5px 5px;
+    max-height: calc(100vh - 20px);
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
     -moz-box-shadow: -4px 4px 8px #888;
     /* FF 3.5+ */
     -webkit-box-shadow: -4px 4px 8px #888;
@@ -47,13 +49,20 @@ body {
     /* IE 8 */
 }
 
+@media (max-height: 475px) {
+    #bar {
+        max-height: calc(100vh - 20px);
+        overflow-y: auto;
+    }
+}
+
 #bar input {
     display: block;
     width: 90%;
     margin: auto;
 }
 
-#io input[type=button]:disabled {
+#loadsavepanel input[type=button]:disabled {
     color: #888;
     background-color: #eee;
     cursor: not-allowed;
@@ -222,17 +231,31 @@ body {
 }
 
 #background {
-    position: absolute;
+    position: fixed;
+    inset: 0;
     background-color: #000;
     opacity: 0.5;
     visibility: hidden;
+    z-index: 1999;
 }
 
 #window {
-    position: absolute;
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     visibility: hidden;
+}
+
+#windowpanel {
+    box-sizing: border-box;
+    position: relative;
     background-color: #fff;
     border: 6px double #333;
+    max-width: calc(100vw - 2em);
+    max-height: calc(100vh - 2em);
+    overflow: auto;
 }
 
 #windowtitle {
@@ -247,6 +270,24 @@ body {
     padding: 1em;
 }
 
+#windowbuttons {
+    display: flow-root;
+}
+
+#iostatus {
+    margin-top: 8px;
+    max-width: 34em;
+    padding: 6px 8px;
+    color: #795548;
+    background: #fff8e1;
+    white-space: pre-line;
+}
+
+#iostatus.unsafe {
+    color: #b71c1c;
+    background: #ffebee;
+}
+
 #windowok, #windowcancel {
     margin: 0em 1em 1em;
 }
@@ -255,12 +296,7 @@ body {
     font-size: 85%;
 }
 
-#textarea {
-    width: 650px;
-    height: 200px;
-}
-
-#opts {
+#optionspanel {
     width: 700px;
 }
 

@@ -71,6 +71,8 @@
     <string name="saveload">保存／読み込み</string>
     <string name="empty">下の入出力欄にXMLデータを貼りつけてから実行してください。</string>
     <string name="client">クライアント</string>
+    <string name="clientfile">ファイル</string>
+    <string name="iosourcelabel">保存先</string>
     <string name="server">サーバ</string>
     <string name="output">入出力欄</string>
     <string name="clientsave">XMLを出力</string>
@@ -98,8 +100,6 @@
     <!-- misc -->
     <string name="xmlerror">XMLエラー</string>
     <string name="docs">ドキュメント</string>
-
-    <string name="clientefzip">EF ZIP を生成</string>
     <string name="efzipexportempty">EF ZIP をエクスポートする前に、少なくとも 1 つのテーブルを追加してください。</string>
     <string name="efzipexporterror">EF ZIP エクスポートを生成できませんでした。</string>
 </locale>

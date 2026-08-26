@@ -26,13 +26,7 @@ test("imports specialized and unknown legacy types without a prompt", async ({ p
     const imported = await page.evaluate(() => d.io.fromXML(new DOMParser().parseFromString("<sql><datatypes db=\"mssql\" /><table name=\"Location\"><row name=\"Shape\" null=\"1\"><datatype>geography</datatype></row><row name=\"Mystery\" null=\"1\"><datatype>future_type</datatype></row><row name=\"Empty\" null=\"1\"><datatype></datatype></row></table></sql>", "text/xml")));
     expect(imported).toBe(true);
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>text</datatype>");
-    await expect(page.locator("#iostatus")).toBeVisible();
-    await expect(page.locator("#iostatus")).toContainText("Import reported");
-    await expect(page.locator("#iostatuslist")).toContainText("(empty type)");
-    await page.locator("#iostatusdismiss").click();
-    await expect(page.locator("#iostatus")).toBeHidden();
     await page.evaluate(() => d.io.click());
-    await expect(page.locator("#iostatus")).toBeHidden();
 });
 
 test("uses the MSSQL fallback for metadata-free legacy XML", async ({ page }) => {
@@ -73,8 +67,10 @@ test("export warnings use the compact status line", async ({ page }) => {
     const saved = await page.evaluate(() => d.toXML());
     await page.locator("#saveload").click();
     expect(await page.evaluate(() => d.io.getSafeExportXml("sqlite"))).toContain("<datatype>text</datatype>");
-    await expect(page.locator("#iostatus")).toBeVisible();
-    await expect(page.locator("#iostatus")).toContainText("Export reported 1 conversion warning");
+    await expect(page.locator("#iostatus")).toContainText("Export warnings");
+    await expect(page.locator("#iostatus")).toContainText("Time-zone semantics are not preserved by sqlite.");
+    expect(await page.evaluate(() => d.io.getSafeExportXml("unsupported"))).toBeNull();
+    await expect(page.locator("#iostatus")).toContainText("no download was created");
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });
 
@@ -108,6 +104,7 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
     await page.locator("#saveload").click();
     await expect(page.locator("#optiondb")).toHaveCount(0);
     await expect(page.locator("#exporttarget option")).toHaveText([
+        "",
         "Microsoft SQL Server",
         "PostgreSQL",
         "MySQL",
@@ -120,11 +117,71 @@ test("preserves defaults and selected target UI behavior", async ({ page }) => {
         "Entity Framework 8",
     ]);
     await page.locator("#exporttarget").selectOption("postgresql");
-    await expect(page.locator("#clientsql")).toHaveValue(/PostgreSQL/);
+    await expect(page.locator("#clientsql")).toHaveValue("Export");
     expect(await page.evaluate(() => d.getOption("lastExportTarget"))).toBe("postgresql");
     await page.evaluate(() => d.io.click());
-    await expect(page.locator("#exporttarget")).toHaveValue("postgresql");
+    await expect(page.locator("#exporttarget")).toHaveValue("");
+    expect(await page.evaluate(() => d.getOption("lastExportTarget"))).toBe("postgresql");
     expect(await page.evaluate(() => d.io.getExportXml("postgresql").xml)).toContain("varchar(20)");
+});
+
+test("round-trips XML through Client browser storage", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="ClientModel"><row name="Id" null="0"><datatype>integer</datatype></row></table></sql>');
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    await page.locator("#serverloadname").fill("Client round trip");
+    await page.locator("#iosave").click();
+    await expect(page.locator('#serverloadmodel option[value="Client round trip"]')).toHaveCount(1);
+    await page.evaluate(() => d.io.fromXMLText("<sql />"));
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="browser"]').click();
+    await page.locator("#serverloadmodel").selectOption("Client round trip");
+    await page.locator("#ioload").click();
+    await expect.poll(() => page.evaluate(() => d.toXML().replace(/created="[^"]*" modified="[^"]*"/, 'created="" modified=""'))).toBe(original);
+});
+
+test("keeps Client and Server model choices isolated", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    await page.evaluate(() => {
+        d.io._clientModelNames = ["Client only"];
+        d.io._serverModels = [{ keyword: "Server only", version: 1, ownerId: "owner" }];
+        d.io.dom.iotype.value = "browser";
+        d.io.updateIoType();
+    });
+    await expect(page.locator('#serverloadmodel option[value="Client only"]')).toHaveCount(1);
+    await expect(page.locator('#serverloadmodel option[value="Server only"]')).toHaveCount(0);
+    await page.locator('[data-source="server"]').click();
+    await expect(page.locator('#serverloadmodel option[value="Server only"]')).toHaveCount(1);
+    await expect(page.locator('#serverloadmodel option[value="Client only"]')).toHaveCount(0);
+    await page.locator('[data-source="browser"]').click();
+    await expect(page.locator('#serverloadmodel option[value="Client only"]')).toHaveCount(1);
+    await expect(page.locator('#serverloadmodel option[value="Server only"]')).toHaveCount(0);
+});
+
+test("keeps the IO modal reachable on narrow screens", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    const bounds = await page.locator("#windowpanel").evaluate((panel) => {
+        const rect = panel.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    });
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(360);
+    expect(bounds.top).toBeGreaterThanOrEqual(0);
+    expect(bounds.bottom).toBeLessThanOrEqual(640);
+    await expect(page.locator("#serverimport")).toBeVisible();
+    await page.setViewportSize({ width: 900, height: 800 });
+    const resized = await page.locator("#windowpanel").evaluate((panel) => {
+        const rect = panel.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, width: rect.width };
+    });
+    expect(resized.width).toBeGreaterThan(0);
+    expect(resized.left).toBeGreaterThanOrEqual(0);
+    expect(resized.right).toBeLessThanOrEqual(900);
 });
 
 test("exposes owner-only sharing controls for server models", async ({ page }) => {
@@ -134,6 +191,10 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     await expect(page.locator("#servershare")).toBeDisabled();
     await expect(page.locator("#servergrantid")).toHaveCount(1);
     await expect(page.locator("#servergrantgroup")).toHaveCount(1);
+    await expect(page.locator("#servergrantid")).toBeDisabled();
+    await expect(page.locator("#servergrantgroup")).toBeDisabled();
+    await expect(page.locator("#serverknownuser")).toBeDisabled();
+    await expect(page.locator("#serverknowngroup")).toBeDisabled();
     await expect(page.locator("#servercopyid")).toHaveText("Copy");
     await expect(page.locator("#serverlist")).toHaveCSS("box-shadow", "none");
     await expect(page.locator("#servercopyid")).toHaveCSS("border-top-width", "0px");
@@ -144,6 +205,14 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     await expect(page.locator("#servergrantgroup")).toHaveValue("");
     await page.evaluate(() => {
         d.io._currentOwnerId = "owner-id";
+        d.io._serverModelState = "owned";
+        d.io._currentGroups = ["finance"];
+        d.io._serverGrants = [
+            { targetType: "User", targetId: "existing-user" },
+            { targetType: "Group", targetId: "existing-group" },
+        ];
+        d.io.refreshGrantChoices();
+        d.io.updateServerModelControls();
         Object.defineProperty(navigator, "clipboard", {
             configurable: true,
             value: { writeText: async () => {} },
@@ -152,13 +221,17 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     await page.locator("#servercopyid").click();
     await expect(page.locator("#servercopyid")).toHaveText("Copied");
     await expect(page.locator("#servercopyid")).toHaveText("Copy", { timeout: 3000 });
+    await expect(page.locator("#servergrantid")).toBeEnabled();
+    await expect(page.locator("#servergrantgroup")).toBeEnabled();
+    await expect(page.locator("#serverknownuser")).toBeEnabled();
+    await expect(page.locator("#serverknowngroup")).toBeEnabled();
     await expect(page.locator("#servershare")).toHaveCSS("box-shadow", "none");
     await expect(page.locator("#servershare")).toHaveCSS("cursor", "not-allowed");
     expect(await page.evaluate(() => {
         d.io._serverModelState = "copyable";
         d.io.updateServerModelControls();
         return {
-            saveDisabled: d.io.dom.serversave.disabled,
+            saveDisabled: d.io.dom.iosave.disabled,
             shareDisabled: d.io.dom.servershare.disabled,
         };
     })).toEqual({
@@ -172,8 +245,9 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
         return d.io.getShareRecipient();
     })).toEqual({ targetType: "Group", targetId: "finance" });
     expect(await page.evaluate(() => {
-        d.io.dom.servergrantid.value = "user-id";
-        d.io.dom.servergrantid.dispatchEvent(new Event("input"));
+        d.io.dom.serverknownuser.add(new Option("user-id", "user-id"));
+        d.io.dom.serverknownuser.value = "user-id";
+        d.io.dom.serverknownuser.dispatchEvent(new Event("change"));
         return d.io.getShareRecipient();
     })).toEqual({ targetType: "User", targetId: "user-id" });
     expect(await page.evaluate(() => {
@@ -191,17 +265,43 @@ test("sends sharing grants as JSON", async ({ page }) => {
         request = route.request();
         await route.fulfill({ status: 204 });
     });
+
     await page.evaluate(() => {
         d.io._name = "Saved";
         d.io._csrfToken = "token";
         d.io._serverModelState = "owned";
         d.io.updateServerModelControls();
-        d.io.dom.servergrantid.value = "user-id";
-        d.io.dom.servergrantid.dispatchEvent(new Event("input"));
+        d.io.dom.serverknownuser.add(new Option("user-id", "user-id"));
+        d.io.dom.serverknownuser.value = "user-id";
+        d.io.dom.serverknownuser.dispatchEvent(new Event("change"));
     });
     await page.locator("#servershare").click();
     await expect.poll(() => request && request.headers()["content-type"]).toBe("application/json");
     expect(request.postData()).toBe(JSON.stringify({ targetType: "User", targetId: "user-id", permission: "View" }));
+});
+
+test("sends sharing revokes through the Unshare control", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    let request;
+    await page.route("**/backend/netcore-ef/access/grant/**", async (route) => {
+        request = route.request();
+        await route.fulfill({ status: 204 });
+    });
+    await page.evaluate(() => {
+        d.io._name = "Saved";
+        d.io._csrfToken = "token";
+        d.io._serverModelState = "owned";
+        d.io.updateServerModelControls();
+        d.io.dom.serverknownuser.add(new Option("user-id", "user-id"));
+        d.io.dom.serverknownuser.value = "user-id";
+        d.io.dom.serverknownuser.dispatchEvent(new Event("change"));
+    });
+    await page.locator('[data-source="server"]').click();
+    await page.locator("#serverunshare").click();
+    await expect.poll(() => request && request.method()).toBe("DELETE");
+    await expect.poll(() => request && request.url()).toContain("targetType=User");
+    await expect.poll(() => request && request.url()).toContain("targetId=user-id");
 });
 
 test("falls back to MSSQL when the saved export target is unavailable", async ({ page }) => {
@@ -209,7 +309,7 @@ test("falls back to MSSQL when the saved export target is unavailable", async ({
     await page.waitForFunction(() => typeof d !== "undefined" && d.io);
     await page.evaluate(() => d.setOption("lastExportTarget", "removed-target"));
     await page.locator("#saveload").click();
-    await expect(page.locator("#exporttarget")).toHaveValue("mssql");
+    await expect(page.locator("#exporttarget")).toHaveValue("");
 });
 
 test("runs every bundled export stylesheet against a portable model", async ({ page }) => {
@@ -265,12 +365,13 @@ test("loads the newest server model from the name and version form", async ({ pa
         });
     });
     await page.evaluate(() => d.io.serverlist());
+    await page.locator('[data-source="server"]').click();
     await page.locator("#serverlist").click();
     await expect(page.locator("#serverlist")).toHaveText("Refreshed");
     await expect(page.locator("#serverlist")).toHaveText("Refresh", { timeout: 3000 });
     await expect(page.locator("#serverloadmodel option")).toHaveCount(2);
     await page.locator("#serverloadmodel").selectOption("Shared");
-    await page.locator("#serverload").click();
+    await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
     await expect.poll(() => loadRequest && loadRequest.url()).not.toContain("version=");
 
@@ -278,7 +379,7 @@ test("loads the newest server model from the name and version form", async ({ pa
     await page.locator("#saveload").click();
     await page.locator("#serverloadmodel").selectOption("Shared");
     await page.locator("#serverloadversion").selectOption("2");
-    await page.locator("#serverload").click();
+    await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("version=2");
 });

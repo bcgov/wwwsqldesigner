@@ -48,11 +48,9 @@ test("downloads an EF ZIP with the configured context and table sources", async 
     }, model);
     await page.locator("#saveload").click();
 
-    await page.locator("#clientef").click();
-    await expect(page.locator("#textarea")).toHaveValue(/public class ExampleContext : DbContext/);
-
     const downloadPromise = page.waitForEvent("download");
-    await page.locator("#clientefzip").click();
+    await page.locator("#exporttarget").selectOption("ef");
+    await page.locator("#clientsql").click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("ExampleContext.zip");
 
@@ -95,23 +93,25 @@ test("clears the export throbber when the stylesheet cannot be loaded", async ({
     await page.goto("/");
     await page.locator("#saveload").click();
 
-    await page.locator("#clientef").click();
+    await page.locator("#exporttarget").selectOption("ef");
+    await page.locator("#clientsql").click();
     await expect(page.locator("#throbber")).toBeHidden();
 });
 
-test("renders imported model names as text instead of markup", async ({ page }) => {
+test("imports file XML and renders model names as text instead of markup", async ({ page }) => {
     await page.goto("/");
 
     const title = '<img src=x data-xss="model-name">';
-    const escapedTitle = title.replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-    const xml = `<sql><table name="${escapedTitle}"><row name="${escapedTitle}" null="0"><datatype>int</datatype></row></table></sql>`;
+    const xml = `<sql format="portable-v1"><datatypes db="portable" /><table name="&lt;img src=x data-xss=&quot;model-name&quot;&gt;"><row name="&lt;img src=x data-xss=&quot;model-name&quot;&gt;" null="0"><datatype>integer</datatype></row></table></sql>`;
     await page.locator("#saveload").click();
-    await page.locator("#textarea").fill(xml);
-    await page.locator("#clientload").click();
-
+    await page.locator('[data-source="xml"]').click();
+    const chooser = page.waitForEvent("filechooser");
+    await page.locator("#ioload").click();
+    await (await chooser).setFiles({ name: "unsafe.xml", mimeType: "application/xml", buffer: Buffer.from(xml) });
+    await page.waitForFunction(() => d.tables.length === 1 && d.tables[0].rows.length === 1);
     const result = await page.evaluate(() => {
-        const tableTitle = document.querySelector(".table .title");
-        const rowTitle = document.querySelector(".table tbody .title");
+        const tableTitle = d.tables[0].dom.title;
+        const rowTitle = d.tables[0].rows[0].dom.title;
         return {
             tableText: tableTitle.textContent,
             rowText: rowTitle.textContent,

@@ -3,7 +3,7 @@
 SQL.Options = function (owner) {
     this.owner = owner;
     this.dom = {
-        container: SQL.dom.get("opts"),
+        container: SQL.dom.get("optionspanel"),
         btn: SQL.dom.get("options"),
     };
     this.dom.btn.value = _("options");

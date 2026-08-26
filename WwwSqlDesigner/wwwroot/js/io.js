@@ -9,23 +9,17 @@ SQL.IO = function (owner) {
     this._currentOwnerId = "";
     this._currentOwnerLabel = "";
     this.dom = {
-        container: SQL.dom.get("io"),
+        container: SQL.dom.get("loadsavepanel"),
     };
 
     let ids = [
         "saveload",
-        "clientlocalsave",
-        "clientsave",
-        "clientlocalload",
-        "clientlocallist",
-        "clientload",
+        "iosave",
+        "ioload",
         "clientsql",
-        "clientef",
-        "clientefzip",
-        "serversave",
-        "serverload",
         "serverlist",
         "servershare",
+        "serverunshare",
         "serverimport",
     ];
     for (let id of ids) {
@@ -33,42 +27,60 @@ SQL.IO = function (owner) {
         this.dom[id] = elm;
         elm.value = _(id);
     }
-    ids = ["client", "server", "output", "backendlabel", "servermodellabel",
-        "serverloadmodellabel", "serverownerlabel", "serverversionlabel",
-        "serveridlabel", "servergrouplabel"];
+    ids = ["servermodellabel", "serverloadmodellabel", "serverownerlabel",
+        "serverversionlabel", "serveridlabel", "servergrouplabel",
+        "serverimportdatabaselabel"];
     for (let id of ids) {
         let elm = SQL.dom.get(id);
         elm.innerHTML = _(id);
     }
     this.dom.serverlist.textContent = _("serverlist");
     this.dom.serverlist.title = _("serverlisttitle");
+    this.dom.serverunshare.value = _("serverunshare");
 
-    this.dom.ta = SQL.dom.get("textarea");
+    this.dom.iosave.value = _("clientsave");
+    this.dom.ioload.value = _("clientload");
+    this.dom.iotype = SQL.dom.get("iotype");
+    this.dom.iopanel = SQL.dom.get("iopanel");
+    this.dom.sharepanel = SQL.dom.get("ioshare");
+    this.dom.iosourcebuttons = Array.from(document.querySelectorAll("#iosourcebuttons .io-source-button"));
+    const sourceLabels = { browser: "client", xml: "clientfile", server: "server" };
+    this.dom.iosourcebuttons.forEach((button) => {
+        const source = button.getAttribute("data-source");
+        button.textContent = _(sourceLabels[source] || source);
+    });
+    SQL.dom.get("iosourcebuttons").setAttribute("aria-label", _("iosourcelabel"));
     this.dom.backend = SQL.dom.get("backend");
     this.dom.exporttarget = SQL.dom.get("exporttarget");
+    this.dom.serverimportdatabase = SQL.dom.get("serverimportdatabase");
     this.dom.exporttargetlabel = SQL.dom.get("exporttargetlabel");
-    const exportLabel = _("exporttarget"); this.dom.exporttargetlabel.textContent = exportLabel === "exporttarget" ? "Export target:" : exportLabel;
     this.dom.status = SQL.dom.get("iostatus");
-    this.dom.statusmessage = SQL.dom.get("iostatusmessage");
-    this.dom.statusdetails = SQL.dom.get("iostatusdetails");
-    this.dom.statuslist = SQL.dom.get("iostatuslist");
-    this.dom.statusdismiss = SQL.dom.get("iostatusdismiss");
+    const exportLabel = _("exporttarget"); this.dom.exporttargetlabel.textContent = exportLabel === "exporttarget" ? "Format" : exportLabel;
     this.dom.serverloadname = SQL.dom.get("serverloadname");
+    this.dom.clientlocalname = this.dom.serverloadname;
     this.dom.serverloadmodel = SQL.dom.get("serverloadmodel");
+    this.dom.clientlocalmodel = this.dom.serverloadmodel;
+    this.dom.serverloadname.style.display = "";
     this.dom.serverloadversion = SQL.dom.get("serverloadversion");
+    this.dom.serverSaveRow = SQL.dom.get("server-save-row");
+    this.dom.serverLoadRow = SQL.dom.get("server-load-row");
     this.dom.serverowner = SQL.dom.get("serverowner");
     this.dom.serverownercontrol = SQL.dom.get("serverownercontrol");
     this.dom.serverversioncontrol = SQL.dom.get("serverversioncontrol");
     this.dom.servergrantid = SQL.dom.get("servergrantid");
     this.dom.servergrantgroup = SQL.dom.get("servergrantgroup");
+    this.dom.serverknownuser = SQL.dom.get("serverknownuser");
+    this.dom.serverknowngroup = SQL.dom.get("serverknowngroup");
     this.dom.servercopyid = SQL.dom.get("servercopyid");
     this.dom.servercopyid.textContent = _("servercopyid");
     this.dom.servercopyid.title = _("servercopytitle");
-    this.dom.serverpanel = SQL.dom.get("serverpanel");
-    this.dom.clientcontent = document.querySelector(".io-client-content");
+    this.dom.servergrantid.value = "";
+    this.dom.servergrantgroup.value = "";
+    this.dom.sharepanel.style.display = "";
     this._actionLabelTimers = {};
     this._currentGroups = [];
     this._serverGrants = [];
+    this._clientModelNames = [];
     this.updateServerModelControls();
 
     this.dom.container.parentNode.removeChild(this.dom.container);
@@ -80,42 +92,46 @@ SQL.IO = function (owner) {
     this.importresponse = this.importresponse.bind(this);
 
     SQL.events.add(this.dom.saveload, "click", this.click.bind(this));
-    SQL.events.add(
-        this.dom.clientlocalsave,
-        "click",
-        this.clientlocalsave.bind(this)
-    );
-    SQL.events.add(this.dom.clientsave, "click", this.clientsave.bind(this));
-    SQL.events.add(
-        this.dom.clientlocalload,
-        "click",
-        this.clientlocalload.bind(this)
-    );
-    SQL.events.add(
-        this.dom.clientlocallist,
-        "click",
-        this.clientlocallist.bind(this)
-    );
-    SQL.events.add(this.dom.clientload, "click", this.clientload.bind(this));
+    SQL.events.add(this.dom.iosave, "click", this.saveCurrent.bind(this));
+    SQL.events.add(this.dom.ioload, "click", this.loadCurrent.bind(this));
     SQL.events.add(this.dom.clientsql, "click", this.clientsql.bind(this));
-    SQL.events.add(this.dom.statusdismiss, "click", this.hideStatus.bind(this));
     SQL.events.add(this.dom.exporttarget, "change", this.changeExportTarget.bind(this));
-    SQL.events.add(this.dom.clientef, "click", this.clientef.bind(this));
-    SQL.events.add(this.dom.clientefzip, "click", this.clientefzip.bind(this));
-    SQL.events.add(this.dom.serversave, "click", this.serversave.bind(this));
-    SQL.events.add(this.dom.serverload, "click", this.serverload.bind(this));
+    SQL.events.add(this.dom.serverimportdatabase, "input", this.updateExportButtons.bind(this));
     SQL.events.add(this.dom.serverlist, "click", () => this.serverlist(null, true));
     SQL.events.add(this.dom.servershare, "click", this.servershare.bind(this));
+    SQL.events.add(this.dom.serverunshare, "click", this.serverunshare.bind(this));
     SQL.events.add(this.dom.servercopyid, "click", this.copyCurrentOwnerId.bind(this));
     SQL.events.add(this.dom.serverimport, "click", this.serverimport.bind(this));
     SQL.events.add(this.dom.serverloadname, "input", this.updateServerModelControls.bind(this));
-    SQL.events.add(this.dom.serverloadmodel, "change", this.updateServerModelChoices.bind(this));
+    SQL.events.add(this.dom.iotype, "change", this.updateIoType.bind(this));
+    this.dom.iosourcebuttons.forEach((button) => {
+        SQL.events.add(button, "click", () => {
+            this.dom.iotype.value = button.getAttribute("data-source");
+            this.updateIoType();
+        });
+    });
+    SQL.events.add(this.dom.serverloadname, "input", this.updateIoType.bind(this));
+    SQL.events.add(this.dom.serverloadmodel, "change", () => {
+        this.dom.serverloadname.value = this.dom.serverloadmodel.value;
+        this.updateServerModelChoices(true);
+    });
     SQL.events.add(this.dom.servergrantid, "input", () => {
         if (this.dom.servergrantid.value) this.dom.servergrantgroup.value = "";
         this.updateServerModelControls();
+        this.updateIoType();
     });
     SQL.events.add(this.dom.servergrantgroup, "change", () => {
         if (this.dom.servergrantgroup.value) this.dom.servergrantid.value = "";
+        this.updateServerModelControls();
+    });
+    SQL.events.add(this.dom.serverknownuser, "change", () => {
+        this.dom.servergrantid.value = this.dom.serverknownuser.value;
+        this.dom.serverknowngroup.value = "";
+        this.updateServerModelControls();
+    });
+    SQL.events.add(this.dom.serverknowngroup, "change", () => {
+        this.dom.servergrantgroup.value = this.dom.serverknowngroup.value;
+        this.dom.serverknownuser.value = "";
         this.updateServerModelControls();
     });
     SQL.events.add(this.dom.serverowner, "change", () => this.updateServerModelChoices(true));
@@ -124,12 +140,14 @@ SQL.IO = function (owner) {
     this.build();
 };
 
-SQL.IO.prototype.hideStatus = function () {
-    this.dom.status.style.display = "none";
+SQL.IO.prototype.shareclick = function () {
+    this.build();
+    this.updateIoType();
+    this.owner.window.open(_("saveload"), this.dom.container);
 };
 
 SQL.IO.prototype.syncClientColumnHeight = function () {
-    this.dom.clientcontent.style.height = this.dom.serverpanel.getBoundingClientRect().height + "px";
+    return;
 };
 
 SQL.IO.prototype.setActionLabel = function (action, label) {
@@ -177,15 +195,6 @@ SQL.IO.prototype.ensureCsrfToken = function (callback, failure) {
     }, { headers: h });
 };
 
-SQL.IO.prototype.showStatus = function (diagnostics, operation) {
-    const messages = Array.from(new Set(diagnostics || []));
-    if (!messages.length) { this.hideStatus(); return; }
-    this.dom.statusmessage.textContent = (operation || "Operation") + " reported " + messages.length + " conversion warning" + (messages.length === 1 ? "." : "s.");
-    SQL.dom.clear(this.dom.statuslist);
-    messages.forEach((message) => { const item = SQL.dom.create("li"); item.textContent = message; this.dom.statuslist.appendChild(item); });
-    this.dom.statusdetails.style.display = "";
-    this.dom.status.style.display = "block";
-};
 SQL.IO.prototype.build = function () {
     SQL.dom.clear(this.dom.backend);
 
@@ -208,26 +217,31 @@ SQL.IO.prototype.build = function () {
         }
     }
 
-    const selectedTarget = this.getExportTarget();
     SQL.dom.clear(this.dom.exporttarget);
+    const placeholder = SQL.dom.create("option");
+    placeholder.value = "";
+    placeholder.textContent = "";
+    placeholder.selected = true;
+    this.dom.exporttarget.appendChild(placeholder);
     for (const target of CONFIG.EXPORT_TARGETS) {
         const option = SQL.dom.create("option");
         option.value = target.id;
         option.textContent = target.label;
-        option.selected = target.id === selectedTarget;
         this.dom.exporttarget.appendChild(option);
     }
+    this.updateExportButtons();
 };
 
 SQL.IO.prototype.click = function () {
     /* open io dialog */
     this.build();
-    this.hideStatus();
-    this.dom.ta.value = "";
     this.dom.serverloadname.value = this._name || "";
+    this.dom.clientlocalname.value = "";
+    this.refreshClientStorageModels();
+    this.updateIoType();
     this.refreshExportTargetLabel();
     this.owner.window.open(_("saveload"), this.dom.container);
-    this.dom.serverloadmodel.focus();
+    this.dom.serverloadname.focus();
     this.syncClientColumnHeight();
     if (!this._serverModels.length) {
         this.serverlist(null, true);
@@ -235,12 +249,59 @@ SQL.IO.prototype.click = function () {
 };
 
 SQL.IO.prototype.refreshExportTargetLabel = function () {
-    this.dom.clientsql.value = _("clientsql") + " (" + this.getExportTargetDefinition().label + ")";
+    this.dom.clientsql.value = _("clientexport");
+};
+
+SQL.IO.prototype.saveCurrent = function () {
+    const type = this.dom.iotype.value;
+    if (type === "browser") return this.clientlocalsave();
+    if (type === "xml") return this.clientsave();
+    return this.serversave();
+};
+
+SQL.IO.prototype.loadCurrent = function () {
+    const type = this.dom.iotype.value;
+    if (type === "browser") return this.clientlocalload();
+    if (type === "xml") return this.clientload();
+    return this.serverload();
+};
+
+SQL.IO.prototype.updateIoType = function () {
+    const type = this.dom.iotype.value;
+    const server = type === "server";
+    const browser = type === "browser";
+    this.dom.serverloadmodel.disabled = type === "xml";
+    this.dom.serverowner.disabled = !server;
+    this.dom.serverloadversion.disabled = !server;
+    this.dom.serverlist.disabled = this.dom.serverloadmodel.disabled;
+    if (browser) {
+        this.renderClientModelChoices();
+    } else if (server) {
+        this.updateServerModelChoices();
+    }
+    this.dom.iosave.disabled = !this.dom.serverloadname.value.trim();
+    this.dom.ioload.disabled = type === "server"
+        ? !this.dom.serverloadmodel.value && !this.dom.serverloadname.value
+        : type === "browser" ? !this.dom.serverloadmodel.value : false;
+    this.dom.iosourcebuttons.forEach((button) => {
+        const selected = button.getAttribute("data-source") === type;
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
 };
 
 SQL.IO.prototype.changeExportTarget = function () {
-    this.owner.setOption("lastExportTarget", this.getExportTarget());
+    if (this.dom.exporttarget.value) {
+        this.owner.setOption("lastExportTarget", this.getExportTarget());
+    }
+    this.updateExportButtons();
     this.refreshExportTargetLabel();
+};
+
+SQL.IO.prototype.updateExportButtons = function () {
+    const target = this.dom.exporttarget.value;
+    this.dom.clientsql.disabled = !target;
+    this.dom.serverimport.disabled = !this.dom.serverimportdatabase.value.trim();
 };
 
 SQL.IO.prototype.parseXml = function (xml) {
@@ -283,28 +344,47 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
     }
     if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
     /* Keep the pane open when conversion warnings need to be read. */
-    if (this.dom.status.style.display === "none") { this.owner.window.close(); }
+    this.owner.window.close();
     return true;
 };
 
 SQL.IO.prototype.clientsave = function () {
+    this._name = this.dom.serverloadname.value.trim();
+    if (!this._name) {
+        return;
+    }
     const xml = this.owner.toXML(true);
-    this.dom.ta.value = xml;
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = (this._name || "database") + ".xml";
+    link.click();
+    URL.revokeObjectURL(url);
 };
 
 SQL.IO.prototype.clientload = function () {
-    const xml = this.dom.ta.value;
-    if (!xml) {
-        alert(_("empty"));
-        return;
-    }
-
-    if (this.fromXMLText(xml)) {
-        this._serverModelState = "none";
-        this._name = "";
-        this.dom.serverloadname.value = "";
-        this.updateServerModelControls();
-    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xml,application/xml,text/xml";
+    input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            if (typeof reader.result !== "string") {
+                throw new Error("Unable to read XML file.");
+            }
+            if (this.fromXMLText(reader.result)) {
+                this._serverModelState = "none";
+                this._name = "";
+                this.dom.serverloadname.value = "";
+                this.updateServerModelControls();
+            }
+        });
+        reader.readAsText(file);
+    });
+    input.click();
 };
 
 SQL.IO.prototype.promptName = function (title, suffix) {
@@ -328,8 +408,9 @@ SQL.IO.prototype.clientlocalsave = function () {
         return;
     }
 
-    let key = this.promptName("serversaveprompt");
+    let key = this.dom.clientlocalname.value.trim();
     if (!key) {
+        this.dom.clientlocalname.focus();
         return;
     }
 
@@ -349,6 +430,12 @@ SQL.IO.prototype.clientlocalsave = function () {
         if (localStorage.getItem(key) != xml) {
             throw new Error("Content verification failed");
         }
+        const modelName = key.substring("wwwsqldesigner_databases_".length);
+        this.lastUsedName = modelName;
+        this.owner.setOption("lastUsedName", modelName);
+        this.refreshClientStorageModels();
+        this.dom.clientlocalmodel.value = modelName;
+        this.updateClientStorageControls();
     } catch (e) {
         alert(
             "Error saving database structure to localStorage! (" +
@@ -364,7 +451,7 @@ SQL.IO.prototype.clientlocalload = function () {
         return;
     }
 
-    let key = this.promptName("serverloadprompt");
+    let key = this.dom.clientlocalmodel.value || this.dom.clientlocalname.value.trim();
     if (!key) {
         return;
     }
@@ -392,6 +479,40 @@ SQL.IO.prototype.clientlocalload = function () {
         this.dom.serverloadname.value = "";
         this.updateServerModelControls();
     }
+};
+
+SQL.IO.prototype.refreshClientStorageModels = function () {
+    const prefix = "wwwsqldesigner_databases_";
+    const names = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+            names.push(key.substring(prefix.length));
+        }
+    }
+    names.sort((a, b) => a.localeCompare(b));
+    this._clientModelNames = names;
+    if (this.dom.iotype.value === "browser") {
+        this.renderClientModelChoices();
+    }
+};
+
+SQL.IO.prototype.renderClientModelChoices = function () {
+    const placeholder = SQL.dom.create("option");
+    placeholder.value = "";
+    placeholder.textContent = "";
+    SQL.dom.clear(this.dom.clientlocalmodel);
+    this.dom.clientlocalmodel.appendChild(placeholder);
+    this._clientModelNames.forEach((name) => {
+        const option = SQL.dom.create("option");
+        option.value = name;
+        option.textContent = name;
+        this.dom.clientlocalmodel.appendChild(option);
+    });
+};
+
+SQL.IO.prototype.updateClientStorageControls = function () {
+    this.updateIoType();
 };
 
 SQL.IO.prototype.clientlocallist = function () {
@@ -432,6 +553,10 @@ SQL.IO.prototype.clientlocallist = function () {
 };
 
 SQL.IO.prototype.clientsql = function () {
+    if (this.getExportTarget() === "ef") {
+        this.clientef();
+        return;
+    }
     const bp = this.owner.getOption("staticpath");
     const target = this.getExportTarget();
     const path = bp + "db/" + target + "/output.xsl";
@@ -442,12 +567,41 @@ SQL.IO.prototype.clientsql = function () {
 };
 
 SQL.IO.prototype.clientef = function () {
-    const bp = this.owner.getOption("staticpath");
-    const path = bp + "db/" + "ef" + "/output.xsl";
-    const h = this.owner.getXhrHeaders();
-    h['transformation'] = 'ef';
+    const xml = this.getSafeExportXml("ef");
+    if (!xml) { return; }
+    const tableCount = this.getModelTableCount(xml);
+    if (!tableCount) {
+        alert(_("efzipexportempty"));
+        return;
+    }
+
+    const path = this.owner.getOption("staticpath") + "db/ef/output.xsl";
     this.owner.window.showThrobber();
-    SQL.request(path, this.finish.bind(this), { xml: true, headers: h });
+    this.getXSL(path, (err, xslDoc) => {
+        if (err) {
+            this.owner.window.hideThrobber();
+            alert(_("efzipexporterror"));
+            return;
+        }
+        try {
+            const source = this.transformEf(xslDoc, xml);
+            const files = this.createEfZipFiles(source, this.getEfSettings().context, tableCount);
+            if (files.length === 1) {
+                this.downloadTextFile(files[0].contents, files[0].name);
+                this.owner.window.hideThrobber();
+            } else {
+                const zip = new JSZip();
+                files.forEach((file) => zip.file(file.name, file.contents));
+                zip.generateAsync({ type: "blob", compression: "DEFLATE" })
+                    .then((archive) => this.downloadEfZip(archive, files.contextName))
+                    .catch(() => alert(_("efzipexporterror")))
+                    .finally(() => this.owner.window.hideThrobber());
+            }
+        } catch (e) {
+            this.owner.window.hideThrobber();
+            alert(_("efzipexporterror"));
+        }
+    });
 };
 
 SQL.IO.prototype.getExportTarget = function () {
@@ -480,49 +634,34 @@ SQL.IO.prototype.getExportXml = function (target) {
 
 SQL.IO.prototype.getSafeExportXml = function (target) {
     const mapped = this.getExportXml(target);
-    this.showStatus(mapped.diagnostics, "Export");
+    const diagnostics = Array.from(new Set(mapped.diagnostics || []));
+    SQL.dom.clear(this.dom.status);
+    this.dom.status.hidden = diagnostics.length === 0;
+    this.dom.status.classList.toggle("unsafe", !mapped.safe);
+    if (diagnostics.length) {
+        const heading = SQL.dom.create("strong");
+        heading.textContent = mapped.safe ? _("exportwarning") : _("exportunsafe");
+        this.dom.status.appendChild(heading);
+        const list = SQL.dom.create("ul");
+        diagnostics.forEach((message) => {
+            const item = SQL.dom.create("li");
+            item.textContent = message;
+            list.appendChild(item);
+        });
+        this.dom.status.appendChild(list);
+    }
     return mapped.safe ? mapped.xml : null;
 };
 
-SQL.IO.prototype.clientefzip = function () {
-    if (typeof JSZip === "undefined") {
-        alert(_("efzipexporterror"));
-        return;
-    }
-
-    const xml = this.getSafeExportXml("ef");
-    if (!xml) { return; }
-    const tableCount = this.getModelTableCount(xml);
-    if (!tableCount) {
-        alert(_("efzipexportempty"));
-        return;
-    }
-
-    const path = this.owner.getOption("staticpath") + "db/ef/output.xsl";
-    this.owner.window.showThrobber();
-    this.getXSL(path, (err, xslDoc) => {
-        if (err) {
-            this.owner.window.hideThrobber();
-            alert(_("efzipexporterror"));
-            return;
-        }
-
-        try {
-            const source = this.transformEf(xslDoc, xml);
-            const files = this.createEfZipFiles(source, this.getEfSettings().context, tableCount);
-            const zip = new JSZip();
-            for (const file of files) {
-                zip.file(file.name, file.contents);
-            }
-            zip.generateAsync({ type: "blob", compression: "DEFLATE" })
-                .then((archive) => this.downloadEfZip(archive, files.contextName))
-                .catch(() => alert(_("efzipexporterror")))
-                .finally(() => this.owner.window.hideThrobber());
-        } catch (e) {
-            this.owner.window.hideThrobber();
-            alert(_("efzipexporterror"));
-        }
-    });
+SQL.IO.prototype.downloadTextFile = function (contents, name) {
+    const blob = new Blob([contents], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
 };
 
 SQL.IO.prototype.getXSL = function (xslPath, cb) {
@@ -577,7 +716,7 @@ SQL.IO.prototype.finish = function () {
     // Get XSL content and invoke transformation
     this.getXSL(xslPath, (err, doc) => {
         if (err) {
-            console.error(err.message);
+            alert(_("xmlerror") + ": " + err.message);
             this.owner.window.hideThrobber();
             return;
         }
@@ -591,7 +730,11 @@ SQL.IO.prototype.finish = function () {
 
 SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
     try {
-        this.dom.ta.value = this.transformEf(xslDoc, xml, this.owner.getXhrHeaders().transformation === "ef");
+        const target = this.owner.getXhrHeaders().transformation;
+        const extension = target === "ef" ? "cs" : "sql";
+        this.downloadTextFile(
+            this.transformEf(xslDoc, xml, target === "ef"),
+            (this._name || "database") + "." + extension);
     } catch (e) {
         alert(_("xmlerror") + ": " + e.message);
     }
@@ -740,7 +883,7 @@ SQL.IO.prototype.quicksave = function (e) {
 
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     if (typeof keyword === "undefined") {
-        keyword = this.dom.serverloadmodel.value;
+        keyword = this.dom.serverloadmodel.value || this.dom.serverloadname.value.trim();
         if (keyword) {
             version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
             ownerId = this.dom.serverowner.value || null;
@@ -769,7 +912,7 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     SQL.request(url, this.loadresponse, { xml: true, headers: h });
 };
 
-SQL.IO.prototype.serverlist = function (e, preserveOutput) {
+SQL.IO.prototype.serverlist = function (e, preserveOutput, after) {
     if (preserveOutput) {
         this.setActionLabel("serverlist", "");
     }
@@ -777,7 +920,12 @@ SQL.IO.prototype.serverlist = function (e, preserveOutput) {
     const url = bp + "backend/" + this.dom.backend.value + "/list";
     const h = this.owner.getXhrHeaders();
     this.owner.window.showThrobber();
-    const callback = (data, code, headers) => this.listresponse(data, code, headers, true);
+    const callback = (data, code, headers) => {
+        this.listresponse(data, code, headers, true);
+        if (after) {
+            after();
+        }
+    };
     SQL.request(url, callback, { headers: h });
 };
 
@@ -786,12 +934,18 @@ SQL.IO.prototype.updateServerModelControls = function () {
     const hasName = this.dom.serverloadname.value.trim().length > 0;
     const hasLoadModel = this.dom.serverloadmodel.value !== "" || hasName;
     const recipient = this.getShareRecipient();
-    const isGranted = recipient && this._serverGrants.some((grant) =>
-        grant.targetType === recipient.targetType && grant.targetId === recipient.targetId);
+    const hasKnownRecipient = Boolean(
+        this.dom.serverknownuser.value || this.dom.serverknowngroup.value);
     this.dom.servershare.disabled = !ownerControlsEnabled || !recipient;
-    this.dom.servershare.value = isGranted ? _("serverunshare") : _("servershare");
-    this.dom.serverload.disabled = !hasLoadModel;
-    this.dom.serversave.disabled = !hasName;
+    this.dom.serverunshare.disabled = !ownerControlsEnabled || !hasKnownRecipient;
+    this.dom.servergrantid.disabled = !ownerControlsEnabled;
+    this.dom.servergrantgroup.disabled = !ownerControlsEnabled || this._currentGroups.length === 0;
+    this.dom.serverknownuser.disabled = !ownerControlsEnabled
+        || !this._serverGrants.some((grant) => grant.targetType === "User");
+    this.dom.serverknowngroup.disabled = !ownerControlsEnabled
+        || !this._serverGrants.some((grant) => grant.targetType === "Group");
+    this.dom.ioload.disabled = !hasLoadModel;
+    this.dom.iosave.disabled = !hasName;
 };
 
 SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
@@ -818,7 +972,7 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     }
     SQL.dom.clear(this.dom.serverloadversion);
     const latest = SQL.dom.create("option");
-    latest.value = ""; latest.textContent = _("serverlatest");
+    latest.value = ""; latest.textContent = "";
     this.dom.serverloadversion.appendChild(latest);
     for (const model of matches) {
         const option = SQL.dom.create("option");
@@ -839,10 +993,8 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
         option.selected = ownerId === selectedOwner && selectedOwner !== "";
         this.dom.serverowner.appendChild(option);
     }
-    this.dom.serverversioncontrol.style.display = "";
-    this.dom.serverownercontrol.style.display = "";
-    this.dom.serverversioncontrol.querySelector("select").disabled = matches.length === 0;
-    this.dom.serverownercontrol.querySelector("select").disabled = ownerIds.length === 0;
+    this.dom.serverloadversion.disabled = matches.length === 0;
+    this.dom.serverowner.disabled = ownerIds.length === 0;
     this.dom.serverloadmodel.value = name;
     this.updateServerModelControls();
 };
@@ -855,9 +1007,20 @@ SQL.IO.prototype.getShareRecipient = function () {
     return null;
 };
 
+SQL.IO.prototype.getKnownShareRecipient = function () {
+    if (this.dom.serverknownuser.value) {
+        return { targetType: "User", targetId: this.dom.serverknownuser.value };
+    }
+    if (this.dom.serverknowngroup.value) {
+        return { targetType: "Group", targetId: this.dom.serverknowngroup.value };
+    }
+    return null;
+};
+
 SQL.IO.prototype.refreshShareState = function () {
     if (this._serverModelState !== "owned" || !this._name) {
         this._serverGrants = [];
+        this.refreshGrantChoices();
         this.updateServerModelControls();
         return;
     }
@@ -874,14 +1037,41 @@ SQL.IO.prototype.refreshShareState = function () {
         } catch (e) {
             this._serverGrants = [];
         }
+        this.refreshGrantChoices();
         this.updateServerModelControls();
     }, { headers: this.owner.getXhrHeaders() });
+};
+
+SQL.IO.prototype.refreshGrantChoices = function () {
+    SQL.dom.clear(this.dom.serverknownuser);
+    SQL.dom.clear(this.dom.serverknowngroup);
+    for (const type of ["User", "Group"]) {
+        const select = type === "User" ? this.dom.serverknownuser : this.dom.serverknowngroup;
+        const placeholder = SQL.dom.create("option");
+        placeholder.value = "";
+        placeholder.textContent = "";
+        select.appendChild(placeholder);
+        this._serverGrants.filter((grant) => grant.targetType === type).forEach((grant) => {
+            const option = SQL.dom.create("option");
+            option.value = grant.targetId;
+            option.textContent = grant.targetId;
+            select.appendChild(option);
+        });
+        select.disabled = this._serverModelState !== "owned"
+            || !this._serverGrants.some((grant) => grant.targetType === type);
+    }
 };
 
 SQL.IO.prototype.copyCurrentOwnerId = function () {
     this.setActionLabel("servercopy", "");
     if (!this._currentOwnerId) {
-        alert("Your user ID is not available yet. Refresh the models first.");
+        this.serverlist(null, true, () => {
+            if (this._currentOwnerId) {
+                this.copyCurrentOwnerId();
+                return;
+            }
+            alert("Your user ID is not available.");
+        });
         return;
     }
     const copied = () => this.setActionLabel("servercopy", _("servercopied"));
@@ -959,7 +1149,7 @@ SQL.IO.prototype.serverunshare = function () {
         return;
     }
 
-    const recipient = this.getShareRecipient();
+    const recipient = this.getKnownShareRecipient();
     if (!recipient) {
         alert(_("serverrecipientrequired"));
         return;
@@ -987,7 +1177,7 @@ SQL.IO.prototype.serverunshare = function () {
 };
 
 SQL.IO.prototype.serverimport = function (e) {
-    const name = prompt(_("serverimportprompt"), "");
+    const name = this.dom.serverimportdatabase.value.trim();
     if (!name) {
         return;
     }
@@ -1006,7 +1196,7 @@ SQL.IO.prototype.serverimport = function (e) {
 SQL.IO.prototype.check = function (code) {
     switch (code) {
         case 403:
-            this.dom.ta.value = _("httpresponse") + ": HTTP 403 - access denied";
+            alert(_("httpresponse") + ": HTTP 403 - access denied");
             return false;
         case 201:
         case 404:
@@ -1014,7 +1204,7 @@ SQL.IO.prototype.check = function (code) {
         case 501:
         case 503:
             const lang = "http" + code;
-            this.dom.ta.value = _("httpresponse") + ": " + _(lang);
+            alert(_("httpresponse") + ": " + _(lang));
             return false;
         default:
             return true;
@@ -1058,12 +1248,16 @@ SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
         return;
     }
     if (!preserveOutput) {
-        this.dom.ta.value = data;
         return;
     }
     if (preserveOutput) this.setActionLabel("serverlist", _("serverrefreshed"));
     let list;
-    try { list = JSON.parse(data || "{}"); } catch (e) { return; }
+    try {
+        list = JSON.parse(data || "{}");
+    } catch (e) {
+        alert(_("httpresponse") + ": " + e.message);
+        return;
+    }
     this._currentOwnerId = list.currentOwnerId || "";
     this._currentOwnerLabel = list.currentOwnerLabel || "";
     this._currentGroups = Array.isArray(list.groups) ? list.groups : [];

@@ -13,3 +13,7 @@ WwwSqlDesigner.Tests/Playwright/playwright-report/
 
 # Local, untracked planning and follow-up notes
 .working/
+
+# Local Copilot and Playwright session artifacts
+.github/
+.playwright-mcp/

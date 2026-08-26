@@ -72,6 +72,8 @@
     <string name="saveload">Konservi / Ŝargi</string>
     <string name="empty">Bonvolu alglui XML datumon en la tekst-zono sube kaj provi de nove.</string>
     <string name="client">Kliento</string>
+    <string name="clientfile">Dosiero</string>
+    <string name="iosourcelabel">Stoka fonto</string>
     <string name="server">Servilo</string>
     <string name="output">Enigo / Eligo</string>
     <string name="clientsave">Konservi XML</string>
@@ -96,8 +98,6 @@
     <!-- misc -->
     <string name="xmlerror">XML-eraro</string>
     <string name="docs">Dokumentaro</string>
-
-    <string name="clientefzip">Krei EF ZIP</string>
     <string name="efzipexportempty">Aldonu almenaŭ unu tabelon antaŭ eksporti EF ZIP.</string>
     <string name="efzipexporterror">Ne eblis krei la EF-ZIP-eksporton.</string>
 </locale>

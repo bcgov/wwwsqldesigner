@@ -72,6 +72,8 @@
     <string name="saveload">Kaydet / Yükle</string>
     <string name="empty">Lütfen XML verilerini aşağıdaki metin alanına yapıştırın ve tekrar deneyin.</string>
     <string name="client">İstemci</string>
+    <string name="clientfile">Dosya</string>
+    <string name="iosourcelabel">Depolama kaynağı</string>
     <string name="server">Sunucu</string>
     <string name="output">Giriş / Çıkış</string>
     <string name="clientsave">XML Kaydet</string>
@@ -99,8 +101,6 @@
     <!-- misc -->
     <string name="xmlerror">XML hatası</string>
     <string name="docs">Belgeleme</string>
-
-    <string name="clientefzip">EF ZIP oluştur</string>
     <string name="efzipexportempty">EF ZIP dışa aktarmadan önce en az bir tablo ekleyin.</string>
     <string name="efzipexporterror">EF ZIP dışa aktarma oluşturulamadı.</string>
 </locale>

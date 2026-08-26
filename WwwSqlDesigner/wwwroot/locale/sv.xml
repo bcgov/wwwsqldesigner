@@ -70,6 +70,8 @@
     <string name="saveload">Spara / Ladda</string>
     <string name="empty">Vänligen klistra in XML i textrutan nedan och försök igen.</string>
     <string name="client">Klient</string>
+    <string name="clientfile">Fil</string>
+    <string name="iosourcelabel">Lagringskälla</string>
     <string name="server">Server</string>
     <string name="output">Input / Output</string>
     <string name="clientsave">Spara XML</string>
@@ -93,8 +95,6 @@
     <!-- misc -->
     <string name="xmlerror">XML error</string>
     <string name="docs">Dokumentation</string>
-
-    <string name="clientefzip">Generera EF-ZIP</string>
     <string name="efzipexportempty">Lägg till minst en tabell innan du exporterar EF-ZIP.</string>
     <string name="efzipexporterror">Det gick inte att skapa EF-ZIP-exporten.</string>
 </locale>
