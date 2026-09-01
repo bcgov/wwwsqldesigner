@@ -371,6 +371,7 @@ test("loads the newest server model from the name and version form", async ({ pa
     await expect(page.locator("#serverlist")).toHaveText("Refresh", { timeout: 3000 });
     await expect(page.locator("#serverloadmodel option")).toHaveCount(2);
     await page.locator("#serverloadmodel").selectOption("Shared");
+    await expect(page.locator('#serverloadversion option[value=""]')).toHaveText("Latest");
     await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
     await expect.poll(() => loadRequest && loadRequest.url()).not.toContain("version=");
@@ -382,6 +383,105 @@ test("loads the newest server model from the name and version form", async ({ pa
     await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("version=2");
+});
+
+test("does not load a save name when the server catalogue is empty", async ({ page }) => {
+    let loadRequests = 0;
+    await page.route("**/backend/netcore-ef/load/**", async (route) => {
+        loadRequests++;
+        await route.abort();
+    });
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="server"]').click();
+    await page.evaluate(() => {
+        d.io._serverModels = [];
+        d.io.dom.serverloadname.value = "Save only";
+        d.io.updateServerModelChoices();
+        d.io.updateIoType();
+    });
+    await expect(page.locator("#iosave")).toBeEnabled();
+    await expect(page.locator("#ioload")).toBeDisabled();
+    await page.locator("#ioload").click({ force: true });
+    expect(loadRequests).toBe(0);
+});
+
+test("prefers the current owner and isolates versions for duplicate server model names", async ({ page }) => {
+    let loadRequest;
+    await page.route("**/backend/netcore-ef/load/**", async (route) => {
+        loadRequest = route.request();
+        await route.fulfill({ status: 200, contentType: "text/xml", body: '<sql><datatypes db="mssql" /></sql>' });
+    });
+    await page.goto("/");
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="server"]').click();
+    await page.evaluate(() => {
+        d.io._currentOwnerId = "current-owner";
+        d.io._currentOwnerLabel = "Current owner";
+        d.io._serverModels = [
+            { keyword: "Duplicate", version: 3, ownerId: "other-owner" },
+            { keyword: "Duplicate", version: 2, ownerId: "current-owner" },
+            { keyword: "Duplicate", version: 1, ownerId: "current-owner" },
+        ];
+        d.io.updateServerModelChoices();
+    });
+    await page.locator("#serverloadmodel").selectOption("Duplicate");
+    await expect(page.locator("#serverowner")).toHaveValue("current-owner");
+    await expect(page.locator("#serverloadversion option")).toHaveText(["Latest", "v2", "v1"]);
+    await page.locator("#serverowner").selectOption("other-owner");
+    await expect(page.locator("#serverloadversion option")).toHaveText(["Latest", "v3"]);
+    await page.locator("#ioload").click();
+    await expect.poll(() => loadRequest && loadRequest.url()).toContain("ownerId=other-owner");
+});
+
+test("preserves the server catalogue and diagram when refresh fails", async ({ page }) => {
+    await page.route("**/backend/netcore-ef/list", async (route) => {
+        await route.fulfill({ status: 503, body: "Unavailable" });
+    });
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="StillHere" /></sql>');
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="server"]').click();
+    await page.evaluate(() => {
+        d.io._serverModels = [{ keyword: "Existing", version: 1, ownerId: "owner" }];
+        d.io.updateServerModelChoices();
+    });
+    await page.locator("#serverlist").click();
+    await expect(page.locator('#serverloadmodel option[value="Existing"]')).toHaveCount(1);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
+test("preserves the current diagram after failed or malformed server loads", async ({ page }) => {
+    let response = {
+        status: 429,
+        body: '<sql format="portable-v1"><datatypes db="portable" /><table name="Replacement" /></sql>',
+    };
+    let loadRequests = 0;
+    await page.route("**/backend/netcore-ef/load/**", async (route) => {
+        loadRequests++;
+        await route.fulfill({ ...response, contentType: "text/xml" });
+    });
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="StillHere" /></sql>');
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="server"]').click();
+    await page.evaluate(() => {
+        d.io._serverModels = [{ keyword: "Broken", version: 1, ownerId: "owner" }];
+        d.io.updateServerModelChoices();
+    });
+    await page.locator("#serverloadmodel").selectOption("Broken");
+    await page.locator("#ioload").click();
+    await expect.poll(() => loadRequests).toBe(1);
+    await expect.poll(() => page.evaluate(() => d.window.dom.throbber.style.visibility)).toBe("hidden");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+    response = { status: 200, body: "<sql>" };
+    await page.locator("#serverloadmodel").selectOption("Broken");
+    await page.locator("#ioload").click();
+    await expect.poll(() => loadRequests).toBe(2);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
 });
 
 test("preserves SQL NULL defaults and normalizes portable token case", async ({ page }) => {
