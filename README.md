@@ -18,12 +18,11 @@ Note that the auto-creation of a database and schema only works with LocalDB in 
 1. Comments per table and column
 1. Creation of SQL DDL scripts based on the data model (full script only, no migrations)
 1. Export of EF classes and a DbContext with configurable namespace and context name
-1. Save and load models from a database
+1. Save models to a database and load the latest or a selected version by model and owner
 1. The DB connection is based on Entity Framework Core, so supports LocalDB (for development), MSSQL, PostgreSQL, etc.
 1. Data model versioning
  
 # Upcoming Features
-1. Easier way to load data model versions
 1. Export to Entity Framework classes, not just SQL DDL
 1. Capture of data classifications per column
 1. Capture of records retention schedule per column

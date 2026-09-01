@@ -281,7 +281,7 @@ SQL.IO.prototype.updateIoType = function () {
     }
     this.dom.iosave.disabled = !this.dom.serverloadname.value.trim();
     this.dom.ioload.disabled = type === "server"
-        ? !this.dom.serverloadmodel.value && !this.dom.serverloadname.value
+        ? !this.dom.serverloadmodel.value
         : type === "browser" ? !this.dom.serverloadmodel.value : false;
     this.dom.iosourcebuttons.forEach((button) => {
         const selected = button.getAttribute("data-source") === type;
@@ -932,7 +932,9 @@ SQL.IO.prototype.serverlist = function (e, preserveOutput, after) {
 SQL.IO.prototype.updateServerModelControls = function () {
     const ownerControlsEnabled = this._serverModelState === "owned";
     const hasName = this.dom.serverloadname.value.trim().length > 0;
-    const hasLoadModel = this.dom.serverloadmodel.value !== "" || hasName;
+    const hasLoadModel = this.dom.iotype.value === "server"
+        ? this.dom.serverloadmodel.value !== ""
+        : this.dom.serverloadmodel.value !== "" || hasName;
     const recipient = this.getShareRecipient();
     const hasKnownRecipient = Boolean(
         this.dom.serverknownuser.value || this.dom.serverknowngroup.value);
@@ -972,7 +974,7 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     }
     SQL.dom.clear(this.dom.serverloadversion);
     const latest = SQL.dom.create("option");
-    latest.value = ""; latest.textContent = "";
+    latest.value = ""; latest.textContent = _("serverlatest");
     this.dom.serverloadversion.appendChild(latest);
     for (const model of matches) {
         const option = SQL.dom.create("option");
@@ -1225,7 +1227,7 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
     this.setCsrfToken(headers);
     const copyable = headers && (headers["X-MODEL-COPYABLE"] || headers["x-model-copyable"]) === "true";
     this.owner.window.hideThrobber();
-    if (!this.check(code)) {
+    if (!this.check(code) || code < 200 || code >= 300) {
         return;
     }
     if (!this.fromXML(data)) {
