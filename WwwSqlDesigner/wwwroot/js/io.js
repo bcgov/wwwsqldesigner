@@ -619,6 +619,11 @@ SQL.IO.prototype.getExportTargetDefinition = function () {
         || CONFIG.EXPORT_TARGETS.find((target) => target.id === CONFIG.DEFAULT_DB);
 };
 
+SQL.IO.nvarcharByteLength = function (value) {
+    // sp_addextendedproperty accepts at most 7,500 bytes for an nvarchar value.
+    return String(value || "").length * 2;
+};
+
 /* Maps a serialized copy only; target selection never rewrites the editor. */
 SQL.IO.prototype.getExportXml = function (target) {
     const doc = this.parseXml(this.owner.toXML());
@@ -634,14 +639,41 @@ SQL.IO.prototype.getExportXml = function (target) {
     }
     const datatypes = doc.querySelector("sql > datatypes");
     if (datatypes) { datatypes.setAttribute("db", target); }
-    const supportsMetadata = target === "mssql" || target === "ef";
-    if (!supportsMetadata && Array.from(doc.querySelectorAll("sql > table")).some((table) =>
+    const supportsSchema = target === "mssql" || target === "ef";
+    const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
+    if (!supportsSchema && Array.from(doc.querySelectorAll("sql > table")).some((table) =>
         SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
         diagnostics.push(target + " export omits non-default schema metadata.");
     }
-    if (!supportsMetadata && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
+    if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
         comment.textContent.trim() !== "")) {
         diagnostics.push(target + " export omits table and column descriptions.");
+    }
+    if (supportsSchema) {
+        for (const table of doc.querySelectorAll("sql > table")) {
+            const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
+            const tableName = schema + "." + table.getAttribute("name");
+            const descriptions = [{
+                comment: SQL.Designer.directChild(table, "comment"),
+                name: tableName,
+            }];
+            for (const row of table.querySelectorAll(":scope > row")) {
+                descriptions.push({
+                    comment: SQL.Designer.directChild(row, "comment"),
+                    name: tableName + "." + row.getAttribute("name"),
+                });
+            }
+            for (const description of descriptions) {
+                const text = description.comment ? description.comment.textContent : "";
+                if (text.trim() === "") { continue; }
+                const bytes = SQL.IO.nvarcharByteLength(text);
+                if (bytes > 7500) {
+                    diagnostics.push(description.name + " description is " + bytes
+                        + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+                    safe = false;
+                }
+            }
+        }
     }
     if (target === "mssql" && doc.querySelector("sql > table > key[type='FULLTEXT']")) {
         diagnostics.push("Microsoft SQL Server export omits portable FULLTEXT keys.");

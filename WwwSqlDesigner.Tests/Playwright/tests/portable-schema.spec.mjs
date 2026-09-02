@@ -153,6 +153,63 @@ test("metadata diagnostics and EF ZIP splitting preserve canonical XML", async (
     expect(files.map((file) => file.name)).toEqual(["Context.cs", "Item.cs"]);
 });
 
+test("counts SQL Server nvarchar description bytes by UTF-16 code unit", async ({ page }) => {
+    await page.goto("/");
+    expect(await page.evaluate(() => [
+        SQL.IO.nvarcharByteLength("A".repeat(3750)),
+        SQL.IO.nvarcharByteLength("\u{1F600}".repeat(1875)),
+        SQL.IO.nvarcharByteLength("A\u{1F600}"),
+    ])).toEqual([7500, 7500, 6]);
+});
+
+test("blocks oversized SQL Server descriptions without mutating canonical XML", async ({ page }) => {
+    await page.goto("/");
+    const safe = "A".repeat(3750);
+    const unsafeTable = "A".repeat(3751);
+    const unsafeColumn = "\u{1F600}".repeat(1876);
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Safe"><datatype>text</datatype><comment>${safe}</comment></row><row name="Details"><datatype>text</datatype><comment>${unsafeColumn}</comment></row><comment>${unsafeTable}</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    for (const target of ["mssql", "ef"]) {
+        const result = await page.evaluate((value) => ({
+            export: d.io.getSafeExportXml(value),
+            messages: Array.from(d.io.dom.status.querySelectorAll("li"), (item) => item.textContent),
+        }), target);
+        expect(result.export).toBeNull();
+        expect(result.messages).toEqual([
+            "sales.Item description is 7502 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.",
+            "sales.Item.Details description is 7504 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.",
+        ]);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("accepts descriptions at the SQL Server limit for MSSQL and EF", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "A".repeat(3750);
+    await load(page, `<sql><table name="Item"><row name="Details"><datatype>text</datatype><comment>${boundary}</comment></row><comment>${boundary}</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    for (const target of ["mssql", "ef"]) {
+        expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).not.toBeNull();
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("separates schema and description export support", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Details"><datatype>text</datatype><comment>column</comment></row><comment>table</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    for (const target of ["postgresql", "oracle"]) {
+        const diagnostics = await page.evaluate((value) => d.io.getExportXml(value).diagnostics, target);
+        expect(diagnostics).toEqual([`${target} export omits non-default schema metadata.`]);
+    }
+    expect(await page.evaluate(() => d.io.getExportXml("sqlite").diagnostics)).toEqual([
+        "sqlite export omits non-default schema metadata.",
+        "sqlite export omits table and column descriptions.",
+    ]);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
 test("round-trips every canonical portable token and facet", async ({ page }) => {
     await page.goto("/");
     const rows = tokens.map((token, index) => `<row name="C${index}" null="1"><datatype>${token}</datatype><default>value</default><comment>note</comment></row>`).join("");
