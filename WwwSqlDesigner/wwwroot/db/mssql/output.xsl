@@ -1,133 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-	XML 2 MsSQL XSL transformation for WWW SQL Designer v 2.x
-	Version: 0.2
-	Author: peter@pcurd.co.uk (Peter) 17/03/2009
-	Author: schliden@gmail.com
--->
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 <xsl:output method="text"/>
+
+<xsl:template name="replace">
+  <xsl:param name="text"/><xsl:param name="find"/><xsl:param name="with"/>
+  <xsl:choose>
+    <xsl:when test="contains($text,$find)"><xsl:value-of select="substring-before($text,$find)"/><xsl:value-of select="$with"/><xsl:call-template name="replace"><xsl:with-param name="text" select="substring-after($text,$find)"/><xsl:with-param name="find" select="$find"/><xsl:with-param name="with" select="$with"/></xsl:call-template></xsl:when>
+    <xsl:otherwise><xsl:value-of select="$text"/></xsl:otherwise>
+  </xsl:choose>
+</xsl:template>
+<xsl:template name="sql-identifier"><xsl:param name="value"/><xsl:text>[</xsl:text><xsl:call-template name="replace"><xsl:with-param name="text" select="$value"/><xsl:with-param name="find" select="']'"/><xsl:with-param name="with" select="']]'"/></xsl:call-template><xsl:text>]</xsl:text></xsl:template>
+<xsl:template name="sql-string"><xsl:param name="value"/><xsl:call-template name="replace"><xsl:with-param name="text" select="$value"/><xsl:with-param name="find" select="&quot;'&quot;"/><xsl:with-param name="with" select="&quot;''&quot;"/></xsl:call-template></xsl:template>
+<xsl:template name="sql-unicode-literal"><xsl:param name="value"/><xsl:text>N'</xsl:text><xsl:call-template name="sql-string"><xsl:with-param name="value" select="$value"/></xsl:call-template><xsl:text>'</xsl:text></xsl:template>
+<xsl:template name="qualified"><xsl:param name="schema"/><xsl:param name="name"/><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$schema"/></xsl:call-template><xsl:text>.</xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$name"/></xsl:call-template></xsl:template>
+
 <xsl:template match="/sql">
-
-<!-- tables -->
-	<xsl:for-each select="table">
-		<xsl:text>CREATE TABLE [</xsl:text>
-		<xsl:value-of select="@name"/>
-		<xsl:text>] (
+  <xsl:for-each select="table">
+    <xsl:text>CREATE TABLE </xsl:text><xsl:call-template name="qualified"><xsl:with-param name="schema" select="@schema"/><xsl:with-param name="name" select="@name"/></xsl:call-template><xsl:text> (
 </xsl:text>
-		<xsl:for-each select="row">
-			<xsl:text>  [</xsl:text>
-			<xsl:value-of select="@name"/>
-			<xsl:text>] </xsl:text>
-
-			<xsl:value-of select="datatype"/>
-			<xsl:text> </xsl:text>
-
-			<xsl:if test="@null = 0">
-				<xsl:text>NOT NULL </xsl:text>
-			</xsl:if>
-
-			<xsl:if test="@autoincrement = 1">
-				<xsl:text>IDENTITY (1, 1) </xsl:text>
-			</xsl:if>
-
-			<xsl:if test="not (position()=last())">
-				<xsl:text>,</xsl:text>
-			</xsl:if>
-
-			<xsl:if test="comment">
-				<xsl:text> -- </xsl:text><xsl:value-of select="comment"/>
-			</xsl:if>
-
-			<xsl:if test="not (position()=last())">
-				<xsl:text>
+    <xsl:for-each select="row">
+      <xsl:text>  </xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text> </xsl:text><xsl:value-of select="datatype"/><xsl:text> </xsl:text>
+      <xsl:if test="@null=0"><xsl:text>NOT NULL </xsl:text></xsl:if><xsl:if test="@autoincrement=1"><xsl:text>IDENTITY (1, 1) </xsl:text></xsl:if><xsl:if test="position()!=last() or ../key[@type='PRIMARY' or @type='FULLTEXT' or @type='UNIQUE']"><xsl:text>,</xsl:text></xsl:if><xsl:text>
 </xsl:text>
-			</xsl:if>
-		</xsl:for-each>
-
-		
-		<xsl:for-each select="key">
-			<xsl:if test="@type = 'PRIMARY' or @type = 'FULLTEXT' or @type = 'UNIQUE'"> 
-				<xsl:text>, 
+    </xsl:for-each>
+    <xsl:for-each select="key[@type='PRIMARY' or @type='FULLTEXT' or @type='UNIQUE']">
+      <xsl:text>  </xsl:text><xsl:if test="@name!=''"><xsl:text>CONSTRAINT </xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text> </xsl:text></xsl:if>
+      <xsl:choose><xsl:when test="@type='PRIMARY'">PRIMARY KEY (</xsl:when><xsl:when test="@type='FULLTEXT'">FULLTEXT KEY (</xsl:when><xsl:otherwise>UNIQUE KEY (</xsl:otherwise></xsl:choose>
+      <xsl:for-each select="part"><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="."/></xsl:call-template><xsl:if test="position()!=last()">, </xsl:if></xsl:for-each><xsl:text>)</xsl:text><xsl:if test="position()!=last()">,</xsl:if><xsl:text>
 </xsl:text>
-				
-				<xsl:if test="not (@name='')"> 
-					<xsl:text>CONSTRAINT </xsl:text>
-					<xsl:value-of select="@name"/> 
-				</xsl:if>
-				<xsl:choose>
-					<xsl:when test="@type = 'PRIMARY'"> PRIMARY KEY (</xsl:when>
-					<xsl:when test="@type = 'FULLTEXT'"> FULLTEXT KEY (</xsl:when>
-					<xsl:when test="@type = 'UNIQUE'"> UNIQUE KEY (</xsl:when>
-				<!--	<xsl:otherwise>KEY (</xsl:otherwise> --> <!-- No otherwise for MSSQL -->
-				</xsl:choose>
-				
-				<!-- MSSQL only recognises these 'key' types -->
-
-				
-					<xsl:for-each select="part">
-						<xsl:text>[</xsl:text><xsl:value-of select="."/><xsl:text>]</xsl:text>
-						<xsl:if test="not (position() = last())">
-							<xsl:text>, </xsl:text>
-						</xsl:if>
-					</xsl:for-each>
-					<xsl:text>)</xsl:text>
-			</xsl:if>
-			
-			
-		</xsl:for-each>
-		
-		
-		
-		
-		<xsl:text>
-) ON [PRIMARY]
+    </xsl:for-each>
+    <xsl:text>) ON [PRIMARY];
 GO
 
 </xsl:text>
+  </xsl:for-each>
+  <xsl:for-each select="table/row/relation">
+    <xsl:text>ALTER TABLE </xsl:text><xsl:call-template name="qualified"><xsl:with-param name="schema" select="../../@schema"/><xsl:with-param name="name" select="../../@name"/></xsl:call-template><xsl:text> ADD FOREIGN KEY (</xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="../@name"/></xsl:call-template><xsl:text>) REFERENCES </xsl:text><xsl:call-template name="qualified"><xsl:with-param name="schema" select="@schema"/><xsl:with-param name="name" select="@table"/></xsl:call-template><xsl:text> (</xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="@row"/></xsl:call-template><xsl:text>);
+GO
 
-	</xsl:for-each>	
-<!-- fk -->
-	<xsl:for-each select="table">
-		<xsl:for-each select="row">
-			<xsl:for-each select="relation">
-				<xsl:text>ALTER TABLE [</xsl:text>
-				<xsl:value-of select="../../@name"/>
-				<xsl:text>] ADD FOREIGN KEY (</xsl:text>
-				<xsl:value-of select="../@name"/>
-				<xsl:text>) REFERENCES [</xsl:text>
-				<xsl:value-of select="@table"/>
-				<xsl:text>] ([</xsl:text>
-				<xsl:value-of select="@row"/>
-				<xsl:text>]);
-				
 </xsl:text>
-			</xsl:for-each>
-		</xsl:for-each>
-	</xsl:for-each>
-	
-	<!-- fk -->
-	<xsl:for-each select="table">
-		<xsl:for-each select="key">
-			<xsl:if test="@type = 'INDEX'">
-				<xsl:text>CREATE INDEX </xsl:text>
-				<xsl:value-of select="@name"/>
-				<xsl:text> ON [</xsl:text>
-				<xsl:value-of select="../@name"/>
-				<xsl:text>] ([</xsl:text>
-				<xsl:for-each select="part">
-					<xsl:value-of select="."/>
-					<xsl:text>]</xsl:text>
-					<xsl:if test="not (position() = last())">
-						<xsl:text>, </xsl:text>
-					</xsl:if>
-				</xsl:for-each>
-				<xsl:text>);
+  </xsl:for-each>
+  <xsl:for-each select="table/key[@type='INDEX']">
+    <xsl:text>CREATE INDEX </xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text> ON </xsl:text><xsl:call-template name="qualified"><xsl:with-param name="schema" select="../@schema"/><xsl:with-param name="name" select="../@name"/></xsl:call-template><xsl:text> (</xsl:text><xsl:for-each select="part"><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="."/></xsl:call-template><xsl:if test="position()!=last()">, </xsl:if></xsl:for-each><xsl:text>);
+GO
 </xsl:text>
-			</xsl:if>
-		</xsl:for-each>
-	</xsl:for-each>
-
-
+  </xsl:for-each>
+  <xsl:for-each select="table[normalize-space(comment)!='']">
+    <xsl:text>EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
+GO
+</xsl:text>
+  </xsl:for-each>
+  <xsl:for-each select="table/row[normalize-space(comment)!='']">
+    <xsl:text>EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@name"/></xsl:call-template><xsl:text>, @level2type=N'COLUMN', @level2name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
+GO
+</xsl:text>
+  </xsl:for-each>
 </xsl:template>
 </xsl:stylesheet>

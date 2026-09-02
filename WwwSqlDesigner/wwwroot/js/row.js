@@ -396,7 +396,11 @@ SQL.Row.prototype.toXML = function () {
     }
     for (let relation of this.relations) {
         if (relation.row2 !== this) { continue; }
-        xml += '<relation table="' + relation.row1.owner.getTitle() + '" row="' + relation.row1.getTitle() + (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
+        const target = relation.row1.owner;
+        xml += '<relation table="' + SQL.escape(target.getTitle()).replace(/"/g, "&quot;") +
+            '" schema="' + SQL.escape(target.getSchema()).replace(/"/g, "&quot;") +
+            '" row="' + SQL.escape(relation.row1.getTitle()).replace(/"/g, "&quot;") +
+            (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
     }
     if (this.data.comment) { xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n"; }
     return xml + "</row>\n";

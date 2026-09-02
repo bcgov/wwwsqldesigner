@@ -7,6 +7,66 @@ async function load(page, xml) {
 
 const tokens = ["integer", "decimal(10,2)", "float", "string(100)", "text", "boolean", "date", "time", "datetime", "datetime-with-time-zone", "binary(16)", "uuid", "json", "xml"];
 
+test("round-trips legacy schemas and resolves same names by schema", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><datatypes db="portable"/>
+      <table name="Item"><row name="Id" null="0"><datatype>integer</datatype></row></table>
+      <table name="Item" schema=" archive "><row name="Id" null="0"><datatype>integer</datatype></row></table>
+      <table name="Link"><row name="ItemId" null="0"><datatype>integer</datatype><relation table="Item" schema="archive" row="Id"/></row></table>
+    </sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain('name="Item" schema="dbo"');
+    expect(saved).toContain('name="Item" schema="archive"');
+    expect(saved).toContain('table="Item" schema="archive" row="Id"');
+    expect(await page.evaluate(() => d.relations[0].row1.owner.getSchema())).toBe("archive");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("rejects duplicate and unresolved schema identities transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><datatypes db="portable"/><table name="Keep"><row name="Id" null="0"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<sql><table name=" Orders " schema="Sales"/><table name="orders" schema=" sales "/></sql>`,
+        `<sql><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Missing" row="Id"/></row></table></sql>`,
+        `<sql><table name="Target"><row name="Id"><datatype>integer</datatype></row></table><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Target" row="Missing"/></row></table></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("table editor validates schema identity and defaults blanks to dbo", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="Two" schema="dbo"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await expect(page.getByLabel("Schema")).toHaveValue("sales");
+    await page.locator("#tablename").fill("Two");
+    await page.locator("#tableschema").fill("DBO");
+    expect(await page.evaluate(() => d.tableManager.save())).toBe(false);
+    expect(await page.evaluate(() => [d.tables[0].getTitle(), d.tables[0].getSchema()])).toEqual(["One", "sales"]);
+    await page.locator("#tablename").fill("One");
+    await page.locator("#tableschema").fill(" ");
+    expect(await page.evaluate(() => d.tableManager.save())).toBeUndefined();
+    expect(await page.evaluate(() => d.tables[0].getSchema())).toBe("dbo");
+});
+
+test("metadata diagnostics and EF ZIP splitting preserve canonical XML", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Id"><datatype>integer</datatype><comment>{ public class Fake { } }</comment></row><comment>description</comment></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    await page.evaluate(() => d.io.getSafeExportXml("sqlite"));
+    await expect(page.locator("#iostatus")).toContainText("schema metadata");
+    await expect(page.locator("#iostatus")).toContainText("descriptions");
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+    const files = await page.evaluate(() => d.io.createEfZipFiles(
+        `namespace N\n{\npublic class Item { public string Text { get; set; } = "{ public class Fake { } }"; }\npublic class Context { /* } */ }\n}`, "Context", 1));
+    expect(files.map((file) => file.name)).toEqual(["Context.cs", "Item.cs"]);
+});
+
 test("round-trips every canonical portable token and facet", async ({ page }) => {
     await page.goto("/");
     const rows = tokens.map((token, index) => `<row name="C${index}" null="1"><datatype>${token}</datatype><default>value</default><comment>note</comment></row>`).join("");

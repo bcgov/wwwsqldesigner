@@ -23,6 +23,7 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
         {
 </xsl:text>
         <xsl:apply-templates select="table" mode="key" />
+        <xsl:apply-templates select="table" mode="mapping" />
         <xsl:apply-templates select="table/row/relation" mode="relation" />
         <xsl:text>        }
     }
@@ -85,6 +86,15 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
         <xsl:apply-templates select="key[@type = 'PRIMARY']" mode="key" />
     </xsl:template>
 
+    <xsl:template match="table" mode="mapping">
+        <xsl:text>        modelBuilder.Entity&lt;</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="@name"/><xsl:with-param name="node" select="."/></xsl:call-template><xsl:text>&gt;().ToTable("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>", "</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="@schema"/></xsl:call-template><xsl:text>")</xsl:text><xsl:if test="normalize-space(comment)!=''"><xsl:text>.HasComment("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:text>;
+</xsl:text>
+        <xsl:for-each select="row[normalize-space(comment)!='']">
+            <xsl:text>        modelBuilder.Entity&lt;</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="../@name"/><xsl:with-param name="node" select=".."/></xsl:call-template><xsl:text>&gt;().Property(e =&gt; e.</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="@name"/><xsl:with-param name="node" select="."/></xsl:call-template><xsl:text>).HasComment("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>");
+</xsl:text>
+        </xsl:for-each>
+    </xsl:template>
+
     <xsl:template match="key" mode="key">
         <xsl:variable name="table" select=".." />
         <xsl:text>        modelBuilder.Entity&lt;</xsl:text>
@@ -103,7 +113,8 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
     <xsl:template match="relation" mode="relation">
         <xsl:variable name="sourceTable" select="ancestor::table" />
         <xsl:variable name="targetName" select="@table" />
-        <xsl:variable name="targetTable" select="/sql/table[@name = $targetName]" />
+        <xsl:variable name="targetSchema" select="@schema" />
+        <xsl:variable name="targetTable" select="/sql/table[@name = $targetName and @schema = $targetSchema]" />
         <xsl:variable name="principalName" select="@row" />
         <xsl:text>        modelBuilder.Entity&lt;</xsl:text>
         <xsl:call-template name="identifier"><xsl:with-param name="name" select="$sourceTable/@name" /><xsl:with-param name="node" select="$sourceTable" /></xsl:call-template>
@@ -115,6 +126,22 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
         <xsl:call-template name="identifier"><xsl:with-param name="name" select="$principalName" /><xsl:with-param name="node" select="$targetTable/row[@name = $principalName]" /></xsl:call-template>
         <xsl:text>);
 </xsl:text>
+    </xsl:template>
+
+    <xsl:template name="csharp-string">
+        <xsl:param name="value"/>
+        <xsl:if test="string-length($value)&gt;0">
+            <xsl:variable name="char" select="substring($value,1,1)"/>
+            <xsl:choose>
+                <xsl:when test="$char='\'"><xsl:text>\\</xsl:text></xsl:when>
+                <xsl:when test="$char='&quot;'"><xsl:text>\&quot;</xsl:text></xsl:when>
+                <xsl:when test="$char='&#13;'"><xsl:text>\r</xsl:text></xsl:when>
+                <xsl:when test="$char='&#10;'"><xsl:text>\n</xsl:text></xsl:when>
+                <xsl:when test="$char='&#9;'"><xsl:text>\t</xsl:text></xsl:when>
+                <xsl:otherwise><xsl:value-of select="$char"/></xsl:otherwise>
+            </xsl:choose>
+            <xsl:call-template name="csharp-string"><xsl:with-param name="value" select="substring($value,2)"/></xsl:call-template>
+        </xsl:if>
     </xsl:template>
 
     <xsl:template name="identifier">

@@ -5,6 +5,7 @@ SQL.TableManager = function (owner) {
     this.dom = {
         container: SQL.dom.get("table"),
         name: SQL.dom.get("tablename"),
+        schema: SQL.dom.get("tableschema"),
         comment: SQL.dom.get("tablecomment"),
     };
     this.selection = [];
@@ -25,7 +26,7 @@ SQL.TableManager = function (owner) {
         elm.value = _(id);
     }
 
-    ids = ["tablenamelabel", "tablecommentlabel"];
+    ids = ["tablenamelabel", "tableschemalabel", "tablecommentlabel"];
     for (let id of ids) {
         const elm = SQL.dom.get(id);
         elm.innerHTML = _(id);
@@ -48,6 +49,8 @@ SQL.TableManager = function (owner) {
     SQL.events.add(this.dom.edittable, "click", this.edit.bind(this));
     SQL.events.add(this.dom.tablekeys, "click", this.keys.bind(this));
     SQL.events.add(document, "keydown", this.press.bind(this));
+    SQL.events.add(this.dom.schema, "input", () => this.dom.schema.setCustomValidity(""));
+    SQL.events.add(this.dom.name, "input", () => this.dom.schema.setCustomValidity(""));
 
     this.dom.container.parentNode.removeChild(this.dom.container);
 };
@@ -203,6 +206,8 @@ SQL.TableManager.prototype.edit = function (e) {
 
     const title = this.selection[0].getTitle();
     this.dom.name.value = title;
+    this.dom.schema.value = this.selection[0].getSchema();
+    this.dom.schema.setCustomValidity("");
     try {
         /* throws in ie6 */
         this.dom.comment.value = this.selection[0].getComment();
@@ -219,8 +224,20 @@ SQL.TableManager.prototype.keys = function (e) {
 };
 
 SQL.TableManager.prototype.save = function () {
-    this.selection[0].setTitle(this.dom.name.value);
-    this.selection[0].setComment(this.dom.comment.value);
+    const selected = this.selection[0];
+    const schema = SQL.Designer.effectiveSchema(this.dom.schema.value);
+    const identity = SQL.Designer.tableIdentity(schema, this.dom.name.value);
+    const duplicate = this.owner.tables.some((table) => table !== selected &&
+        SQL.Designer.tableIdentity(table.getSchema(), table.getTitle()) === identity);
+    if (duplicate) {
+        this.dom.schema.setCustomValidity("A table with this schema and name already exists.");
+        this.dom.schema.reportValidity();
+        return false;
+    }
+    this.dom.schema.setCustomValidity("");
+    selected.setSchema(schema);
+    selected.setTitle(this.dom.name.value);
+    selected.setComment(this.dom.comment.value);
 };
 
 SQL.TableManager.prototype.press = function (e) {

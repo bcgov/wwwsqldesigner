@@ -10,6 +10,7 @@ SQL.Table = function (owner, name, x, y, z) {
     this.selected = false;
     SQL.Visual.apply(this);
     this.data.comment = "";
+    this.schema = SQL.Designer.effectiveSchema();
 
     this.setTitle(name);
     this.x = x || 0;
@@ -273,9 +274,10 @@ SQL.Table.prototype.down = function (e) {
 };
 
 SQL.Table.prototype.toXML = function () {
-    const t = this.getTitle().replace(/"/g, "&quot;");
+    const t = SQL.escape(this.getTitle()).replace(/"/g, "&quot;");
+    const schema = SQL.escape(this.getSchema()).replace(/"/g, "&quot;");
     let xml = "";
-    xml += '<table x="' + this.x + '" y="' + this.y + '" name="' + t + '">\n';
+    xml += '<table x="' + this.x + '" y="' + this.y + '" name="' + t + '" schema="' + schema + '">\n';
     for (let row of this.rows) {
         xml += row.toXML();
     }
@@ -291,6 +293,7 @@ SQL.Table.prototype.toXML = function () {
 };
 
 SQL.Table.prototype.fromXML = function (node) {
+    this.setSchema(node.getAttribute("schema"));
     const name = node.getAttribute("name");
     this.setTitle(name);
     const x = parseInt(node.getAttribute("x")) || 0;
@@ -314,6 +317,14 @@ SQL.Table.prototype.fromXML = function (node) {
             this.setComment(ch.firstChild.nodeValue);
         }
     }
+};
+
+SQL.Table.prototype.getSchema = function () {
+    return this.schema;
+};
+
+SQL.Table.prototype.setSchema = function (schema) {
+    this.schema = SQL.Designer.effectiveSchema(schema);
 };
 
 SQL.Table.prototype.getZ = function () {

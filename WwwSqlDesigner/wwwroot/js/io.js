@@ -342,7 +342,12 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
         alert(_("xmlerror") + ": Null document");
         return false;
     }
-    if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
+    try {
+        if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
+    } catch (e) {
+        alert(_("xmlerror") + ": " + e.message);
+        return false;
+    }
     /* Keep the pane open when conversion warnings need to be read. */
     this.owner.window.close();
     return true;
@@ -629,6 +634,15 @@ SQL.IO.prototype.getExportXml = function (target) {
     }
     const datatypes = doc.querySelector("sql > datatypes");
     if (datatypes) { datatypes.setAttribute("db", target); }
+    const supportsMetadata = target === "mssql" || target === "ef";
+    if (!supportsMetadata && Array.from(doc.querySelectorAll("sql > table")).some((table) =>
+        SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
+        diagnostics.push(target + " export omits non-default schema metadata.");
+    }
+    if (!supportsMetadata && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
+        comment.textContent.trim() !== "")) {
+        diagnostics.push(target + " export omits table and column descriptions.");
+    }
     return { xml: new XMLSerializer().serializeToString(doc), diagnostics: diagnostics, safe: safe };
 };
 
@@ -779,9 +793,31 @@ SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
     while ((match = classPattern.exec(source))) {
         let depth = 0;
         let end = match.index + match[0].length - 1;
+        let state = "code";
+        let escaped = false;
         for (; end < source.length; end++) {
-            if (source[end] === "{") { depth++; }
-            if (source[end] === "}" && --depth === 0) { break; }
+            const current = source[end];
+            const next = source[end + 1];
+            if (state === "line") {
+                if (current === "\n") { state = "code"; }
+                continue;
+            }
+            if (state === "block") {
+                if (current === "*" && next === "/") { state = "code"; end++; }
+                continue;
+            }
+            if (state === "string" || state === "char") {
+                if (escaped) { escaped = false; continue; }
+                if (current === "\\") { escaped = true; continue; }
+                if ((state === "string" && current === '"') || (state === "char" && current === "'")) { state = "code"; }
+                continue;
+            }
+            if (current === "/" && next === "/") { state = "line"; end++; continue; }
+            if (current === "/" && next === "*") { state = "block"; end++; continue; }
+            if (current === '"') { state = "string"; continue; }
+            if (current === "'") { state = "char"; continue; }
+            if (current === "{") { depth++; }
+            if (current === "}" && --depth === 0) { break; }
         }
         if (depth !== 0) {
             throw new Error("Unable to separate generated classes.");

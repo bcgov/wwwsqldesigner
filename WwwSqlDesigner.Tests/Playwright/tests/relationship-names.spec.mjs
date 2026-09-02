@@ -162,7 +162,7 @@ test("relationship labels render in non-SVG mode and do not affect exports", asy
 
     await loadModel(page, unnamedModel.replace('row="Id" />', 'row="Id" name="has" />'));
     const namedSql = await exportDownload(page, "mssql");
-    expect(namedSql.toString()).toContain("ALTER TABLE [Child] ADD FOREIGN KEY (ParentId) REFERENCES [Parent] ([Id])");
+    expect(namedSql.toString()).toContain("ALTER TABLE [dbo].[Child] ADD FOREIGN KEY ([ParentId]) REFERENCES [dbo].[Parent] ([Id])");
     expect(namedSql).toEqual(unnamedSql);
     await page.evaluate(() => d.window.close());
     const namedEf = await exportEfSources(page);

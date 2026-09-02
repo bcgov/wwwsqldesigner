@@ -33,6 +33,15 @@ SQL.Designer = function () {
     this.applyStyle();
 };
 SQL.Designer.prototype = Object.create(SQL.Visual.prototype);
+SQL.Designer.prototype.DEFAULT_SCHEMA = "dbo";
+SQL.Designer.prototype.effectiveSchema = function (value) {
+    const schema = value == null ? "" : String(value).trim();
+    return schema || SQL.Designer.DEFAULT_SCHEMA;
+};
+SQL.Designer.prototype.tableIdentity = function (schema, tableName) {
+    return SQL.Designer.effectiveSchema(schema).toLowerCase() + "\u0000" +
+        String(tableName == null ? "" : tableName).trim().toLowerCase();
+};
 
 /* update area size */
 SQL.Designer.prototype.sync = function () {
@@ -339,13 +348,11 @@ SQL.Designer.prototype.alignTables = function () {
     this.sync();
 };
 
-SQL.Designer.prototype.findNamedTable = function (name) {
-    /* find row specified as table(row) */
-    for (let table of this.tables) {
-        if (table.getTitle() == name) {
-            return table;
-        }
-    }
+SQL.Designer.prototype.findTable = function (schema, name) {
+    const identity = SQL.Designer.tableIdentity(schema, name);
+    const matches = this.tables.filter((table) =>
+        SQL.Designer.tableIdentity(table.getSchema(), table.getTitle()) === identity);
+    return matches.length === 1 ? matches[0] : undefined;
 };
 
 SQL.Designer.prototype.toXML = function (recordSave) {
@@ -382,8 +389,47 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
     copy.setAttribute("format", SQL.PortableTypes.format);
     return { node: copy, diagnostics: diagnostics };
 };
+SQL.Designer.prototype.validatePortableImport = function (prepared) {
+    const portable = prepared.node;
+    const tables = Array.from(portable.children).filter((child) =>
+        child.tagName && child.tagName.toLowerCase() === "table");
+    const identities = new Map();
+    for (const table of tables) {
+        const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
+        table.setAttribute("schema", schema);
+        const identity = SQL.Designer.tableIdentity(schema, table.getAttribute("name"));
+        if (identities.has(identity)) {
+            throw new Error("Duplicate table identity: [" + schema + "].[" + table.getAttribute("name") + "].");
+        }
+        identities.set(identity, table);
+    }
+    for (const sourceTable of tables) {
+        const rows = Array.from(sourceTable.children).filter((child) =>
+            child.tagName && child.tagName.toLowerCase() === "row");
+        for (const sourceRow of rows) {
+            const relations = Array.from(sourceRow.children).filter((child) =>
+                child.tagName && child.tagName.toLowerCase() === "relation");
+            for (const relation of relations) {
+                const schema = SQL.Designer.effectiveSchema(relation.getAttribute("schema"));
+                relation.setAttribute("schema", schema);
+                const target = identities.get(SQL.Designer.tableIdentity(schema, relation.getAttribute("table")));
+                if (!target) {
+                    throw new Error("Relationship target table not found: [" + schema + "].[" + relation.getAttribute("table") + "].");
+                }
+                const targetRows = Array.from(target.children).filter((child) =>
+                    child.tagName && child.tagName.toLowerCase() === "row" &&
+                    child.getAttribute("name") === relation.getAttribute("row"));
+                if (targetRows.length !== 1) {
+                    throw new Error("Relationship target row not found: [" + schema + "].[" +
+                        target.getAttribute("name") + "].[" + relation.getAttribute("row") + "].");
+                }
+            }
+        }
+    }
+    return prepared;
+};
 SQL.Designer.prototype.fromXML = function (node) {
-    const prepared = this.preparePortableImport(node);
+    const prepared = this.validatePortableImport(this.preparePortableImport(node));
     const portable = prepared.node;
     this.clearTables();
     window.DATATYPES = SQL.PortableTypes.registry();
@@ -396,9 +442,9 @@ SQL.Designer.prototype.fromXML = function (node) {
     for (let table of this.tables) { table.select(); table.deselect(); }
     const rs = portable.getElementsByTagName("relation");
     for (let rel of rs) {
-        let t1 = this.findNamedTable(rel.getAttribute("table"));
+        let t1 = this.findTable(rel.getAttribute("schema"), rel.getAttribute("table"));
         let r1 = t1 && t1.findNamedRow(rel.getAttribute("row"));
-        let t2 = this.findNamedTable(rel.parentNode.parentNode.getAttribute("name"));
+        let t2 = this.findTable(rel.parentNode.parentNode.getAttribute("schema"), rel.parentNode.parentNode.getAttribute("name"));
         let r2 = t2 && t2.findNamedRow(rel.parentNode.getAttribute("name"));
         if (r1 && r2) { const relation = this.addRelation(r1, r2); relation.name = rel.getAttribute("name") || ""; relation.redraw(); }
     }

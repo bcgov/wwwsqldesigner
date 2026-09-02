@@ -11,6 +11,7 @@
     <string name="newtable">new table</string>
     <string name="addpending">place table</string>
     <string name="tablenamelabel">Name</string>
+    <string name="tableschemalabel">Schema</string>
     <string name="tablecommentlabel">Comment</string>
 
     <!-- row management -->

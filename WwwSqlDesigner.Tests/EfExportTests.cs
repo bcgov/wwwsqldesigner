@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Security;
 using System.Xml;
 using System.Xml.Xsl;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -137,6 +139,137 @@ public class EfExportTests
 
         StringAssert.Contains(generated, "public class ExampleContext_2");
         StringAssert.Contains(generated, "public class ExampleContext : DbContext");
+    }
+
+    [TestMethod]
+    public void EfExportMapsSchemasCommentsAndSameNamedRelationships()
+    {
+        var generated = Transform("""
+            <sql><datatypes db="mssql"/>
+              <table name="Item" schema="sales"><row name="Id" null="0"><datatype>int</datatype><comment>id "quoted" \ path { public class Fake { } }</comment></row><comment>表
+            comment</comment></table>
+              <table name="Item" schema="archive"><row name="Id" null="0"><datatype>int</datatype></row></table>
+              <table name="Link" schema="dbo"><row name="ArchiveId" null="0"><datatype>int</datatype><relation table="Item" schema="archive" row="Id"/></row></table>
+            </sql>
+            """);
+
+        StringAssert.Contains(generated, "public class Item_2");
+        StringAssert.Contains(generated, "ToTable(\"Item\", \"sales\").HasComment(\"表\\r\\n");
+        StringAssert.Contains(generated, "Property(e => e.Id).HasComment(\"id \\\"quoted\\\" \\\\ path { public class Fake { } }\")");
+        StringAssert.Contains(generated, "HasOne<Item_2>()");
+    }
+
+    [TestMethod]
+    public void GeneratedHostileCommentsCompileAndProduceSqlServerDescriptionMigrations()
+    {
+        var generated = Transform("""
+            <sql><datatypes db="mssql"/>
+              <table name="Order's Table" schema="sales">
+                <row name="Id" null="0"><datatype>int</datatype></row>
+                <row name="ValueColumn" null="0"><datatype>nvarchar(100)</datatype><comment>列's "column" \ path&#13;&#10;{ class AlsoFake { } }</comment></row>
+                <key type="PRIMARY"><part>Id</part></key>
+                <comment>表's "table" \ path&#13;&#10;{ public class Fake { } }</comment>
+              </table>
+            </sql>
+            """, GeneratedContextParameters());
+        var projectDirectory = Path.Combine(Path.GetTempPath(), $"wwwsqldesigner-ef-export-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(projectDirectory);
+            var applicationProject = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../WwwSqlDesigner/WwwSqlDesigner.csproj"));
+            File.WriteAllText(Path.Combine(projectDirectory, "GeneratedMigrationProof.csproj"), $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <OutputType>Exe</OutputType>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <Nullable>enable</Nullable>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <ProjectReference Include="{SecurityElement.Escape(applicationProject)}" />
+                  </ItemGroup>
+                </Project>
+                """);
+            File.WriteAllText(Path.Combine(projectDirectory, "Program.cs"), generated + """
+
+                namespace GeneratedMigrationProof
+                {
+                    using System.Linq;
+                    using Microsoft.EntityFrameworkCore;
+                    using Microsoft.EntityFrameworkCore.Infrastructure;
+                    using Microsoft.EntityFrameworkCore.Metadata;
+                    using Microsoft.EntityFrameworkCore.Migrations;
+                    using Microsoft.EntityFrameworkCore.Migrations.Operations;
+                    using Microsoft.EntityFrameworkCore.Storage;
+                    using Testing.Generated;
+
+                    internal static class Program
+                    {
+                        private static void Main()
+                        {
+                            System.Console.OutputEncoding = System.Text.Encoding.UTF8;
+                            var options = new DbContextOptionsBuilder<GeneratedContext>()
+                                .UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=GeneratedMigrationProof;Trusted_Connection=True")
+                                .Options;
+                            using var context = new GeneratedContext(options);
+                            var model = context.GetService<IDesignTimeModel>().Model;
+                            var operations = context.GetService<IMigrationsModelDiffer>()
+                                .GetDifferences(null, model.GetRelationalModel());
+                            var commands = context.GetService<IMigrationsSqlGenerator>()
+                                .Generate(operations, model);
+                            System.Console.Write(string.Join("\n", commands.Select(command => command.CommandText)));
+                        }
+                    }
+                }
+                """);
+
+            var result = RunDotNet(projectDirectory);
+
+            Assert.AreEqual(0, result.ExitCode, $"Generated EF source did not compile/run.{Environment.NewLine}{result.Output}");
+            StringAssert.Contains(result.Output, "MS_Description");
+            StringAssert.Contains(result.Output, "'SCHEMA', N'sales', 'TABLE', N'Order''s Table';");
+            StringAssert.Contains(result.Output, "'SCHEMA', N'sales', 'TABLE', N'Order''s Table', 'COLUMN', N'ValueColumn';");
+            StringAssert.Contains(result.Output, "N'表''s \"table\" \\ path'");
+            StringAssert.Contains(result.Output, "N'列''s \"column\" \\ path'");
+            StringAssert.Contains(result.Output, "NCHAR(13), NCHAR(10)");
+            StringAssert.Contains(result.Output, "N'{ public class Fake { } }'");
+            StringAssert.Contains(result.Output, "N'{ class AlsoFake { } }'");
+        }
+        finally
+        {
+            if (Directory.Exists(projectDirectory))
+            {
+                Directory.Delete(projectDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static XsltArgumentList GeneratedContextParameters()
+    {
+        var parameters = new XsltArgumentList();
+        parameters.AddParam("namespace", "", "Testing.Generated");
+        parameters.AddParam("context", "", "GeneratedContext");
+        return parameters;
+    }
+
+    private static (int ExitCode, string Output) RunDotNet(string projectDirectory)
+    {
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = "run --project GeneratedMigrationProof.csproj --configuration Release",
+            WorkingDirectory = projectDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        }) ?? throw new AssertFailedException("Could not start the .NET SDK.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        return (process.ExitCode, standardOutput.GetAwaiter().GetResult() + standardError.GetAwaiter().GetResult());
     }
 
     [TestMethod]
