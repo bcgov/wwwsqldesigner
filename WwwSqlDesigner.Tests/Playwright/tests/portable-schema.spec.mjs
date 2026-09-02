@@ -38,6 +38,41 @@ test("rejects duplicate and unresolved schema identities transactionally", async
     }
 });
 
+test("validates exact row names and key parts transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<sql><table name="T"><row name=""><datatype>integer</datatype></row></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"/></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part></part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>id</part></key></table></sql>`,
+        `<sql><table name="T"><row name=" Id "><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table></sql>`,
+        `<sql><table name="Target"><row name="Id"><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row></table><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Target" row="Id"/></row></table></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("preserves exact row names and composite key order", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Exact"><row name=" Id "><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part><part> Id </part></key></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    const names = await page.evaluate((xml) => {
+        const table = new DOMParser().parseFromString(xml, "text/xml").querySelector("table");
+        return {
+            rows: Array.from(table.children).filter((child) => child.tagName === "row").map((row) => row.getAttribute("name")),
+            parts: Array.from(table.querySelector("key").children).map((part) => part.textContent),
+        };
+    }, saved);
+    expect(names).toEqual({ rows: [" Id ", "Id"], parts: ["Id", " Id "] });
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
 test("rejects misplaced and duplicate known elements without changing the diagram", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);

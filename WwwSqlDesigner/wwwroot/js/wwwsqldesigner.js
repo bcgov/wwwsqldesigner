@@ -426,6 +426,7 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
     }
     const tables = SQL.Designer.directChildren(portable, "table");
     const identities = new Map();
+    const rowMaps = new Map();
     for (const table of tables) {
         const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
         table.setAttribute("schema", schema);
@@ -434,6 +435,33 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
             throw new Error("Duplicate table identity: [" + schema + "].[" + table.getAttribute("name") + "].");
         }
         identities.set(identity, table);
+        const rows = new Map();
+        for (const row of SQL.Designer.directChildren(table, "row")) {
+            const name = row.getAttribute("name") || "";
+            if (!name.length) {
+                throw new Error("Row name cannot be empty.");
+            }
+            if (rows.has(name)) {
+                throw new Error("Duplicate row name: " + name + ".");
+            }
+            rows.set(name, row);
+        }
+        rowMaps.set(table, rows);
+        for (const key of SQL.Designer.directChildren(table, "key")) {
+            const parts = SQL.Designer.directChildren(key, "part");
+            if (!parts.length) {
+                throw new Error("Key must contain at least one part.");
+            }
+            for (const part of parts) {
+                const name = part.textContent;
+                if (!name.length) {
+                    throw new Error("Key part cannot be empty.");
+                }
+                if (!rows.has(name)) {
+                    throw new Error("Key part row not found: " + name + ".");
+                }
+            }
+        }
     }
     for (const sourceTable of tables) {
         const rows = SQL.Designer.directChildren(sourceTable, "row");
@@ -446,9 +474,7 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
                 if (!target) {
                     throw new Error("Relationship target table not found: [" + schema + "].[" + relation.getAttribute("table") + "].");
                 }
-                const targetRows = SQL.Designer.directChildren(target, "row").filter((child) =>
-                    child.getAttribute("name") === relation.getAttribute("row"));
-                if (targetRows.length !== 1) {
+                if (!rowMaps.get(target).has(relation.getAttribute("row"))) {
                     throw new Error("Relationship target row not found: [" + schema + "].[" +
                         target.getAttribute("name") + "].[" + relation.getAttribute("row") + "].");
                 }

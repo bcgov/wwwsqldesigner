@@ -166,12 +166,16 @@ public class EfExportTests
             <sql><datatypes db="mssql"/>
               <table name="Order's Table" schema="sales">
                 <row name="Id" null="0"><datatype>int</datatype></row>
-                <row name="ValueColumn" null="0"><datatype>nvarchar(100)</datatype><comment>列's "column" \ path&#13;&#10;{ class AlsoFake { } }</comment></row>
+                <row name="ValueColumn" null="0"><datatype>nvarchar(100)</datatype><comment>列's "column" \ path&#13;&#10;{ class AlsoFake { } }&#133;&#8232;&#8233;</comment></row>
                 <key type="PRIMARY"><part>Id</part></key>
-                <comment>表's "table" \ path&#13;&#10;{ public class Fake { } }</comment>
+                <comment>表's "table" \ path&#13;&#10;{ public class Fake { } }&#133;&#8232;&#8233;</comment>
               </table>
             </sql>
             """, GeneratedContextParameters());
+        StringAssert.Contains(generated, "\\u0085\\u2028\\u2029");
+        Assert.IsFalse(generated.Contains('\u0085'));
+        Assert.IsFalse(generated.Contains('\u2028'));
+        Assert.IsFalse(generated.Contains('\u2029'));
         var projectDirectory = Path.Combine(Path.GetTempPath(), $"wwwsqldesigner-ef-export-{Guid.NewGuid():N}");
 
         try
@@ -232,8 +236,11 @@ public class EfExportTests
             StringAssert.Contains(result.Output, "N'表''s \"table\" \\ path'");
             StringAssert.Contains(result.Output, "N'列''s \"column\" \\ path'");
             StringAssert.Contains(result.Output, "NCHAR(13), NCHAR(10)");
-            StringAssert.Contains(result.Output, "N'{ public class Fake { } }'");
-            StringAssert.Contains(result.Output, "N'{ class AlsoFake { } }'");
+            StringAssert.Contains(result.Output, "N'{ public class Fake { } }\u0085\u2028\u2029'");
+            StringAssert.Contains(result.Output, "N'{ class AlsoFake { } }\u0085\u2028\u2029'");
+            StringAssert.Contains(result.Output, "\u0085");
+            StringAssert.Contains(result.Output, "\u2028");
+            StringAssert.Contains(result.Output, "\u2029");
         }
         finally
         {

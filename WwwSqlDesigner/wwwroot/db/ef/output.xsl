@@ -138,6 +138,9 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
                 <xsl:when test="$char='&#13;'"><xsl:text>\r</xsl:text></xsl:when>
                 <xsl:when test="$char='&#10;'"><xsl:text>\n</xsl:text></xsl:when>
                 <xsl:when test="$char='&#9;'"><xsl:text>\t</xsl:text></xsl:when>
+                <xsl:when test="$char='&#133;'"><xsl:text>\u0085</xsl:text></xsl:when>
+                <xsl:when test="$char='&#8232;'"><xsl:text>\u2028</xsl:text></xsl:when>
+                <xsl:when test="$char='&#8233;'"><xsl:text>\u2029</xsl:text></xsl:when>
                 <xsl:otherwise><xsl:value-of select="$char"/></xsl:otherwise>
             </xsl:choose>
             <xsl:call-template name="csharp-string"><xsl:with-param name="value" select="substring($value,2)"/></xsl:call-template>
