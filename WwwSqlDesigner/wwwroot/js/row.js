@@ -410,7 +410,7 @@ SQL.Row.prototype.fromXML = function (node) {
     const obj = { type: 0, size: "", nll: node.getAttribute("null") === "1", ai: node.getAttribute("autoincrement") === "1" };
     const comment = node.getElementsByTagName("comment")[0];
     if (comment && comment.firstChild) { obj.comment = comment.firstChild.nodeValue; }
-    const datatype = node.getElementsByTagName("datatype")[0];
+    const datatype = SQL.Designer.directChild(node, "datatype");
     if (datatype) {
         const portable = SQL.PortableTypes.canonical(datatype.textContent);
         if (portable) {
@@ -419,7 +419,7 @@ SQL.Row.prototype.fromXML = function (node) {
             for (let i = 0; i < types.length; i++) { if (types[i].getAttribute("sql") === portable.kind) { obj.type = i; break; } }
         }
     }
-    const defaultValue = node.getElementsByTagName("default")[0];
+    const defaultValue = SQL.Designer.directChild(node, "default");
     if (defaultValue && defaultValue.firstChild) {
         obj.def = defaultValue.firstChild.nodeValue;
         const quote = window.DATATYPES.getElementsByTagName("type")[obj.type].getAttribute("quote");

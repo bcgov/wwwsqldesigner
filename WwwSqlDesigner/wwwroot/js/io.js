@@ -625,7 +625,7 @@ SQL.IO.prototype.getExportXml = function (target) {
     const diagnostics = [];
     let safe = true;
     for (const row of doc.querySelectorAll("sql > table > row")) {
-        const datatype = row.getElementsByTagName("datatype")[0];
+        const datatype = SQL.Designer.directChild(row, "datatype");
         const portable = SQL.PortableTypes.canonical(datatype ? datatype.textContent : "");
         const mapped = portable ? SQL.PortableTypes.map(portable, target) : { safe: false, diagnostics: ["Invalid portable datatype."], type: "" };
         diagnostics.push.apply(diagnostics, mapped.diagnostics);
@@ -642,6 +642,9 @@ SQL.IO.prototype.getExportXml = function (target) {
     if (!supportsMetadata && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
         comment.textContent.trim() !== "")) {
         diagnostics.push(target + " export omits table and column descriptions.");
+    }
+    if (target === "mssql" && doc.querySelector("sql > table > key[type='FULLTEXT']")) {
+        diagnostics.push("Microsoft SQL Server export omits portable FULLTEXT keys.");
     }
     return { xml: new XMLSerializer().serializeToString(doc), diagnostics: diagnostics, safe: safe };
 };

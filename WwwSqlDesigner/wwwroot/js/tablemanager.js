@@ -156,7 +156,7 @@ SQL.TableManager.prototype.click = function (e) {
     this.select(newtable);
     this.owner.rowManager.select(false);
     if (this.selection.length == 1) {
-        this.edit(e);
+        this.edit(e, newtable);
     }
 };
 
@@ -201,8 +201,14 @@ SQL.TableManager.prototype.remove = function (e) {
     }
 };
 
-SQL.TableManager.prototype.edit = function (e) {
-    this.owner.window.open(_("edittable"), this.dom.container, this.save);
+SQL.TableManager.prototype.edit = function (e, transientTable) {
+    this.transientTable = transientTable || null;
+    this.owner.window.open(_("edittable"), this.dom.container, this.save, () => {
+        if (transientTable && this.owner.tables.indexOf(transientTable) !== -1) {
+            this.owner.removeTable(transientTable);
+        }
+        this.transientTable = null;
+    });
 
     const title = this.selection[0].getTitle();
     this.dom.name.value = title;
@@ -238,6 +244,7 @@ SQL.TableManager.prototype.save = function () {
     selected.setSchema(schema);
     selected.setTitle(this.dom.name.value);
     selected.setComment(this.dom.comment.value);
+    this.transientTable = null;
 };
 
 SQL.TableManager.prototype.press = function (e) {

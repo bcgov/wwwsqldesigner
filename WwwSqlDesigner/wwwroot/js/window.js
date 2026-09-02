@@ -15,7 +15,7 @@ SQL.Window = function (owner) {
     this.dom.cancel.value = _("windowcancel");
     this.dom.throbber.alt = this.dom.throbber.title = _("throbber");
     SQL.events.add(this.dom.ok, "click", this.ok.bind(this));
-    SQL.events.add(this.dom.cancel, "click", this.close.bind(this));
+    SQL.events.add(this.dom.cancel, "click", this.cancel.bind(this));
     SQL.events.add(document, "keydown", this.key.bind(this));
 
     this.state = 0;
@@ -30,9 +30,10 @@ SQL.Window.prototype.hideThrobber = function () {
     this.dom.throbber.style.visibility = "hidden";
 };
 
-SQL.Window.prototype.open = function (title, content, callback) {
+SQL.Window.prototype.open = function (title, content, callback, cancelCallback) {
     this.state = 1;
     this.callback = callback;
+    this.cancelCallback = cancelCallback;
     while (this.dom.title.childNodes.length > 1) {
         this.dom.title.removeChild(this.dom.title.childNodes[1]);
     }
@@ -67,7 +68,7 @@ SQL.Window.prototype.key = function (e) {
         this.ok(e);
     }
     if (e.keyCode == 27) {
-        this.close();
+        this.cancel();
     }
 };
 
@@ -84,4 +85,15 @@ SQL.Window.prototype.close = function () {
     this.state = 0;
     this.dom.background.style.visibility = "hidden";
     this.dom.container.style.visibility = "hidden";
+};
+
+SQL.Window.prototype.cancel = function () {
+    if (!this.state) {
+        return;
+    }
+    const callback = this.cancelCallback;
+    this.close();
+    if (callback) {
+        callback();
+    }
 };

@@ -38,6 +38,57 @@ test("rejects duplicate and unresolved schema identities transactionally", async
     }
 });
 
+test("rejects misplaced and duplicate known elements without changing the diagram", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<unknown/>`,
+        `<sql><table name="Outer"><table name="Nested"/></table></sql>`,
+        `<sql><table name="T"><row name="A"><datatype>integer</datatype><row name="Nested"/></row></table></sql>`,
+        `<sql><table name="T"><row name="A"><datatype>integer</datatype><key type="PRIMARY"/></row></table></sql>`,
+        `<sql><table name="T"><row name="A"><datatype>integer</datatype><datatype>text</datatype></row></table></sql>`,
+        `<sql><legend/><legend/></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("new table cancel and Escape discard only the transient table", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const create = async () => {
+        await page.locator("#addtable").click();
+        await page.locator("#area").click({ position: { x: 300, y: 200 } });
+    };
+    await create();
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep"]);
+    await create();
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep"]);
+    await create();
+    await page.locator("#tablename").fill("Saved");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep", "Saved"]);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep", "Saved"]);
+});
+
+test("warns once when MSSQL omits FULLTEXT keys without mutating XML", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Search"><row name="Text"><datatype>text</datatype></row><key type="FULLTEXT" name="A"><part>Text</part></key><key type="FULLTEXT" name="B"><part>Text</part></key></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    expect(await page.evaluate(() => d.io.getSafeExportXml("mssql"))).not.toBeNull();
+    await expect(page.locator("#iostatus li")).toHaveCount(1);
+    await expect(page.locator("#iostatus")).toContainText("omits portable FULLTEXT keys");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
 test("table editor validates schema identity and defaults blanks to dbo", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="Two" schema="dbo"><row name="Id"><datatype>integer</datatype></row></table></sql>`);

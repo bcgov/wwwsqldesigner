@@ -299,12 +299,12 @@ SQL.Table.prototype.fromXML = function (node) {
     const x = parseInt(node.getAttribute("x")) || 0;
     const y = parseInt(node.getAttribute("y")) || 0;
     this.moveTo(x, y);
-    const rows = node.getElementsByTagName("row");
+    const rows = SQL.Designer.directChildren(node, "row");
     for (let row of rows) {
         const r = this.addRow("");
         r.fromXML(row);
     }
-    const keys = node.getElementsByTagName("key");
+    const keys = SQL.Designer.directChildren(node, "key");
     for (let key of keys) {
         const k = this.addKey();
         k.fromXML(key);

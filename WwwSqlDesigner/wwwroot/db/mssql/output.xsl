@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 <xsl:output method="text"/>
+<xsl:variable name="upper" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ'"/>
+<xsl:variable name="lower" select="'abcdefghijklmnopqrstuvwxyz'"/>
 
 <xsl:template name="replace">
   <xsl:param name="text"/><xsl:param name="find"/><xsl:param name="with"/>
@@ -13,19 +15,34 @@
 <xsl:template name="sql-string"><xsl:param name="value"/><xsl:call-template name="replace"><xsl:with-param name="text" select="$value"/><xsl:with-param name="find" select="&quot;'&quot;"/><xsl:with-param name="with" select="&quot;''&quot;"/></xsl:call-template></xsl:template>
 <xsl:template name="sql-unicode-literal"><xsl:param name="value"/><xsl:text>N'</xsl:text><xsl:call-template name="sql-string"><xsl:with-param name="value" select="$value"/></xsl:call-template><xsl:text>'</xsl:text></xsl:template>
 <xsl:template name="qualified"><xsl:param name="schema"/><xsl:param name="name"/><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$schema"/></xsl:call-template><xsl:text>.</xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$name"/></xsl:call-template></xsl:template>
+<xsl:template name="emit-schema">
+    <xsl:param name="schema"/>
+      <xsl:variable name="identifier"><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$schema"/></xsl:call-template></xsl:variable>
+      <xsl:text>IF SCHEMA_ID(</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="$schema"/></xsl:call-template><xsl:text>) IS NULL EXEC(N'</xsl:text><xsl:call-template name="sql-string"><xsl:with-param name="value" select="concat('CREATE SCHEMA ',string($identifier))"/></xsl:call-template><xsl:text>');
+GO
+
+</xsl:text>
+</xsl:template>
 
 <xsl:template match="/sql">
+  <xsl:for-each select="table">
+    <xsl:variable name="schema" select="normalize-space(@schema)"/>
+    <xsl:variable name="schema-lower" select="translate($schema,$upper,$lower)"/>
+    <xsl:if test="$schema!='' and $schema-lower!='dbo' and not(preceding-sibling::table[translate(normalize-space(@schema),$upper,$lower)=$schema-lower])">
+      <xsl:call-template name="emit-schema"><xsl:with-param name="schema" select="$schema"/></xsl:call-template>
+    </xsl:if>
+  </xsl:for-each>
   <xsl:for-each select="table">
     <xsl:text>CREATE TABLE </xsl:text><xsl:call-template name="qualified"><xsl:with-param name="schema" select="@schema"/><xsl:with-param name="name" select="@name"/></xsl:call-template><xsl:text> (
 </xsl:text>
     <xsl:for-each select="row">
       <xsl:text>  </xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text> </xsl:text><xsl:value-of select="datatype"/><xsl:text> </xsl:text>
-      <xsl:if test="@null=0"><xsl:text>NOT NULL </xsl:text></xsl:if><xsl:if test="@autoincrement=1"><xsl:text>IDENTITY (1, 1) </xsl:text></xsl:if><xsl:if test="position()!=last() or ../key[@type='PRIMARY' or @type='FULLTEXT' or @type='UNIQUE']"><xsl:text>,</xsl:text></xsl:if><xsl:text>
+      <xsl:if test="@null=0"><xsl:text>NOT NULL </xsl:text></xsl:if><xsl:if test="@autoincrement=1"><xsl:text>IDENTITY (1, 1) </xsl:text></xsl:if><xsl:if test="position()!=last() or ../key[@type='PRIMARY' or @type='UNIQUE']"><xsl:text>,</xsl:text></xsl:if><xsl:text>
 </xsl:text>
     </xsl:for-each>
-    <xsl:for-each select="key[@type='PRIMARY' or @type='FULLTEXT' or @type='UNIQUE']">
+    <xsl:for-each select="key[@type='PRIMARY' or @type='UNIQUE']">
       <xsl:text>  </xsl:text><xsl:if test="@name!=''"><xsl:text>CONSTRAINT </xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text> </xsl:text></xsl:if>
-      <xsl:choose><xsl:when test="@type='PRIMARY'">PRIMARY KEY (</xsl:when><xsl:when test="@type='FULLTEXT'">FULLTEXT KEY (</xsl:when><xsl:otherwise>UNIQUE KEY (</xsl:otherwise></xsl:choose>
+      <xsl:choose><xsl:when test="@type='PRIMARY'">PRIMARY KEY (</xsl:when><xsl:otherwise>UNIQUE (</xsl:otherwise></xsl:choose>
       <xsl:for-each select="part"><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="."/></xsl:call-template><xsl:if test="position()!=last()">, </xsl:if></xsl:for-each><xsl:text>)</xsl:text><xsl:if test="position()!=last()">,</xsl:if><xsl:text>
 </xsl:text>
     </xsl:for-each>

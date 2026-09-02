@@ -367,15 +367,24 @@ SQL.Designer.prototype.toXML = function (recordSave) {
     return xml;
 };
 
+SQL.Designer.prototype.directChildren = function (node, name) {
+    return Array.from(node.children || []).filter((child) =>
+        child.tagName && child.tagName.toLowerCase() === name);
+};
+SQL.Designer.prototype.directChild = function (node, name) {
+    return SQL.Designer.directChildren(node, name)[0] || null;
+};
+
 SQL.Designer.prototype.preparePortableImport = function (node) {
     const copy = node.cloneNode(true);
-    const types = copy.getElementsByTagName("datatypes");
+    const types = SQL.Designer.directChildren(copy, "datatypes");
     const currentDb = window.DATATYPES.getAttribute("db");
     const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? CONFIG.DEFAULT_DB : currentDb);
     const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
     const diagnostics = [];
-    for (const row of copy.getElementsByTagName("row")) {
-        const datatype = row.getElementsByTagName("datatype")[0];
+    for (const table of SQL.Designer.directChildren(copy, "table")) {
+      for (const row of SQL.Designer.directChildren(table, "row")) {
+        const datatype = SQL.Designer.directChild(row, "datatype");
         if (!datatype) { continue; }
         const original = datatype.textContent.trim();
         let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
@@ -385,14 +394,37 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
         }
         datatype.textContent = SQL.PortableTypes.formatToken(type);
         if (type.diagnostics) { diagnostics.push.apply(diagnostics, type.diagnostics); }
+      }
     }
     copy.setAttribute("format", SQL.PortableTypes.format);
     return { node: copy, diagnostics: diagnostics };
 };
 SQL.Designer.prototype.validatePortableImport = function (prepared) {
     const portable = prepared.node;
-    const tables = Array.from(portable.children).filter((child) =>
-        child.tagName && child.tagName.toLowerCase() === "table");
+    if (!portable.tagName || portable.tagName.toLowerCase() !== "sql") {
+        throw new Error("Invalid model root: expected sql.");
+    }
+    const allowedParents = {
+        datatypes: ["sql"], legend: ["sql"], table: ["sql"], row: ["table"],
+        key: ["table"], comment: ["table", "row"], datatype: ["row"],
+        default: ["row"], relation: ["row"], part: ["key"]
+    };
+    const singletons = { sql: ["datatypes", "legend"], table: ["comment"], row: ["datatype", "default", "comment"] };
+    for (const element of [portable].concat(Array.from(portable.querySelectorAll("*")))) {
+        const name = element.tagName.toLowerCase();
+        if (allowedParents[name]) {
+            const parentName = element.parentElement && element.parentElement.tagName.toLowerCase();
+            if (allowedParents[name].indexOf(parentName) === -1) {
+                throw new Error("Misplaced model element: " + name + ".");
+            }
+        }
+        for (const childName of singletons[name] || []) {
+            if (SQL.Designer.directChildren(element, childName).length > 1) {
+                throw new Error("Duplicate model element: " + childName + ".");
+            }
+        }
+    }
+    const tables = SQL.Designer.directChildren(portable, "table");
     const identities = new Map();
     for (const table of tables) {
         const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
@@ -404,11 +436,9 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
         identities.set(identity, table);
     }
     for (const sourceTable of tables) {
-        const rows = Array.from(sourceTable.children).filter((child) =>
-            child.tagName && child.tagName.toLowerCase() === "row");
+        const rows = SQL.Designer.directChildren(sourceTable, "row");
         for (const sourceRow of rows) {
-            const relations = Array.from(sourceRow.children).filter((child) =>
-                child.tagName && child.tagName.toLowerCase() === "relation");
+            const relations = SQL.Designer.directChildren(sourceRow, "relation");
             for (const relation of relations) {
                 const schema = SQL.Designer.effectiveSchema(relation.getAttribute("schema"));
                 relation.setAttribute("schema", schema);
@@ -416,8 +446,7 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
                 if (!target) {
                     throw new Error("Relationship target table not found: [" + schema + "].[" + relation.getAttribute("table") + "].");
                 }
-                const targetRows = Array.from(target.children).filter((child) =>
-                    child.tagName && child.tagName.toLowerCase() === "row" &&
+                const targetRows = SQL.Designer.directChildren(target, "row").filter((child) =>
                     child.getAttribute("name") === relation.getAttribute("row"));
                 if (targetRows.length !== 1) {
                     throw new Error("Relationship target row not found: [" + schema + "].[" +
@@ -435,12 +464,13 @@ SQL.Designer.prototype.fromXML = function (node) {
     window.DATATYPES = SQL.PortableTypes.registry();
     this.typeIndex = false;
     this.fkTypeFor = false;
-    const legends = portable.getElementsByTagName("legend");
+    const legends = SQL.Designer.directChildren(portable, "legend");
     this.legend.fromXML(legends.length ? legends[0] : null);
-    const tables = portable.getElementsByTagName("table");
+    const tables = SQL.Designer.directChildren(portable, "table");
     for (let table of tables) { const t = this.addTable("", 0, 0); t.fromXML(table); }
     for (let table of this.tables) { table.select(); table.deselect(); }
-    const rs = portable.getElementsByTagName("relation");
+    const rs = tables.flatMap((table) => SQL.Designer.directChildren(table, "row")
+        .flatMap((row) => SQL.Designer.directChildren(row, "relation")));
     for (let rel of rs) {
         let t1 = this.findTable(rel.getAttribute("schema"), rel.getAttribute("table"));
         let r1 = t1 && t1.findNamedRow(rel.getAttribute("row"));

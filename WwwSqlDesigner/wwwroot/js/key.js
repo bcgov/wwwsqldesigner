@@ -71,7 +71,7 @@ SQL.Key.prototype.toXML = function () {
 SQL.Key.prototype.fromXML = function (node) {
     this.setType(node.getAttribute("type"));
     this.setName(node.getAttribute("name"));
-    const parts = node.getElementsByTagName("part");
+    const parts = SQL.Designer.directChildren(node, "part");
     for (let part of parts) {
         const name = part.firstChild.nodeValue;
         const row = this.owner.findNamedRow(name);
