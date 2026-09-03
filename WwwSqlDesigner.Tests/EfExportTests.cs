@@ -306,6 +306,20 @@ public class EfExportTests
     }
 
     [TestMethod]
+    public void EmitsClassificationAnnotationWithOrWithoutComment()
+    {
+        var generated = Transform("""
+            <sql><table name="Person" schema="dbo">
+              <row name="PublicId" null="0"><datatype>int</datatype><classification>Public</classification></row>
+              <row name="Secret" null="0"><datatype>nvarchar(20)</datatype><comment>Note</comment><classification>Protected B</classification></row>
+            </table></sql>
+            """, GeneratedContextParameters());
+
+        StringAssert.Contains(generated, "Property(e => e.PublicId).HasAnnotation(\"DataClassification\", \"Public\")");
+        StringAssert.Contains(generated, "Property(e => e.Secret).HasComment(\"Note\").HasAnnotation(\"DataClassification\", \"Protected B\")");
+    }
+
+    [TestMethod]
     public void XmlParsingRejectsDtdsAndRequiresModernBrowserApis()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));

@@ -645,6 +645,7 @@ SQL.IO.prototype.getExportXml = function (target) {
     if (datatypes) { datatypes.setAttribute("db", target); }
     const supportsSchema = target === "mssql" || target === "ef";
     const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
+    const supportsClassification = target === "mssql" || target === "ef";
     if (!supportsSchema) {
         const tables = Array.from(doc.querySelectorAll("sql > table"));
         if (tables.some((table) =>
@@ -670,6 +671,9 @@ SQL.IO.prototype.getExportXml = function (target) {
     if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
         SQL.IO.hasXmlContent(comment.textContent))) {
         diagnostics.push(target + " export omits table and column descriptions.");
+    }
+    if (!supportsClassification && doc.querySelector("sql > table > row > classification")) {
+        diagnostics.push(target + " export omits column data classifications.");
     }
     if (supportsSchema) {
         for (const table of doc.querySelectorAll("sql > table")) {

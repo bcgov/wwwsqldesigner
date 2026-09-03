@@ -104,4 +104,22 @@ public class MssqlExportTests
         Assert.IsFalse(sql.Contains("FULLTEXT", StringComparison.Ordinal));
         Assert.IsFalse(sql.Contains("[Text] nvarchar(max) ,", StringComparison.Ordinal));
     }
+
+    [TestMethod]
+    public void EmitsSeparateEscapedColumnDataClassification()
+    {
+        var sql = Transform("""
+            <sql><table name="People's" schema="Sec]ure">
+              <row name="Birth]Date" null="1"><datatype>date</datatype>
+                <comment>Sensitive date</comment><classification>Protected C</classification>
+              </row>
+            </table></sql>
+            """);
+
+        StringAssert.Contains(sql, "@name=N'MS_Description', @value=N'Sensitive date'");
+        StringAssert.Contains(sql, "@name=N'DataClassification', @value=N'Protected C'");
+        StringAssert.Contains(sql, "@level0name=N'Sec]ure'");
+        StringAssert.Contains(sql, "@level1name=N'People''s'");
+        StringAssert.Contains(sql, "@level2name=N'Birth]Date'");
+    }
 }

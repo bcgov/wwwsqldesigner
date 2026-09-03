@@ -1281,3 +1281,102 @@ test("drops lossy native metadata from portable facets", async ({ page }) => {
     expect(imported.facets).toBe("");
     expect(imported.diagnostics.join(" ")).toContain("ignored");
 });
+
+test("edits and round trips optional column classifications", async ({ page }) => {
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="People"><row name="Name" null="0"><datatype>string(20)</datatype><classification>Protected A</classification></row></table></sql>');
+    await page.evaluate(() => d.tables[0].rows[0].expand());
+    const select = page.getByRole("combobox", { name: "Classification" });
+    await expect(select.locator("option")).toHaveText(["", "Public", "Protected A", "Protected B", "Protected C"]);
+    await expect(select).toHaveValue("Protected A");
+    await select.selectOption("Protected C");
+    expect(await page.evaluate(() => d.tables[0].rows[0].collapse())).toBe(true);
+    expect(await page.evaluate(() => d.toXML())).toContain("<classification>Protected C</classification>");
+    await page.evaluate(() => d.tables[0].rows[0].expand());
+    await select.selectOption("");
+    expect(await page.evaluate(() => d.tables[0].rows[0].collapse())).toBe(true);
+    expect(await page.evaluate(() => d.toXML())).not.toContain("<classification>");
+});
+
+test("commits column classifications atomically with row edits", async ({ page }) => {
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="People"><row name="Name"><datatype>string(20)</datatype><classification>Public</classification></row></table></sql>');
+    await page.evaluate(() => d.tables[0].rows[0].expand());
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    const classification = page.getByRole("combobox", { name: "Classification" });
+    await classification.selectOption("Protected B");
+    await name.fill("");
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => ({
+        classification: d.tables[0].rows[0].data.classification,
+        expanded: d.tables[0].rows[0].expanded,
+    }))).toEqual({
+        classification: "Public",
+        expanded: true,
+    });
+    expect(await page.evaluate(() => d.toXML())).toContain("<classification>Public</classification>");
+    expect(await page.evaluate(() => d.toXML())).not.toContain("<classification>Protected B</classification>");
+
+    await name.fill("DisplayName");
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => ({
+        classification: d.tables[0].rows[0].data.classification,
+        expanded: d.tables[0].rows[0].expanded,
+        name: d.tables[0].rows[0].getTitle(),
+    }))).toEqual({ classification: "Protected B", expanded: false, name: "DisplayName" });
+});
+
+test("warns when exports omit column classifications without mutating the model", async ({ page }) => {
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="People" schema="dbo"><row name="Name"><datatype>string(20)</datatype><classification>Protected A</classification></row><row name="Email"><datatype>string(100)</datatype><classification>Protected B</classification></row></table></sql>');
+    const original = await page.evaluate(() => d.toXML());
+    const unsupported = await page.evaluate(() => d.io.getExportXml("sqlite"));
+    expect(unsupported.safe).toBe(true);
+    expect(unsupported.diagnostics).toEqual(["sqlite export omits column data classifications."]);
+    expect(unsupported.xml).toContain("<classification>Protected A</classification>");
+    expect(unsupported.xml).toContain("<classification>Protected B</classification>");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="People" schema="sales"><row name="Id"><datatype>integer</datatype><classification>Protected A</classification></row></table><table name="People" schema="archive"><row name="Id"><datatype>integer</datatype><classification>Protected B</classification></row></table></sql>');
+    const blockedOriginal = await page.evaluate(() => d.toXML());
+    const blocked = await page.evaluate(() => d.io.getExportXml("sqlite"));
+    expect(blocked.safe).toBe(false);
+    expect(blocked.diagnostics).toContain("sqlite export omits column data classifications.");
+    expect(blocked.diagnostics).toContain("sqlite export maps qualified tables archive.People, sales.People to the same unqualified table name.");
+    expect(await page.evaluate(() => d.toXML())).toBe(blockedOriginal);
+});
+
+test("rejects invalid classifications transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="StillHere" /></sql>');
+    const original = await page.evaluate(() => d.toXML());
+    for (const classification of [
+        "<classification></classification>",
+        "<classification> \t\r\n</classification>",
+        "<classification> Public</classification>",
+        "<classification>Public </classification>",
+        "<classification>protected a</classification>",
+        "<classification><!--x-->Public</classification>",
+        "<classification><![CDATA[Public]]></classification>",
+        "<classification><x/>Public</classification>",
+        "<classification>Public<x/>Protected A</classification>",
+        "<Classification>Public</Classification>",
+        "<classification>Public</classification><classification>Protected A</classification>",
+    ]) {
+        const result = await page.evaluate((value) => {
+            const xml = '<sql format="portable-v1"><datatypes db="portable" /><table name="Replacement"><row name="Id"><datatype>integer</datatype>' + value + "</row></table></sql>";
+            try { d.fromXML(new DOMParser().parseFromString(xml, "text/xml").documentElement); return "loaded"; }
+            catch (error) { return error.message; }
+        }, classification);
+        expect(result).not.toBe("loaded");
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+
+    const misplaced = await page.evaluate(() => {
+        const xml = '<sql format="portable-v1"><datatypes db="portable" /><classification>Public</classification><table name="Replacement"><row name="Id"><datatype>integer</datatype></row></table></sql>';
+        try { d.fromXML(new DOMParser().parseFromString(xml, "text/xml").documentElement); return "loaded"; }
+        catch (error) { return error.message; }
+    });
+    expect(misplaced).not.toBe("loaded");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
