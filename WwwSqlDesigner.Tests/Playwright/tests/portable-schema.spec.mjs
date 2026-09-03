@@ -211,6 +211,28 @@ test("transforms an EF description at the SQL Server boundary in Chromium", asyn
     expect(generated).toContain(`HasComment("${boundary}")`);
 });
 
+test("transforms apostrophe-heavy MSSQL descriptions safely in Chromium", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "'".repeat(3750);
+    await load(page, `<sql><table name="Item"><row name="Details"><datatype>text</datatype><comment>O'Brien</comment></row><comment>${boundary}</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const generated = await page.evaluate(async () => {
+        const stylesheet = await (await fetch("db/mssql/output.xsl")).text();
+        return d.io.transformEf(stylesheet, d.io.getSafeExportXml("mssql"), false);
+    });
+    expect(generated).toContain(`@value=N'${boundary.repeat(2)}'`);
+    expect(generated).toContain("@value=N'O''Brien'");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    const oversized = "'".repeat(3751);
+    await load(page, `<sql><table name="Item"><row name="Id"><datatype>integer</datatype></row><comment>${oversized}</comment></table></sql>`);
+    const oversizedOriginal = await page.evaluate(() => d.toXML());
+    const blocked = await page.evaluate(() => d.io.getExportXml("mssql"));
+    expect(blocked.safe).toBe(false);
+    expect(blocked.diagnostics).toContain("dbo.Item description is 7502 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+    expect(await page.evaluate(() => d.toXML())).toBe(oversizedOriginal);
+});
+
 test("treats only XML whitespace as an absent description", async ({ page }) => {
     await page.goto("/");
     const nbspBoundary = "\u00a0".repeat(3750);
