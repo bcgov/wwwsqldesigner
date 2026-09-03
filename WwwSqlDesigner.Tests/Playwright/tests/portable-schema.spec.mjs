@@ -115,18 +115,42 @@ test("validates exact row names and key parts transactionally", async ({ page })
     }
 });
 
-test("preserves exact row names and composite key order", async ({ page }) => {
+test("rejects nested sql roots transactionally", async ({ page }) => {
     await page.goto("/");
-    await load(page, `<sql><table name="Exact"><row name=" Id "><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part><part> Id </part></key></table></sql>`);
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<sql><sql/></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype><comment><sql/></comment></row></table></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("rejects duplicate exact key parts transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part><part>Id</part></key></table></sql>`)).toBe(false);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
+test("preserves exact row names, key order, and row reuse across keys", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Exact"><row name=" Id "><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part><part> Id </part></key><key type="INDEX"><part>Id</part></key></table></sql>`);
     const saved = await page.evaluate(() => d.toXML());
     const names = await page.evaluate((xml) => {
         const table = new DOMParser().parseFromString(xml, "text/xml").querySelector("table");
         return {
             rows: Array.from(table.children).filter((child) => child.tagName === "row").map((row) => row.getAttribute("name")),
-            parts: Array.from(table.querySelector("key").children).map((part) => part.textContent),
+            keys: Array.from(table.querySelectorAll("key")).map((key) =>
+                Array.from(key.children).map((part) => part.textContent)),
         };
     }, saved);
-    expect(names).toEqual({ rows: [" Id ", "Id"], parts: ["Id", " Id "] });
+    expect(names).toEqual({ rows: [" Id ", "Id"], keys: [["Id", " Id "], ["Id"]] });
     await load(page, saved);
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });

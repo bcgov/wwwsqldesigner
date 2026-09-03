@@ -410,6 +410,9 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
     const singletons = { sql: ["datatypes", "legend"], table: ["comment"], row: ["datatype", "default", "comment"] };
     for (const element of [portable].concat(Array.from(portable.querySelectorAll("*")))) {
         const name = element.tagName.toLowerCase();
+        if (name === "sql" && element !== portable) {
+            throw new Error("Misplaced model element: sql.");
+        }
         if (allowedParents[name]) {
             const parentName = element.parentElement && element.parentElement.tagName.toLowerCase();
             if (allowedParents[name].indexOf(parentName) === -1) {
@@ -458,6 +461,7 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
             if (!parts.length) {
                 throw new Error("Key must contain at least one part.");
             }
+            const partNames = new Set();
             for (const part of parts) {
                 if (part.childNodes.length !== 1 || part.firstChild.nodeType !== Node.TEXT_NODE) {
                     throw new Error("Key part must contain exactly one text node.");
@@ -466,6 +470,10 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
                 if (!name.length) {
                     throw new Error("Key part cannot be empty.");
                 }
+                if (partNames.has(name)) {
+                    throw new Error("Duplicate key part: " + name + ".");
+                }
+                partNames.add(name);
                 if (!rows.has(name)) {
                     throw new Error("Key part row not found: " + name + ".");
                 }
