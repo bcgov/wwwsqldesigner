@@ -11,6 +11,7 @@
     <string name="newtable">new table</string>
     <string name="addpending">place table</string>
     <string name="tablenamelabel">Name</string>
+    <string name="tableschemalabel">Schema</string>
     <string name="tablecommentlabel">Comment</string>
 
     <!-- row management -->
@@ -26,6 +27,8 @@
     <string name="foreignconnectpending">click target row</string>
     <string name="foreigndisconnect">Remove foreign key</string>
     <string name="relationname">Enter relationship name</string>
+    <string name="relationrowexists">A field named "%s" already exists in the target table.</string>
+    <string name="relationrowempty">The relationship pattern generated an empty field name.</string>
     <string name="confirmtable">Really delete table</string>
     <string name="confirmrow">Really delete field</string>
 
@@ -52,6 +55,7 @@
     <string name="optionsnapnotice">In pixels, 0 = disable snapping</string>
     <string name="pattern">Pattern for foreign names</string>
     <string name="optionpatternnotice">%T = primary table, %R = primary key, %t = foreign table</string>
+    <string name="optionpatternempty">Enter a relationship field name pattern.</string>
     <string name="hide">Hide connectors on table drag?</string>
     <string name="vector">Draw smooth connectors (if supported by browser)?</string>
     <string name="showsize">Show field size in table design?</string>

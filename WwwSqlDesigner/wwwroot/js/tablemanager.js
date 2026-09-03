@@ -5,6 +5,7 @@ SQL.TableManager = function (owner) {
     this.dom = {
         container: SQL.dom.get("table"),
         name: SQL.dom.get("tablename"),
+        schema: SQL.dom.get("tableschema"),
         comment: SQL.dom.get("tablecomment"),
     };
     this.selection = [];
@@ -25,7 +26,7 @@ SQL.TableManager = function (owner) {
         elm.value = _(id);
     }
 
-    ids = ["tablenamelabel", "tablecommentlabel"];
+    ids = ["tablenamelabel", "tableschemalabel", "tablecommentlabel"];
     for (let id of ids) {
         const elm = SQL.dom.get(id);
         elm.innerHTML = _(id);
@@ -48,11 +49,22 @@ SQL.TableManager = function (owner) {
     SQL.events.add(this.dom.edittable, "click", this.edit.bind(this));
     SQL.events.add(this.dom.tablekeys, "click", this.keys.bind(this));
     SQL.events.add(document, "keydown", this.press.bind(this));
+    SQL.events.add(this.dom.schema, "input", () => {
+        this.dom.schema.setCustomValidity("");
+        this.dom.name.setCustomValidity("");
+    });
+    SQL.events.add(this.dom.name, "input", () => {
+        this.dom.name.setCustomValidity("");
+        this.dom.schema.setCustomValidity("");
+    });
 
     this.dom.container.parentNode.removeChild(this.dom.container);
 };
 
 SQL.TableManager.prototype.addRow = function (e) {
+    if (this.owner.rowManager.select(false) === false) {
+        return;
+    }
     const newrow = this.selection[0].addRow(_("newrow"));
     this.owner.rowManager.select(newrow);
     newrow.expand();
@@ -139,6 +151,9 @@ SQL.TableManager.prototype.click = function (e) {
     /* finish adding new table */
     let newtable = false;
     if (this.adding) {
+        if (this.owner.rowManager.select(false) === false) {
+            return;
+        }
         this.adding = false;
         SQL.dom.removeClass("area", "adding");
         this.dom.addtable.value = this.oldvalue;
@@ -153,7 +168,7 @@ SQL.TableManager.prototype.click = function (e) {
     this.select(newtable);
     this.owner.rowManager.select(false);
     if (this.selection.length == 1) {
-        this.edit(e);
+        this.edit(e, newtable);
     }
 };
 
@@ -180,6 +195,10 @@ SQL.TableManager.prototype.clear = function (e) {
     if (!result) {
         return;
     }
+    if (this.owner.rowManager.select(false) === false) {
+        return;
+    }
+    this.select(false);
     this.owner.clearTables();
 };
 
@@ -192,17 +211,34 @@ SQL.TableManager.prototype.remove = function (e) {
     if (!result) {
         return;
     }
+    if (this.owner.rowManager.select(false) === false) {
+        return;
+    }
     const sel = this.selection.slice(0);
+    this.select(false);
     for (let table of sel) {
         this.owner.removeTable(table);
     }
 };
 
-SQL.TableManager.prototype.edit = function (e) {
-    this.owner.window.open(_("edittable"), this.dom.container, this.save);
+SQL.TableManager.prototype.edit = function (e, transientTable) {
+    this.transientTable = transientTable || null;
+    this.owner.window.open(_("edittable"), this.dom.container, this.save, () => {
+        if (transientTable && this.owner.tables.indexOf(transientTable) !== -1) {
+            this.owner.rowManager.discardSelection(transientTable);
+            if (this.selection.indexOf(transientTable) !== -1) {
+                this.select(false);
+            }
+            this.owner.removeTable(transientTable);
+        }
+        this.transientTable = null;
+    });
 
     const title = this.selection[0].getTitle();
     this.dom.name.value = title;
+    this.dom.schema.value = this.selection[0].getSchema();
+    this.dom.name.setCustomValidity("");
+    this.dom.schema.setCustomValidity("");
     try {
         /* throws in ie6 */
         this.dom.comment.value = this.selection[0].getComment();
@@ -219,8 +255,28 @@ SQL.TableManager.prototype.keys = function (e) {
 };
 
 SQL.TableManager.prototype.save = function () {
-    this.selection[0].setTitle(this.dom.name.value);
-    this.selection[0].setComment(this.dom.comment.value);
+    const selected = this.selection[0];
+    if (!this.dom.name.value.trim()) {
+        this.dom.name.setCustomValidity("Table name cannot be empty.");
+        this.dom.name.reportValidity();
+        this.dom.name.focus();
+        return false;
+    }
+    this.dom.name.setCustomValidity("");
+    const schema = SQL.Designer.effectiveSchema(this.dom.schema.value);
+    const identity = SQL.Designer.tableIdentity(schema, this.dom.name.value);
+    const duplicate = this.owner.tables.some((table) => table !== selected &&
+        SQL.Designer.tableIdentity(table.getSchema(), table.getTitle()) === identity);
+    if (duplicate) {
+        this.dom.schema.setCustomValidity("A table with this schema and name already exists.");
+        this.dom.schema.reportValidity();
+        return false;
+    }
+    this.dom.schema.setCustomValidity("");
+    selected.setSchema(schema);
+    selected.setTitle(this.dom.name.value);
+    selected.setComment(this.dom.comment.value);
+    this.transientTable = null;
 };
 
 SQL.TableManager.prototype.press = function (e) {

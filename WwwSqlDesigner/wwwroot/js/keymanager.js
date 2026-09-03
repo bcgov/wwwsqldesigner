@@ -210,10 +210,10 @@ SQL.KeyManager.prototype.right = function (e) {
             this.key.removeRow(row);
         }
     }
-    this.switchTo(this.dom.list.selectedIndex);
+    this.sync(this.table);
 };
 
 SQL.KeyManager.prototype.open = function (table) {
     this.sync(table);
-    this.owner.window.open(_("tablekeys"), this.dom.container, this.purge);
+    this.owner.window.open(_("tablekeys"), this.dom.container, this.purge, this.purge);
 };

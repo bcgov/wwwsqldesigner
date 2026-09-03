@@ -76,6 +76,7 @@ SQL.Options.prototype.save = function () {
     const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
     const namespace = this.dom.optionefnamespace.value.trim();
     const context = this.dom.optionefcontext.value.trim();
+    const pattern = this.dom.optionpattern.value;
     const namespaceParts = namespace.split(".");
     const validNamespace = !namespace || namespaceParts.every(
         (part) => identifier.test(part) && !CONFIG.CSHARP_KEYWORDS.includes(part)
@@ -86,6 +87,7 @@ SQL.Options.prototype.save = function () {
 
     this.dom.optionefnamespace.setCustomValidity("");
     this.dom.optionefcontext.setCustomValidity("");
+    this.dom.optionpattern.setCustomValidity("");
     if (!validNamespace) {
         this.dom.optionefnamespace.setCustomValidity(
             "Enter dot-separated C# identifiers for the EF namespace."
@@ -102,6 +104,12 @@ SQL.Options.prototype.save = function () {
         this.dom.optionefcontext.focus();
         return false;
     }
+    if (!pattern.trim()) {
+        this.dom.optionpattern.setCustomValidity(_("optionpatternempty"));
+        this.dom.optionpattern.reportValidity();
+        this.dom.optionpattern.focus();
+        return false;
+    }
 
     this.owner.setOption("locale", this.dom.optionlocale.value);
     this.owner.setOption(
@@ -113,7 +121,7 @@ SQL.Options.prototype.save = function () {
         context || CONFIG.EF_DEFAULT_CONTEXT
     );
     this.owner.setOption("snap", this.dom.optionsnap.value);
-    this.owner.setOption("pattern", this.dom.optionpattern.value);
+    this.owner.setOption("pattern", pattern);
     this.owner.setOption("style", this.dom.optionstyle.value);
     this.owner.setOption("hide", this.dom.optionhide.checked ? "1" : "");
     this.owner.setOption("vector", this.dom.optionvector.checked ? "1" : "");

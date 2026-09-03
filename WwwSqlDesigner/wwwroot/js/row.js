@@ -61,14 +61,17 @@ SQL.Row.prototype.select = function () {
 
 SQL.Row.prototype.deselect = function () {
     if (!this.selected) {
-        return;
+        return true;
+    }
+    if (this.collapse() === false) {
+        return false;
     }
     this.selected = false;
     for (let relation of this.relations) {
         relation.dehighlight();
     }
     this.redraw();
-    this.collapse();
+    return true;
 };
 
 SQL.Row.prototype.setTitle = function (t) {
@@ -88,15 +91,24 @@ SQL.Row.prototype.setTitle = function (t) {
 
 SQL.Row.prototype.click = function (e) {
     /* clicked on row */
-    SQL.publish("rowclick", this);
-    this.owner.owner.rowManager.select(this);
+    SQL.events.stop(e);
+    const rowManager = this.owner.owner.rowManager;
+    const sourceRow = rowManager.selected;
+    const connecting = rowManager.connecting;
+    if (rowManager.select(this) === false) {
+        return;
+    }
+    SQL.publish("rowclick", this, { sourceRow: sourceRow, connecting: connecting });
+    this.owner.owner.tableManager.select(this.owner);
 };
 
 SQL.Row.prototype.dblclick = function (e) {
     /* dblclicked on row */
     SQL.events.prevent(e);
     SQL.events.stop(e);
-    this.expand();
+    if (this.owner.owner.rowManager.selected === this) {
+        this.expand();
+    }
 };
 
 SQL.Row.prototype.update = function (data) {
@@ -164,6 +176,7 @@ SQL.Row.prototype.buildEdit = function () {
     this.dom.name.type = "text";
     elms.push(["name", this.dom.name]);
     SQL.events.add(this.dom.name, "keypress", this.enter);
+    SQL.events.add(this.dom.name, "input", () => this.dom.name.setCustomValidity(""));
 
     this.dom.type = this.buildTypeSelect(this.data.type);
     elms.push(["type", this.dom.type]);
@@ -243,8 +256,20 @@ SQL.Row.prototype.expand = function () {
 
 SQL.Row.prototype.collapse = function () {
     if (!this.expanded) {
-        return;
+        return true;
     }
+    const title = this.dom.name.value;
+    const duplicate = this.owner.rows.some((row) =>
+        row !== this && row.getTitle() === title);
+    if (!title || duplicate) {
+        this.dom.name.setCustomValidity(
+            !title ? "Field name cannot be empty." : "A field with this name already exists."
+        );
+        this.dom.name.reportValidity();
+        this.dom.name.focus();
+        return false;
+    }
+    this.dom.name.setCustomValidity("");
     this.expanded = false;
     this.dom.container.classList.remove("expanded");
 
@@ -260,7 +285,8 @@ SQL.Row.prototype.collapse = function () {
     this.dom.container.appendChild(this.dom.content);
 
     this.update(data);
-    this.setTitle(this.dom.name.value);
+    this.setTitle(title);
+    return true;
 };
 
 SQL.Row.prototype.load = function () {
@@ -376,8 +402,8 @@ SQL.Row.prototype.destroy = function () {
     while (this.relations.length) {
         this.owner.owner.removeRelation(this.relations[0]);
     }
-    for (let key of this.keys) {
-        key.removeRow(this);
+    while (this.keys.length) {
+        this.keys[0].removeRow(this);
     }
 };
 
@@ -396,7 +422,11 @@ SQL.Row.prototype.toXML = function () {
     }
     for (let relation of this.relations) {
         if (relation.row2 !== this) { continue; }
-        xml += '<relation table="' + relation.row1.owner.getTitle() + '" row="' + relation.row1.getTitle() + (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
+        const target = relation.row1.owner;
+        xml += '<relation table="' + SQL.escape(target.getTitle()).replace(/"/g, "&quot;") +
+            '" schema="' + SQL.escape(target.getSchema()).replace(/"/g, "&quot;") +
+            '" row="' + SQL.escape(relation.row1.getTitle()).replace(/"/g, "&quot;") +
+            (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
     }
     if (this.data.comment) { xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n"; }
     return xml + "</row>\n";
@@ -406,7 +436,7 @@ SQL.Row.prototype.fromXML = function (node) {
     const obj = { type: 0, size: "", nll: node.getAttribute("null") === "1", ai: node.getAttribute("autoincrement") === "1" };
     const comment = node.getElementsByTagName("comment")[0];
     if (comment && comment.firstChild) { obj.comment = comment.firstChild.nodeValue; }
-    const datatype = node.getElementsByTagName("datatype")[0];
+    const datatype = SQL.Designer.directChild(node, "datatype");
     if (datatype) {
         const portable = SQL.PortableTypes.canonical(datatype.textContent);
         if (portable) {
@@ -415,7 +445,7 @@ SQL.Row.prototype.fromXML = function (node) {
             for (let i = 0; i < types.length; i++) { if (types[i].getAttribute("sql") === portable.kind) { obj.type = i; break; } }
         }
     }
-    const defaultValue = node.getElementsByTagName("default")[0];
+    const defaultValue = SQL.Designer.directChild(node, "default");
     if (defaultValue && defaultValue.firstChild) {
         obj.def = defaultValue.firstChild.nodeValue;
         const quote = window.DATATYPES.getElementsByTagName("type")[obj.type].getAttribute("quote");

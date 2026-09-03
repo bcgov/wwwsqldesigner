@@ -10,6 +10,7 @@ SQL.Table = function (owner, name, x, y, z) {
     this.selected = false;
     SQL.Visual.apply(this);
     this.data.comment = "";
+    this.schema = SQL.Designer.effectiveSchema();
 
     this.setTitle(name);
     this.x = x || 0;
@@ -98,19 +99,27 @@ SQL.Table.prototype.hideRelations = function () {
 SQL.Table.prototype.click = function (e) {
     SQL.events.stop(e);
     const t = SQL.events.target(e);
-    this.owner.tableManager.select(this);
 
     if (t != this.dom.title) {
         return;
     } /* click on row */
 
-    SQL.publish("tableclick", this);
-    this.owner.rowManager.select(false);
+    const rowManager = this.owner.rowManager;
+    const sourceRow = this.clickSourceRow || rowManager.selected;
+    const creating = this.clickCreating || rowManager.creating;
+    this.clickSourceRow = null;
+    this.clickCreating = false;
+    if (rowManager.select(false) === false) {
+        return;
+    }
+    this.owner.tableManager.select(this);
+    SQL.publish("tableclick", this, { sourceRow: sourceRow, creating: creating });
 };
 
 SQL.Table.prototype.dblclick = function (e) {
     const t = SQL.events.target(e);
-    if (t == this.dom.title) {
+    const selection = this.owner.tableManager.selection;
+    if (t == this.dom.title && selection.length == 1 && selection[0] === this) {
         this.owner.tableManager.edit();
     }
 };
@@ -232,6 +241,15 @@ SQL.Table.prototype.down = function (e) {
         return;
     } /* on a row */
 
+    const rowManager = this.owner.rowManager;
+    const sourceRow = rowManager.selected;
+    const creating = rowManager.creating;
+    if (rowManager.select(false) === false) {
+        return;
+    }
+    this.clickSourceRow = sourceRow;
+    this.clickCreating = creating;
+
     /* touch? */
     let event;
     let moveEvent;
@@ -273,9 +291,10 @@ SQL.Table.prototype.down = function (e) {
 };
 
 SQL.Table.prototype.toXML = function () {
-    const t = this.getTitle().replace(/"/g, "&quot;");
+    const t = SQL.escape(this.getTitle()).replace(/"/g, "&quot;");
+    const schema = SQL.escape(this.getSchema()).replace(/"/g, "&quot;");
     let xml = "";
-    xml += '<table x="' + this.x + '" y="' + this.y + '" name="' + t + '">\n';
+    xml += '<table x="' + this.x + '" y="' + this.y + '" name="' + t + '" schema="' + schema + '">\n';
     for (let row of this.rows) {
         xml += row.toXML();
     }
@@ -291,17 +310,18 @@ SQL.Table.prototype.toXML = function () {
 };
 
 SQL.Table.prototype.fromXML = function (node) {
+    this.setSchema(node.getAttribute("schema"));
     const name = node.getAttribute("name");
     this.setTitle(name);
     const x = parseInt(node.getAttribute("x")) || 0;
     const y = parseInt(node.getAttribute("y")) || 0;
     this.moveTo(x, y);
-    const rows = node.getElementsByTagName("row");
+    const rows = SQL.Designer.directChildren(node, "row");
     for (let row of rows) {
         const r = this.addRow("");
         r.fromXML(row);
     }
-    const keys = node.getElementsByTagName("key");
+    const keys = SQL.Designer.directChildren(node, "key");
     for (let key of keys) {
         const k = this.addKey();
         k.fromXML(key);
@@ -314,6 +334,14 @@ SQL.Table.prototype.fromXML = function (node) {
             this.setComment(ch.firstChild.nodeValue);
         }
     }
+};
+
+SQL.Table.prototype.getSchema = function () {
+    return this.schema;
+};
+
+SQL.Table.prototype.setSchema = function (schema) {
+    this.schema = SQL.Designer.effectiveSchema(schema);
 };
 
 SQL.Table.prototype.getZ = function () {

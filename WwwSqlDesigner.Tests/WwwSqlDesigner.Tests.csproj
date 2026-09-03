@@ -21,5 +21,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\WwwSqlDesigner\wwwroot\db\ef\output.xsl" Link="TestData\ef-output.xsl" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\WwwSqlDesigner\wwwroot\db\mssql\output.xsl" Link="TestData\mssql-output.xsl" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

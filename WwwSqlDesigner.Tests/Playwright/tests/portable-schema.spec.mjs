@@ -7,6 +7,762 @@ async function load(page, xml) {
 
 const tokens = ["integer", "decimal(10,2)", "float", "string(100)", "text", "boolean", "date", "time", "datetime", "datetime-with-time-zone", "binary(16)", "uuid", "json", "xml"];
 
+test("round-trips legacy schemas and resolves same names by schema", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><datatypes db="portable"/>
+      <table name="Item"><row name="Id" null="0"><datatype>integer</datatype></row></table>
+      <table name="Item" schema=" archive "><row name="Id" null="0"><datatype>integer</datatype></row></table>
+      <table name="Link"><row name="ItemId" null="0"><datatype>integer</datatype><relation table="Item" schema="archive" row="Id"/></row></table>
+    </sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).toContain('name="Item" schema="dbo"');
+    expect(saved).toContain('name="Item" schema="archive"');
+    expect(saved).toContain('table="Item" schema="archive" row="Id"');
+    expect(await page.evaluate(() => d.relations[0].row1.owner.getSchema())).toBe("archive");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("rejects duplicate and unresolved schema identities transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><datatypes db="portable"/><table name="Keep"><row name="Id" null="0"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<sql><table name=" Orders " schema="Sales"/><table name="orders" schema=" sales "/></sql>`,
+        `<sql><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Missing" row="Id"/></row></table></sql>`,
+        `<sql><table name="Target"><row name="Id"><datatype>integer</datatype></row></table><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Target" row="Missing"/></row></table></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("validates table names transactionally while preserving valid whitespace identity", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const invalid = [
+        `<sql><table/></sql>`,
+        `<sql><table name=""/></sql>`,
+        `<sql><table name=" \t\r\n "/></sql>`,
+        `<sql><table name="\u00a0"/></sql>`,
+    ];
+    for (const xml of invalid) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+
+    await load(page, `<sql><table name=" Item " schema=" Sales "><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => [d.tables[0].getTitle(), d.tables[0].getSchema()])).toEqual([" Item ", "Sales"]);
+    const spaced = await page.evaluate(() => d.toXML());
+    expect(spaced).toContain('name=" Item " schema="Sales"');
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name=" Item " schema="Sales"/><table name="item" schema=" sales "/></sql>`)).toBe(false);
+    expect(await page.evaluate(() => d.toXML())).toBe(spaced);
+});
+
+test("validates default node shape transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const invalid = [
+        `<default><x/></default>`,
+        `<default><!--x--></default>`,
+        `<default><![CDATA[value]]></default>`,
+        `<default>value<!--x--></default>`,
+        `<default>value<x/></default>`,
+        `<default><!--x--><!--y--></default>`,
+    ];
+    for (const value of invalid) {
+        const xml = `<sql><table name="T"><row name="Value"><datatype>text</datatype>${value}</row></table></sql>`;
+        expect(await page.evaluate((input) => d.io.fromXMLText(input), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("accepts absent, empty, and ordinary text defaults", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Defaults"><row name="Absent"><datatype>text</datatype></row><row name="Empty"><datatype>text</datatype><default></default></row><row name="Text"><datatype>text</datatype><default>hello</default></row></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).not.toContain('name="Absent"><datatype>text</datatype><default>');
+    expect(saved).not.toContain('name="Empty"><datatype>text</datatype><default>');
+    expect(saved).toContain("<default>'hello'</default>");
+});
+
+test("validates exact row names and key parts transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<sql><table name="T"><row name=""><datatype>integer</datatype></row></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"/></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part></part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>id</part></key></table></sql>`,
+        `<sql><table name="T"><row name=" Id "><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><!--x-->Id</part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><![CDATA[Id]]></part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><x/></part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><x/>Id</part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>I<![CDATA[d]]></part></key></table></sql>`,
+        `<sql><table name="Target"><row name="Id"><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row></table><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Target" row="Id"/></row></table></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("rejects nested sql roots transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<sql><sql/></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype><comment><sql/></comment></row></table></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("rejects duplicate exact key parts transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part><part>Id</part></key></table></sql>`)).toBe(false);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
+test("preserves exact row names, key order, and row reuse across keys", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Exact"><row name=" Id "><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part><part> Id </part></key><key type="INDEX"><part>Id</part></key></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    const names = await page.evaluate((xml) => {
+        const table = new DOMParser().parseFromString(xml, "text/xml").querySelector("table");
+        return {
+            rows: Array.from(table.children).filter((child) => child.tagName === "row").map((row) => row.getAttribute("name")),
+            keys: Array.from(table.querySelectorAll("key")).map((key) =>
+                Array.from(key.children).map((part) => part.textContent)),
+        };
+    }, saved);
+    expect(names).toEqual({ rows: [" Id ", "Id"], keys: [["Id", " Id "], ["Id"]] });
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("rejects misplaced and duplicate known elements without changing the diagram", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const cases = [
+        `<unknown/>`,
+        `<sql><table name="Outer"><table name="Nested"/></table></sql>`,
+        `<sql><table name="T"><row name="A"><datatype>integer</datatype><row name="Nested"/></row></table></sql>`,
+        `<sql><table name="T"><row name="A"><datatype>integer</datatype><key type="PRIMARY"/></row></table></sql>`,
+        `<sql><table name="T"><row name="A"><datatype>integer</datatype><datatype>text</datatype></row></table></sql>`,
+        `<sql><legend/><legend/></sql>`,
+    ];
+    for (const xml of cases) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("new table cancel and Escape discard only the transient table", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const create = async () => {
+        await page.locator("#addtable").click();
+        await page.locator("#area").click({ position: { x: 300, y: 200 } });
+    };
+    await create();
+    await page.evaluate(() => {
+        d.rowManager.select(d.tables[1].rows[0]);
+        d.tables[1].rows[0].expand();
+    });
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => ({
+        tables: d.tables.map((table) => table.getTitle()),
+        selectedRow: d.rowManager.selected,
+    }))).toEqual({ tables: ["Keep"], selectedRow: null });
+    await create();
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep"]);
+    await create();
+    await page.locator("#tablename").fill("Saved");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep", "Saved"]);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep", "Saved"]);
+});
+
+test("warns once when MSSQL omits FULLTEXT keys without mutating XML", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Search"><row name="Text"><datatype>text</datatype></row><key type="FULLTEXT" name="A"><part>Text</part></key><key type="FULLTEXT" name="B"><part>Text</part></key></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    expect(await page.evaluate(() => d.io.getSafeExportXml("mssql"))).not.toBeNull();
+    await expect(page.locator("#iostatus li")).toHaveCount(1);
+    await expect(page.locator("#iostatus")).toContainText("omits portable FULLTEXT keys");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
+test("blocks projected table collisions only for schema-dropping exports", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name=" Item " schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="item" schema="archive"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    for (const target of ["cubrid", "mysql", "oracle", "postgresql", "sqlalchemy", "sqlite", "vfp9", "web2py"]) {
+        expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).toBeNull();
+        await expect(page.locator("#iostatus")).toContainText(`${target} export omits non-default schema metadata.`);
+        await expect(page.locator("#iostatus")).toContainText("archive.item, sales. Item ");
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+    for (const target of ["mssql", "ef"]) {
+        expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).not.toBeNull();
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+
+    await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="Two" schema="archive"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => d.io.getSafeExportXml("mysql"))).not.toBeNull();
+    await expect(page.locator("#iostatus li")).toHaveCount(1);
+    await expect(page.locator("#iostatus")).toContainText("mysql export omits non-default schema metadata.");
+});
+
+test("relation creation rejects an exact target field collision and remains pending for retry", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table><table x="320" y="20" name="Target"><row name="Id_Source"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("Id", { exact: true }).click();
+    await page.locator("#foreigncreate").click();
+    await page.getByText("Target", { exact: true }).click();
+    expect(await page.evaluate(() => ({
+        rows: d.tables[1].rows.map((row) => row.getTitle()),
+        relations: d.relations.length,
+        pending: d.rowManager.creating,
+    }))).toEqual({ rows: ["Id_Source"], relations: 0, pending: true });
+
+    await page.evaluate(() => d.tables[1].rows[0].setTitle("Existing"));
+    await page.getByText("Target", { exact: true }).click();
+    expect(await page.evaluate(() => ({
+        rows: d.tables[1].rows.map((row) => row.getTitle()),
+        relations: d.relations.length,
+        pending: d.rowManager.creating,
+        relation: [d.relations[0].row1.getTitle(), d.relations[0].row2.getTitle()],
+    }))).toEqual({
+        rows: ["Existing", "Id_Source"],
+        relations: 1,
+        pending: false,
+        relation: ["Id", "Id_Source"],
+    });
+});
+
+test("options reject an empty relationship pattern atomically and preserve the corrected value", async ({ page }) => {
+        await page.goto("/");
+        await page.evaluate(() => {
+            const values = {
+                locale: "en", efnamespace: "Original.Namespace", efcontext: "OriginalContext",
+                snap: "10", pattern: "%R_%T", style: "wwwsqldesigner", hide: "",
+                vector: "", showsize: "", showtype: "",
+            };
+            window.optionWrites = [];
+            d.getOption = (name) => values[name];
+            d.setOption = (name, value) => {
+                optionWrites.push([name, value]);
+                values[name] = value;
+            };
+        });
+        await page.locator("#options").click();
+        await page.locator("#optionefnamespace").fill("Bad..Namespace");
+        await page.locator("#optionefcontext").fill("Bad-Context");
+        await page.locator("#optionpattern").fill(" \t ");
+        await page.locator("#windowok").click();
+        await expect(page.locator("#optionefnamespace")).toBeFocused();
+        await page.locator("#optionefnamespace").fill("Retried.Namespace");
+        await page.locator("#windowok").click();
+        await expect(page.locator("#optionefcontext")).toBeFocused();
+        await page.locator("#optionefcontext").fill("RetriedContext");
+        await page.locator("#windowok").click();
+        await expect(page.locator("#optionpattern")).toBeFocused();
+        expect(await page.evaluate(() => optionWrites)).toEqual([]);
+        await page.locator("#optionpattern").fill(" %R_retry ");
+        await page.locator("#windowok").click();
+        expect(await page.evaluate(() => ({
+            pattern: optionWrites.find(([name]) => name === "pattern")[1],
+            count: optionWrites.length,
+        }))).toEqual({ pattern: " %R_retry ", count: 10 });
+});
+
+test("legacy empty relationship patterns remain pending without mutation and recover", async ({ page }) => {
+        await page.goto("/");
+        await load(page, `<sql><table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table><table x="320" y="20" name="Target"/></sql>`);
+        await page.evaluate(() => {
+            const getOption = d.getOption.bind(d);
+            d.getOption = (name) => name === "pattern" ? " \t " : getOption(name);
+        });
+        page.on("dialog", (dialog) => dialog.accept());
+        await page.getByText("Id", { exact: true }).click();
+        await page.locator("#foreigncreate").click();
+        await page.getByText("Target", { exact: true }).click();
+        expect(await page.evaluate(() => ({
+            rows: d.tables[1].rows.length, relations: d.relations.length,
+            pending: d.rowManager.creating, source: d.rowManager.selected.getTitle(),
+        }))).toEqual({ rows: 0, relations: 0, pending: true, source: "Id" });
+        await page.evaluate(() => {
+            const getOption = d.getOption;
+            d.getOption = (name) => name === "pattern" ? "%R_retry" : getOption(name);
+        });
+        await page.getByText("Target", { exact: true }).click();
+        expect(await page.evaluate(() => ({
+            rows: d.tables[1].rows.map((row) => row.getTitle()),
+            relations: d.relations.length, pending: d.rowManager.creating,
+        }))).toEqual({ rows: ["Id_retry"], relations: 1, pending: false });
+});
+
+test("row dblclick expands only the row selected by preceding click events", async ({ page }) => {
+        await page.goto("/");
+        await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);
+        await page.getByText("One", { exact: true }).dblclick();
+        await page.locator("tbody.expanded input[type=text]").first().fill("");
+        await page.getByText("Two", { exact: true }).dblclick();
+        expect(await page.evaluate(() => ({
+            selected: d.rowManager.selected.getTitle(),
+            expanded: d.tables[0].rows.map((row) => row.expanded),
+        }))).toEqual({ selected: "One", expanded: [true, false] });
+        await page.locator("tbody.expanded input[type=text]").first().fill("One fixed");
+        await page.getByText("Two", { exact: true }).dblclick();
+        expect(await page.evaluate(() => ({
+            selected: d.rowManager.selected && d.rowManager.selected.getTitle(),
+            expanded: d.tables[0].rows.map((row) => row.expanded),
+        }))).toEqual({ selected: false, expanded: [false, false] });
+        await page.getByText("Two", { exact: true }).dblclick();
+        expect(await page.evaluate(() => ({
+            selected: d.rowManager.selected.getTitle(),
+            expanded: d.tables[0].rows.map((row) => row.expanded),
+        }))).toEqual({ selected: "Two", expanded: [false, true] });
+});
+
+test("table title dblclick edits only a sole selected table", async ({ page }) => {
+        await page.goto("/");
+        await load(page, `<sql><table x="20" y="20" name="One"/><table x="320" y="20" name="Two"/></sql>`);
+        await page.evaluate(() => {
+            d.tableManager.select(d.tables[0]);
+            d.tableManager.select(d.tables[1], true);
+        });
+        await page.getByText("One", { exact: true }).dblclick();
+        await expect(page.locator("#window")).toBeHidden();
+        await page.getByText("Two", { exact: true }).dblclick();
+        await expect(page.locator("#window")).toBeVisible();
+        await expect(page.locator("#tablename")).toHaveValue("Two");
+});
+
+test("invalid row removal is atomic and succeeds after correction", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("One", { exact: true }).dblclick();
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => ({
+        rows: d.tables[0].rows.map((row) => row.getTitle()),
+        selected: d.rowManager.selected.getTitle(),
+        expanded: d.rowManager.selected.expanded,
+    }))).toEqual({ rows: ["One", "Two"], selected: "One", expanded: true });
+    await name.fill("Retried");
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => d.tables[0].rows.map((row) => row.getTitle()))).toEqual(["Two"]);
+});
+
+test("single and multi-table removal validate before destruction", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table x="20" y="20" name="One"><row name="A"><datatype>integer</datatype></row></table><table x="320" y="20" name="Two"><row name="B"><datatype>integer</datatype></row></table><table x="620" y="20" name="Three"><row name="C"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("A", { exact: true }).dblclick();
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.locator("#removetable").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["One", "Two", "Three"]);
+    await name.fill("A1");
+    await page.locator("#removetable").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Two", "Three"]);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.tableManager.select(d.tables[1], true);
+    });
+    await page.locator("#removetable").click();
+    expect(await page.evaluate(() => d.tables.length)).toBe(0);
+});
+
+test("clear all is atomic for an invalid editor and recovers after correction", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table x="20" y="20" name="One"><row name="A"><datatype>integer</datatype></row></table><table x="320" y="20" name="Two"><row name="B"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("A", { exact: true }).dblclick();
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.locator("#cleartables").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["One", "Two"]);
+    await name.fill("A1");
+    await page.locator("#cleartables").click();
+    expect(await page.evaluate(() => d.tables.length)).toBe(0);
+});
+
+test("valid replacement discards an invalid editor while rejected import preserves it", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.getByText("Id", { exact: true }).dblclick();
+    let name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><table name="Replacement"><row name="NewId"><datatype>integer</datatype></row></table></sql>`)).toBe(true);
+    expect(await page.evaluate(() => ({
+        tables: d.tables.map((table) => table.getTitle()),
+        selected: d.rowManager.selected,
+    }))).toEqual({ tables: ["Replacement"], selected: null });
+
+    await page.getByText("NewId", { exact: true }).dblclick();
+    name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><table name="Bad"/><table name="bad"/></sql>`)).toBe(false);
+    expect(await page.evaluate(() => ({
+        tables: d.tables.map((table) => table.getTitle()),
+        selected: d.rowManager.selected.getTitle(),
+        expanded: d.rowManager.selected.expanded,
+        input: d.rowManager.selected.dom.name.value,
+    }))).toEqual({ tables: ["Replacement"], selected: "NewId", expanded: true, input: "" });
+});
+
+test("invalid row keeps new-table placement pending until one successful retry", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.tables[0].rows[0].expand();
+    });
+    await page.locator("tbody.expanded input[type=text]").first().fill("");
+    await page.locator("#addtable").click();
+    await page.evaluate(() => d.tableManager.click({ clientX: 300, clientY: 200 }));
+    expect(await page.evaluate(() => ({
+        adding: d.tableManager.adding,
+        tables: d.tables.map((table) => table.getTitle()),
+        selectedTable: d.tableManager.selection[0].getTitle(),
+        selectedRow: d.rowManager.selected.getTitle(),
+    }))).toEqual({ adding: true, tables: ["Keep"], selectedTable: "Keep", selectedRow: "Id" });
+
+    await page.locator("tbody.expanded input[type=text]").first().fill("RetriedId");
+    await page.evaluate(() => d.tableManager.click({ clientX: 300, clientY: 200 }));
+    expect(await page.evaluate(() => ({
+        adding: d.tableManager.adding,
+        tables: d.tables.map((table) => table.getTitle()),
+        rows: d.tables[1].rows.map((row) => row.getTitle()),
+        selected: d.tableManager.selection[0] === d.tables[1],
+        transient: d.tableManager.transientTable === d.tables[1],
+    }))).toEqual({
+        adding: false,
+        tables: ["Keep", "new table"],
+        rows: ["id"],
+        selected: true,
+        transient: true,
+    });
+});
+
+test("table editor validates schema identity and defaults blanks to dbo", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="Two" schema="dbo"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await expect(page.getByLabel("Schema")).toHaveValue("sales");
+    await page.locator("#tablename").fill("Two");
+    await page.locator("#tableschema").fill("DBO");
+    expect(await page.evaluate(() => d.tableManager.save())).toBe(false);
+    expect(await page.evaluate(() => [d.tables[0].getTitle(), d.tables[0].getSchema()])).toEqual(["One", "sales"]);
+    await page.locator("#tablename").fill("One");
+    await page.locator("#tableschema").fill(" ");
+    expect(await page.evaluate(() => d.tableManager.save())).toBeUndefined();
+    expect(await page.evaluate(() => d.tables[0].getSchema())).toBe("dbo");
+});
+
+test("table editor rejects empty names before mutation and permits retry or transient cancel", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name=" Keep " schema="sales"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await page.locator("#tablename").fill(" \t ");
+    await page.locator("#windowok").click();
+    await expect(page.locator("#window")).toBeVisible();
+    await expect(page.locator("#tablename")).toBeFocused();
+    expect(await page.locator("#tablename").evaluate((input) => input.validationMessage)).not.toBe("");
+    expect(await page.evaluate(() => [d.tables[0].getTitle(), d.tables[0].getSchema()])).toEqual([" Keep ", "sales"]);
+    await page.locator("#tablename").fill(" Retried ");
+    expect(await page.locator("#tablename").evaluate((input) => input.validationMessage)).toBe("");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.tables[0].getTitle())).toBe(" Retried ");
+
+    await page.locator("#addtable").click();
+    await page.locator("#area").click({ position: { x: 300, y: 200 } });
+    await page.locator("#tablename").fill("");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.tables.length)).toBe(2);
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual([" Retried "]);
+});
+
+test("row editor blocks empty and exact duplicate collapse while accepting exact distinctions", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.tables[0].rows[0].expand();
+    });
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.keyboard.press("Enter");
+    await expect(name).toBeFocused();
+    expect(await name.evaluate((input) => input.validationMessage)).not.toBe("");
+    expect(await page.evaluate(() => ({
+        selected: d.rowManager.selected.getTitle(),
+        expanded: d.tables[0].rows[0].expanded,
+        title: d.tables[0].rows[0].getTitle(),
+    }))).toEqual({ selected: "One", expanded: true, title: "One" });
+
+    await name.fill("Two");
+    await page.getByText("Two", { exact: true }).click();
+    expect(await page.evaluate(() => [d.rowManager.selected.getTitle(), d.tables[0].rows[0].expanded])).toEqual(["One", true]);
+    expect(await name.evaluate((input) => input.validationMessage)).not.toBe("");
+    await page.locator("#addrow").click();
+    expect(await page.evaluate(() => d.rowManager.selected.getTitle())).toBe("One");
+
+    await name.fill(" two ");
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => d.tables[0].rows[0].getTitle())).toBe(" two ");
+    await page.evaluate(() => { d.rowManager.select(d.tables[0].rows[1]); d.tables[0].rows[1].expand(); });
+    await page.locator("tbody.expanded input[type=text]").first().fill("TWO");
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => d.tables[0].rows[1].getTitle())).toBe("TWO");
+});
+
+test("invalid edited rows block add, table selection, and relation actions until corrected", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql>
+      <table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row></table>
+      <table x="320" y="320" name="Target"><row name="TargetId"><datatype>integer</datatype></row></table>
+      <table x="620" y="20" name="Other"><row name="OtherId"><datatype>integer</datatype></row></table>
+    </sql>`);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.tables[0].rows[0].expand();
+        d.rowManager.foreignconnect();
+    });
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+
+    await page.locator("#addrow").click();
+    expect(await page.evaluate(() => d.tables[0].rows.length)).toBe(1);
+    await page.getByText("Other", { exact: true }).click();
+    expect(await page.evaluate(() => d.tableManager.selection[0].getTitle())).toBe("Source");
+    await page.getByText("TargetId", { exact: true }).click();
+    expect(await page.evaluate(() => ({
+        relations: d.relations.length,
+        row: d.rowManager.selected.getTitle(),
+        table: d.tableManager.selection[0].getTitle(),
+    }))).toEqual({ relations: 0, row: "Id", table: "Source" });
+
+    await name.fill("SourceId");
+    await page.getByText("TargetId", { exact: true }).click();
+    expect(await page.evaluate(() => d.relations.length)).toBe(1);
+    expect(await page.evaluate(() => ({
+        source: d.relations[0].row1.getTitle(),
+        target: d.relations[0].row2.getTitle(),
+    }))).toEqual({ source: "SourceId", target: "TargetId" });
+
+    await page.getByText("Other", { exact: true }).click();
+    expect(await page.evaluate(() => d.tableManager.selection[0].getTitle())).toBe("Other");
+    await page.locator("#addrow").click();
+    expect(await page.evaluate(() => d.tables[2].rows.length)).toBe(2);
+});
+
+test("key dialog purges empty additions on Cancel, Escape, and OK", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    for (const close of ["#windowcancel", "Escape", "#windowok"]) {
+        await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.keyManager.open(d.tables[0]); });
+        await page.locator("#keyadd").click();
+        expect(await page.evaluate(() => d.tables[0].keys.length)).toBe(1);
+        if (close === "Escape") {
+            await page.keyboard.press(close);
+        } else {
+            await page.locator(close).click();
+        }
+        expect(await page.evaluate(() => d.tables[0].keys.length)).toBe(0);
+    }
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).not.toContain("<key ");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("removing last key fields and keyed rows leaves no empty serialized keys", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row><key type="PRIMARY"><part>One</part></key><key type="INDEX"><part>One</part><part>Two</part></key></table></sql>`);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.keyManager.open(d.tables[0]); });
+    await page.locator("#keyfields option").first().click();
+    await page.locator("#keyright").click();
+    expect(await page.evaluate(() => d.tables[0].keys.length)).toBe(1);
+    await page.locator("#windowok").click();
+
+    await page.evaluate(() => { d.rowManager.select(d.tables[0].rows[0]); window.confirm = () => true; });
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => ({
+        rows: d.tables[0].rows.map((row) => row.getTitle()),
+        keys: d.tables[0].keys.map((key) => key.rows.map((row) => row.getTitle())),
+    }))).toEqual({ rows: ["Two"], keys: [["Two"]] });
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => [d.tables[0].rows.length, d.tables[0].keys.length])).toEqual([0, 0]);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).not.toContain("<key ");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("metadata diagnostics and EF ZIP splitting preserve canonical XML", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Id"><datatype>integer</datatype><comment>{ public class Fake { } }</comment></row><comment>description</comment></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    await page.evaluate(() => d.io.getSafeExportXml("sqlite"));
+    await expect(page.locator("#iostatus")).toContainText("schema metadata");
+    await expect(page.locator("#iostatus")).toContainText("descriptions");
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+    const files = await page.evaluate(() => d.io.createEfZipFiles(
+        `namespace N\n{\npublic class Item { public string Text { get; set; } = "{ public class Fake { } }"; }\npublic class Context { /* } */ }\n}`, "Context", 1));
+    expect(files.map((file) => file.name)).toEqual(["Context.cs", "Item.cs"]);
+});
+
+test("counts SQL Server nvarchar description bytes by UTF-16 code unit", async ({ page }) => {
+    await page.goto("/");
+    expect(await page.evaluate(() => [
+        SQL.IO.nvarcharByteLength("A".repeat(3750)),
+        SQL.IO.nvarcharByteLength("\u{1F600}".repeat(1875)),
+        SQL.IO.nvarcharByteLength("A\u{1F600}"),
+    ])).toEqual([7500, 7500, 6]);
+});
+
+test("blocks oversized SQL Server descriptions without mutating canonical XML", async ({ page }) => {
+    await page.goto("/");
+    const safe = "A".repeat(3750);
+    const unsafeTable = "A".repeat(3751);
+    const unsafeColumn = "\u{1F600}".repeat(1876);
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Safe"><datatype>text</datatype><comment>${safe}</comment></row><row name="Details"><datatype>text</datatype><comment>${unsafeColumn}</comment></row><comment>${unsafeTable}</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    for (const target of ["mssql", "ef"]) {
+        const result = await page.evaluate((value) => ({
+            export: d.io.getSafeExportXml(value),
+            messages: Array.from(d.io.dom.status.querySelectorAll("li"), (item) => item.textContent),
+        }), target);
+        expect(result.export).toBeNull();
+        expect(result.messages).toEqual([
+            "sales.Item description is 7502 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.",
+            "sales.Item.Details description is 7504 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.",
+        ]);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("accepts descriptions at the SQL Server limit for MSSQL and EF", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "A".repeat(3750);
+    await load(page, `<sql><table name="Item"><row name="Details"><datatype>text</datatype><comment>${boundary}</comment></row><comment>${boundary}</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    for (const target of ["mssql", "ef"]) {
+        expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).not.toBeNull();
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("transforms an EF description at the SQL Server boundary in Chromium", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "A".repeat(3750);
+    await load(page, `<sql><table name="Item"><row name="Id"><datatype>integer</datatype></row><comment>${boundary}</comment></table></sql>`);
+    const generated = await page.evaluate(async () => {
+        const stylesheet = await (await fetch("db/ef/output.xsl")).text();
+        return d.io.transformEf(stylesheet, d.io.getSafeExportXml("ef"), true);
+    });
+    expect(generated).toContain(`HasComment("${boundary}")`);
+});
+
+test("transforms apostrophe-heavy MSSQL descriptions safely in Chromium", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "'".repeat(3750);
+    await load(page, `<sql><table name="Item"><row name="Details"><datatype>text</datatype><comment>O'Brien</comment></row><comment>${boundary}</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const generated = await page.evaluate(async () => {
+        const stylesheet = await (await fetch("db/mssql/output.xsl")).text();
+        return d.io.transformEf(stylesheet, d.io.getSafeExportXml("mssql"), false);
+    });
+    expect(generated).toContain(`@value=N'${boundary.repeat(2)}'`);
+    expect(generated).toContain("@value=N'O''Brien'");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    const oversized = "'".repeat(3751);
+    await load(page, `<sql><table name="Item"><row name="Id"><datatype>integer</datatype></row><comment>${oversized}</comment></table></sql>`);
+    const oversizedOriginal = await page.evaluate(() => d.toXML());
+    const blocked = await page.evaluate(() => d.io.getExportXml("mssql"));
+    expect(blocked.safe).toBe(false);
+    expect(blocked.diagnostics).toContain("dbo.Item description is 7502 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+    expect(await page.evaluate(() => d.toXML())).toBe(oversizedOriginal);
+});
+
+test("treats only XML whitespace as an absent description", async ({ page }) => {
+    await page.goto("/");
+    const nbspBoundary = "\u00a0".repeat(3750);
+    expect(await page.evaluate(() => [
+        SQL.IO.hasXmlContent(" \t\r\n"),
+        SQL.IO.hasXmlContent("\u00a0"),
+    ])).toEqual([false, true]);
+    await load(page, `<sql><table name="Item"><row name="Space"><datatype>text</datatype><comment> \t\r\n</comment></row></table></sql>`);
+    expect((await page.evaluate(() => d.io.getExportXml("sqlite"))).diagnostics).toEqual([]);
+    await load(page, `<sql><table name="Item"><row name="Nbsp"><datatype>text</datatype><comment>${nbspBoundary}</comment></row></table></sql>`);
+    for (const target of ["mssql", "ef"]) {
+        expect((await page.evaluate((value) => d.io.getExportXml(value), target)).safe).toBe(true);
+    }
+    const unsupported = await page.evaluate(() => d.io.getExportXml("sqlite"));
+    expect(unsupported.safe).toBe(true);
+    expect(unsupported.diagnostics).toEqual([
+        "sqlite export omits table and column descriptions.",
+    ]);
+    await load(page, `<sql><table name="Item"><row name="Nbsp"><datatype>text</datatype><comment>${nbspBoundary}\u00a0</comment></row></table></sql>`);
+    for (const target of ["mssql", "ef"]) {
+        const result = await page.evaluate((value) => d.io.getExportXml(value), target);
+        expect(result.safe).toBe(false);
+        expect(result.diagnostics).toContain("dbo.Item.Nbsp description is 7502 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+    }
+});
+
+test("separates schema and description export support", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Details"><datatype>text</datatype><comment>column</comment></row><comment>table</comment></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    for (const target of ["postgresql", "oracle"]) {
+        const diagnostics = await page.evaluate((value) => d.io.getExportXml(value).diagnostics, target);
+        expect(diagnostics).toEqual([`${target} export omits non-default schema metadata.`]);
+    }
+    expect(await page.evaluate(() => d.io.getExportXml("sqlite").diagnostics)).toEqual([
+        "sqlite export omits non-default schema metadata.",
+        "sqlite export omits table and column descriptions.",
+    ]);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
 test("round-trips every canonical portable token and facet", async ({ page }) => {
     await page.goto("/");
     const rows = tokens.map((token, index) => `<row name="C${index}" null="1"><datatype>${token}</datatype><default>value</default><comment>note</comment></row>`).join("");

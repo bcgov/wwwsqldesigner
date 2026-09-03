@@ -33,6 +33,15 @@ SQL.Designer = function () {
     this.applyStyle();
 };
 SQL.Designer.prototype = Object.create(SQL.Visual.prototype);
+SQL.Designer.prototype.DEFAULT_SCHEMA = "dbo";
+SQL.Designer.prototype.effectiveSchema = function (value) {
+    const schema = value == null ? "" : String(value).trim();
+    return schema || SQL.Designer.DEFAULT_SCHEMA;
+};
+SQL.Designer.prototype.tableIdentity = function (schema, tableName) {
+    return SQL.Designer.effectiveSchema(schema).toLowerCase() + "\u0000" +
+        String(tableName == null ? "" : tableName).trim().toLowerCase();
+};
 
 /* update area size */
 SQL.Designer.prototype.sync = function () {
@@ -179,8 +188,6 @@ SQL.Designer.prototype.addTable = function (name, x, y) {
 };
 
 SQL.Designer.prototype.removeTable = function (t) {
-    this.tableManager.select(false);
-    this.rowManager.select(false);
     const idx = this.tables.indexOf(t);
     if (idx == -1) {
         return;
@@ -339,13 +346,11 @@ SQL.Designer.prototype.alignTables = function () {
     this.sync();
 };
 
-SQL.Designer.prototype.findNamedTable = function (name) {
-    /* find row specified as table(row) */
-    for (let table of this.tables) {
-        if (table.getTitle() == name) {
-            return table;
-        }
-    }
+SQL.Designer.prototype.findTable = function (schema, name) {
+    const identity = SQL.Designer.tableIdentity(schema, name);
+    const matches = this.tables.filter((table) =>
+        SQL.Designer.tableIdentity(table.getSchema(), table.getTitle()) === identity);
+    return matches.length === 1 ? matches[0] : undefined;
 };
 
 SQL.Designer.prototype.toXML = function (recordSave) {
@@ -360,15 +365,24 @@ SQL.Designer.prototype.toXML = function (recordSave) {
     return xml;
 };
 
+SQL.Designer.prototype.directChildren = function (node, name) {
+    return Array.from(node.children || []).filter((child) =>
+        child.tagName && child.tagName.toLowerCase() === name);
+};
+SQL.Designer.prototype.directChild = function (node, name) {
+    return SQL.Designer.directChildren(node, name)[0] || null;
+};
+
 SQL.Designer.prototype.preparePortableImport = function (node) {
     const copy = node.cloneNode(true);
-    const types = copy.getElementsByTagName("datatypes");
+    const types = SQL.Designer.directChildren(copy, "datatypes");
     const currentDb = window.DATATYPES.getAttribute("db");
     const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? CONFIG.DEFAULT_DB : currentDb);
     const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
     const diagnostics = [];
-    for (const row of copy.getElementsByTagName("row")) {
-        const datatype = row.getElementsByTagName("datatype")[0];
+    for (const table of SQL.Designer.directChildren(copy, "table")) {
+      for (const row of SQL.Designer.directChildren(table, "row")) {
+        const datatype = SQL.Designer.directChild(row, "datatype");
         if (!datatype) { continue; }
         const original = datatype.textContent.trim();
         let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
@@ -378,27 +392,134 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
         }
         datatype.textContent = SQL.PortableTypes.formatToken(type);
         if (type.diagnostics) { diagnostics.push.apply(diagnostics, type.diagnostics); }
+      }
     }
     copy.setAttribute("format", SQL.PortableTypes.format);
     return { node: copy, diagnostics: diagnostics };
 };
-SQL.Designer.prototype.fromXML = function (node) {
-    const prepared = this.preparePortableImport(node);
+SQL.Designer.prototype.validatePortableImport = function (prepared) {
     const portable = prepared.node;
+    if (!portable.tagName || portable.tagName.toLowerCase() !== "sql") {
+        throw new Error("Invalid model root: expected sql.");
+    }
+    const allowedParents = {
+        datatypes: ["sql"], legend: ["sql"], table: ["sql"], row: ["table"],
+        key: ["table"], comment: ["table", "row"], datatype: ["row"],
+        default: ["row"], relation: ["row"], part: ["key"]
+    };
+    const singletons = { sql: ["datatypes", "legend"], table: ["comment"], row: ["datatype", "default", "comment"] };
+    for (const element of [portable].concat(Array.from(portable.querySelectorAll("*")))) {
+        const name = element.tagName.toLowerCase();
+        if (name === "sql" && element !== portable) {
+            throw new Error("Misplaced model element: sql.");
+        }
+        if (allowedParents[name]) {
+            const parentName = element.parentElement && element.parentElement.tagName.toLowerCase();
+            if (allowedParents[name].indexOf(parentName) === -1) {
+                throw new Error("Misplaced model element: " + name + ".");
+            }
+        }
+        for (const childName of singletons[name] || []) {
+            if (SQL.Designer.directChildren(element, childName).length > 1) {
+                throw new Error("Duplicate model element: " + childName + ".");
+            }
+        }
+        if (name === "default" && element.childNodes.length &&
+            (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
+            throw new Error("Default must contain exactly one text node.");
+        }
+    }
+    const tables = SQL.Designer.directChildren(portable, "table");
+    const identities = new Map();
+    const rowMaps = new Map();
+    for (const table of tables) {
+        const tableName = table.getAttribute("name");
+        if (tableName === null || !String(tableName).trim().length) {
+            throw new Error("Table name cannot be empty.");
+        }
+        const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
+        table.setAttribute("schema", schema);
+        const identity = SQL.Designer.tableIdentity(schema, tableName);
+        if (identities.has(identity)) {
+            throw new Error("Duplicate table identity: [" + schema + "].[" + table.getAttribute("name") + "].");
+        }
+        identities.set(identity, table);
+        const rows = new Map();
+        for (const row of SQL.Designer.directChildren(table, "row")) {
+            const name = row.getAttribute("name") || "";
+            if (!name.length) {
+                throw new Error("Row name cannot be empty.");
+            }
+            if (rows.has(name)) {
+                throw new Error("Duplicate row name: " + name + ".");
+            }
+            rows.set(name, row);
+        }
+        rowMaps.set(table, rows);
+        for (const key of SQL.Designer.directChildren(table, "key")) {
+            const parts = SQL.Designer.directChildren(key, "part");
+            if (!parts.length) {
+                throw new Error("Key must contain at least one part.");
+            }
+            const partNames = new Set();
+            for (const part of parts) {
+                if (part.childNodes.length !== 1 || part.firstChild.nodeType !== Node.TEXT_NODE) {
+                    throw new Error("Key part must contain exactly one text node.");
+                }
+                const name = part.firstChild.nodeValue;
+                if (!name.length) {
+                    throw new Error("Key part cannot be empty.");
+                }
+                if (partNames.has(name)) {
+                    throw new Error("Duplicate key part: " + name + ".");
+                }
+                partNames.add(name);
+                if (!rows.has(name)) {
+                    throw new Error("Key part row not found: " + name + ".");
+                }
+            }
+        }
+    }
+    for (const sourceTable of tables) {
+        const rows = SQL.Designer.directChildren(sourceTable, "row");
+        for (const sourceRow of rows) {
+            const relations = SQL.Designer.directChildren(sourceRow, "relation");
+            for (const relation of relations) {
+                const schema = SQL.Designer.effectiveSchema(relation.getAttribute("schema"));
+                relation.setAttribute("schema", schema);
+                const target = identities.get(SQL.Designer.tableIdentity(schema, relation.getAttribute("table")));
+                if (!target) {
+                    throw new Error("Relationship target table not found: [" + schema + "].[" + relation.getAttribute("table") + "].");
+                }
+                if (!rowMaps.get(target).has(relation.getAttribute("row"))) {
+                    throw new Error("Relationship target row not found: [" + schema + "].[" +
+                        target.getAttribute("name") + "].[" + relation.getAttribute("row") + "].");
+                }
+            }
+        }
+    }
+    return prepared;
+};
+SQL.Designer.prototype.fromXML = function (node) {
+    const prepared = this.validatePortableImport(this.preparePortableImport(node));
+    const portable = prepared.node;
+    this.rowManager.discardSelection();
+    this.tableManager.select(false);
     this.clearTables();
     window.DATATYPES = SQL.PortableTypes.registry();
     this.typeIndex = false;
     this.fkTypeFor = false;
-    const legends = portable.getElementsByTagName("legend");
+    const legends = SQL.Designer.directChildren(portable, "legend");
     this.legend.fromXML(legends.length ? legends[0] : null);
-    const tables = portable.getElementsByTagName("table");
+    const tables = SQL.Designer.directChildren(portable, "table");
     for (let table of tables) { const t = this.addTable("", 0, 0); t.fromXML(table); }
     for (let table of this.tables) { table.select(); table.deselect(); }
-    const rs = portable.getElementsByTagName("relation");
+    const rs = tables.flatMap((table) => SQL.Designer.directChildren(table, "row")
+        .flatMap((row) => SQL.Designer.directChildren(row, "relation")));
     for (let rel of rs) {
-        let t1 = this.findNamedTable(rel.getAttribute("table"));
+        let t1 = this.findTable(rel.getAttribute("schema"), rel.getAttribute("table"));
         let r1 = t1 && t1.findNamedRow(rel.getAttribute("row"));
-        let t2 = this.findNamedTable(rel.parentNode.parentNode.getAttribute("name"));
+        let t2 = this.findTable(rel.parentNode.parentNode.getAttribute("schema"), rel.parentNode.parentNode.getAttribute("name"));
         let r2 = t2 && t2.findNamedRow(rel.parentNode.getAttribute("name"));
         if (r1 && r2) { const relation = this.addRelation(r1, r2); relation.name = rel.getAttribute("name") || ""; relation.redraw(); }
     }

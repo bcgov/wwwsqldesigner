@@ -43,12 +43,16 @@ SQL.Key.prototype.removeRow = function (r) {
     if (idx == -1) {
         return;
     }
-    r.removeKey(this);
     this.rows.splice(idx, 1);
+    r.removeKey(this);
+    if (!this.rows.length) {
+        this.owner.removeKey(this);
+    }
 };
 
 SQL.Key.prototype.destroy = function () {
-    for (let row of this.rows) {
+    while (this.rows.length) {
+        const row = this.rows.pop();
         row.removeKey(this);
     }
 };
@@ -71,7 +75,7 @@ SQL.Key.prototype.toXML = function () {
 SQL.Key.prototype.fromXML = function (node) {
     this.setType(node.getAttribute("type"));
     this.setName(node.getAttribute("name"));
-    const parts = node.getElementsByTagName("part");
+    const parts = SQL.Designer.directChildren(node, "part");
     for (let part of parts) {
         const name = part.firstChild.nodeValue;
         const row = this.owner.findNamedRow(name);

@@ -342,7 +342,12 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
         alert(_("xmlerror") + ": Null document");
         return false;
     }
-    if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
+    try {
+        if (!this.owner.fromXML(xmlDoc.documentElement)) { return false; }
+    } catch (e) {
+        alert(_("xmlerror") + ": " + e.message);
+        return false;
+    }
     /* Keep the pane open when conversion warnings need to be read. */
     this.owner.window.close();
     return true;
@@ -614,13 +619,22 @@ SQL.IO.prototype.getExportTargetDefinition = function () {
         || CONFIG.EXPORT_TARGETS.find((target) => target.id === CONFIG.DEFAULT_DB);
 };
 
+SQL.IO.nvarcharByteLength = function (value) {
+    // sp_addextendedproperty accepts at most 7,500 bytes for an nvarchar value.
+    return String(value || "").length * 2;
+};
+
+SQL.IO.hasXmlContent = function (value) {
+    return /[^ \t\r\n]/.test(String(value || ""));
+};
+
 /* Maps a serialized copy only; target selection never rewrites the editor. */
 SQL.IO.prototype.getExportXml = function (target) {
     const doc = this.parseXml(this.owner.toXML());
     const diagnostics = [];
     let safe = true;
     for (const row of doc.querySelectorAll("sql > table > row")) {
-        const datatype = row.getElementsByTagName("datatype")[0];
+        const datatype = SQL.Designer.directChild(row, "datatype");
         const portable = SQL.PortableTypes.canonical(datatype ? datatype.textContent : "");
         const mapped = portable ? SQL.PortableTypes.map(portable, target) : { safe: false, diagnostics: ["Invalid portable datatype."], type: "" };
         diagnostics.push.apply(diagnostics, mapped.diagnostics);
@@ -629,6 +643,63 @@ SQL.IO.prototype.getExportXml = function (target) {
     }
     const datatypes = doc.querySelector("sql > datatypes");
     if (datatypes) { datatypes.setAttribute("db", target); }
+    const supportsSchema = target === "mssql" || target === "ef";
+    const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
+    if (!supportsSchema) {
+        const tables = Array.from(doc.querySelectorAll("sql > table"));
+        if (tables.some((table) =>
+            SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
+            diagnostics.push(target + " export omits non-default schema metadata.");
+        }
+        const projected = new Map();
+        for (const table of tables) {
+            const identity = SQL.Designer.tableIdentity("", table.getAttribute("name"));
+            const sources = projected.get(identity) || [];
+            sources.push(SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
+                "." + table.getAttribute("name"));
+            projected.set(identity, sources);
+        }
+        for (const sources of projected.values()) {
+            if (sources.length < 2) { continue; }
+            diagnostics.push(target + " export maps qualified tables " +
+                sources.slice().sort().join(", ") +
+                " to the same unqualified table name.");
+            safe = false;
+        }
+    }
+    if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
+        SQL.IO.hasXmlContent(comment.textContent))) {
+        diagnostics.push(target + " export omits table and column descriptions.");
+    }
+    if (supportsSchema) {
+        for (const table of doc.querySelectorAll("sql > table")) {
+            const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
+            const tableName = schema + "." + table.getAttribute("name");
+            const descriptions = [{
+                comment: SQL.Designer.directChild(table, "comment"),
+                name: tableName,
+            }];
+            for (const row of table.querySelectorAll(":scope > row")) {
+                descriptions.push({
+                    comment: SQL.Designer.directChild(row, "comment"),
+                    name: tableName + "." + row.getAttribute("name"),
+                });
+            }
+            for (const description of descriptions) {
+                const text = description.comment ? description.comment.textContent : "";
+                if (!SQL.IO.hasXmlContent(text)) { continue; }
+                const bytes = SQL.IO.nvarcharByteLength(text);
+                if (bytes > 7500) {
+                    diagnostics.push(description.name + " description is " + bytes
+                        + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+                    safe = false;
+                }
+            }
+        }
+    }
+    if (target === "mssql" && doc.querySelector("sql > table > key[type='FULLTEXT']")) {
+        diagnostics.push("Microsoft SQL Server export omits portable FULLTEXT keys.");
+    }
     return { xml: new XMLSerializer().serializeToString(doc), diagnostics: diagnostics, safe: safe };
 };
 
@@ -779,9 +850,31 @@ SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
     while ((match = classPattern.exec(source))) {
         let depth = 0;
         let end = match.index + match[0].length - 1;
+        let state = "code";
+        let escaped = false;
         for (; end < source.length; end++) {
-            if (source[end] === "{") { depth++; }
-            if (source[end] === "}" && --depth === 0) { break; }
+            const current = source[end];
+            const next = source[end + 1];
+            if (state === "line") {
+                if (current === "\n") { state = "code"; }
+                continue;
+            }
+            if (state === "block") {
+                if (current === "*" && next === "/") { state = "code"; end++; }
+                continue;
+            }
+            if (state === "string" || state === "char") {
+                if (escaped) { escaped = false; continue; }
+                if (current === "\\") { escaped = true; continue; }
+                if ((state === "string" && current === '"') || (state === "char" && current === "'")) { state = "code"; }
+                continue;
+            }
+            if (current === "/" && next === "/") { state = "line"; end++; continue; }
+            if (current === "/" && next === "*") { state = "block"; end++; continue; }
+            if (current === '"') { state = "string"; continue; }
+            if (current === "'") { state = "char"; continue; }
+            if (current === "{") { depth++; }
+            if (current === "}" && --depth === 0) { break; }
         }
         if (depth !== 0) {
             throw new Error("Unable to separate generated classes.");

@@ -54,7 +54,9 @@ SQL.RowManager.prototype.select = function (row) {
         return;
     }
     if (this.selected) {
-        this.selected.deselect();
+        if (this.selected.deselect() === false) {
+            return false;
+        }
     }
 
     this.selected = row;
@@ -62,15 +64,36 @@ SQL.RowManager.prototype.select = function (row) {
         this.selected.select();
     }
     this.redraw();
+    return true;
+};
+
+SQL.RowManager.prototype.discardSelection = function (owner) {
+    const row = this.selected;
+    if (!row || (owner && row !== owner && row.owner !== owner)) {
+        return;
+    }
+    if (row.expanded) {
+        row.expanded = false;
+        row.dom.container.classList.remove("expanded");
+        SQL.dom.clear(row.dom.container);
+        row.dom.container.appendChild(row.dom.content);
+    }
+    row.selected = false;
+    for (let relation of row.relations) {
+        relation.dehighlight();
+    }
+    row.redraw();
+    this.selected = null;
+    this.redraw();
 };
 
 SQL.RowManager.prototype.tableClick = function (e) {
     /* create relation after clicking target table */
-    if (!this.creating) {
+    if (!this.creating && !e.data.creating) {
         return;
     }
 
-    const r1 = this.selected;
+    const r1 = e.data.sourceRow;
     const t2 = e.target;
 
     let p = this.owner.getOption("pattern");
@@ -78,6 +101,16 @@ SQL.RowManager.prototype.tableClick = function (e) {
     p = p.replace(/%t/g, t2.getTitle());
     p = p.replace(/%R/g, r1.getTitle());
 
+    if (!p.trim()) {
+        alert(_("relationrowempty"));
+        this.beginCreate(r1);
+        return;
+    }
+    if (t2.rows.some((row) => row.getTitle() === p)) {
+        alert(_("relationrowexists").replace("%s", p));
+        this.beginCreate(r1);
+        return;
+    }
     const r2 = t2.addRow(p, r1.data);
     r2.update({ type: SQL.Designer.getFKTypeFor(r1.data.type) });
     r2.update({ ai: false });
@@ -86,11 +119,11 @@ SQL.RowManager.prototype.tableClick = function (e) {
 
 SQL.RowManager.prototype.rowClick = function (e) {
     /* draw relation after clicking target row */
-    if (!this.connecting) {
+    if (!this.connecting && !e.data.connecting) {
         return;
     }
 
-    const r1 = this.selected;
+    const r1 = e.data.sourceRow;
     const r2 = e.target;
 
     if (r1 == r2) {
@@ -106,9 +139,17 @@ SQL.RowManager.prototype.foreigncreate = function (e) {
     if (this.creating) {
         this.endCreate();
     } else {
-        this.creating = true;
-        this.dom.foreigncreate.value = "[" + _("foreignpending") + "]";
+        this.beginCreate();
     }
+};
+
+SQL.RowManager.prototype.beginCreate = function (sourceRow) {
+    if (sourceRow) {
+        this.select(sourceRow);
+        this.owner.tableManager.select(sourceRow.owner);
+    }
+    this.creating = true;
+    this.dom.foreigncreate.value = "[" + _("foreignpending") + "]";
 };
 
 SQL.RowManager.prototype.foreignconnect = function (e) {
@@ -161,8 +202,12 @@ SQL.RowManager.prototype.remove = function (e) {
     if (!result) {
         return;
     }
-    const t = this.selected.owner;
-    this.selected.owner.removeRow(this.selected);
+    const row = this.selected;
+    const t = row.owner;
+    if (this.select(false) === false) {
+        return;
+    }
+    t.removeRow(row);
 
     let next = false;
     if (t.rows) {
