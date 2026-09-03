@@ -624,9 +624,7 @@ SQL.IO.nvarcharByteLength = function (value) {
     return String(value || "").length * 2;
 };
 
-SQL.IO.hasXmlContent = function (value) {
-    return /[^ \t\r\n]/.test(String(value || ""));
-};
+SQL.IO.hasXmlContent = SQL.hasXmlContent;
 
 /* Maps a serialized copy only; target selection never rewrites the editor. */
 SQL.IO.prototype.getExportXml = function (target) {
@@ -646,6 +644,7 @@ SQL.IO.prototype.getExportXml = function (target) {
     const supportsSchema = target === "mssql" || target === "ef";
     const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
     const supportsClassification = target === "mssql" || target === "ef";
+    const supportsRecordsSchedule = target === "mssql" || target === "ef";
     if (!supportsSchema) {
         const tables = Array.from(doc.querySelectorAll("sql > table"));
         if (tables.some((table) =>
@@ -669,11 +668,15 @@ SQL.IO.prototype.getExportXml = function (target) {
         }
     }
     if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
-        SQL.IO.hasXmlContent(comment.textContent))) {
+        SQL.hasXmlContent(comment.textContent))) {
         diagnostics.push(target + " export omits table and column descriptions.");
     }
     if (!supportsClassification && doc.querySelector("sql > table > row > classification")) {
         diagnostics.push(target + " export omits column data classifications.");
+    }
+    if (!supportsRecordsSchedule && Array.from(doc.querySelectorAll("sql > table > records-schedule")).some((recordsSchedule) =>
+        SQL.hasXmlContent(recordsSchedule.textContent))) {
+        diagnostics.push(target + " export omits table records schedules.");
     }
     if (supportsSchema) {
         for (const table of doc.querySelectorAll("sql > table")) {
@@ -691,11 +694,26 @@ SQL.IO.prototype.getExportXml = function (target) {
             }
             for (const description of descriptions) {
                 const text = description.comment ? description.comment.textContent : "";
-                if (!SQL.IO.hasXmlContent(text)) { continue; }
+                if (!SQL.hasXmlContent(text)) { continue; }
                 const bytes = SQL.IO.nvarcharByteLength(text);
                 if (bytes > 7500) {
                     diagnostics.push(description.name + " description is " + bytes
                         + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+                    safe = false;
+                }
+            }
+        }
+        if (target === "mssql") {
+            for (const table of doc.querySelectorAll("sql > table")) {
+                const recordsSchedule = SQL.Designer.directChild(table, "records-schedule");
+                const text = recordsSchedule ? recordsSchedule.textContent : "";
+                if (!SQL.hasXmlContent(text)) { continue; }
+                const bytes = SQL.IO.nvarcharByteLength(text);
+                if (bytes > 7500) {
+                    const name = SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
+                        "." + table.getAttribute("name");
+                    diagnostics.push(name + " records schedule is " + bytes
+                        + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the records schedule.");
                     safe = false;
                 }
             }

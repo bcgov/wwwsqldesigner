@@ -16,6 +16,7 @@ Note that the auto-creation of a database and schema only works with LocalDB in 
 # Current Features
 1. Full-feature ER diagrams
 1. Comments per table and column
+1. Optional free-form records schedules per table
 1. Optional column data classifications (Public, Protected A, Protected B, or Protected C)
 1. Creation of SQL DDL scripts based on the data model (full script only, no migrations)
 1. Export of EF Core 8 classes and a DbContext, as C# or a multi-file ZIP, with configurable namespace and context name
@@ -25,6 +26,5 @@ Note that the auto-creation of a database and schema only works with LocalDB in 
 1. Data model versioning
  
 # Upcoming Features
-1. Capture of records retention schedule per column
 1. Expanding the SQL import feature to support more than an import from a local MySQL DB
 1. User roles and permissions

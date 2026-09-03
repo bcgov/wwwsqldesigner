@@ -320,6 +320,21 @@ public class EfExportTests
     }
 
     [TestMethod]
+    public void EmitsEscapedRecordsScheduleAnnotationInTheTableMappingChain()
+    {
+        var generated = Transform("""
+            <sql><table name="Item" schema="sales">
+              <row name="Id" null="0"><datatype>int</datatype></row>
+              <comment>Table note</comment>
+              <records-schedule> Keep "quoted" \ path&#13;&#10;O'Brien </records-schedule>
+            </table></sql>
+            """, GeneratedContextParameters());
+
+        StringAssert.Contains(generated,
+            "ToTable(\"Item\", \"sales\").HasComment(\"Table note\").HasAnnotation(\"RecordsSchedule\", \" Keep \\\"quoted\\\" \\\\ path\\r\\nO'Brien \")");
+    }
+
+    [TestMethod]
     public void XmlParsingRejectsDtdsAndRequiresModernBrowserApis()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));

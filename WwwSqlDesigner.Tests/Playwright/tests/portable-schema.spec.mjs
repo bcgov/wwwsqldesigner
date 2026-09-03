@@ -1380,3 +1380,184 @@ test("rejects invalid classifications transactionally", async ({ page }) => {
     expect(misplaced).not.toBe("loaded");
     expect(await page.evaluate(() => d.toXML())).toBe(original);
 });
+
+test("edits table records schedules atomically and keeps Enter local to textareas", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row><comment>Original comment</comment><records-schedule>Original schedule</records-schedule></table><table name="Two" schema="dbo"/></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    const comment = page.getByLabel("Comment");
+    const recordsSchedule = page.getByLabel("Records schedule");
+    await expect(recordsSchedule).toHaveValue("Original schedule");
+
+    await comment.fill("Pending comment");
+    await comment.press("Enter");
+    await expect(comment).toHaveValue("Pending comment\n");
+    await expect(page.locator("#window")).toBeVisible();
+    await recordsSchedule.fill(" \u00a0Pending schedule");
+    await recordsSchedule.press("Enter");
+    await expect(recordsSchedule).toHaveValue(" \u00a0Pending schedule\n");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    await page.locator("#tablename").fill("");
+    await page.locator("#windowok").click();
+    await expect(page.locator("#window")).toBeVisible();
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    await page.locator("#tablename").fill("Two");
+    await page.locator("#tableschema").fill("dbo");
+    await page.locator("#windowok").click();
+    await expect(page.locator("#window")).toBeVisible();
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    await page.locator("#tablename").fill("Renamed");
+    await page.locator("#tableschema").fill("sales");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => ({
+        comment: d.tables[0].getComment(),
+        name: d.tables[0].getTitle(),
+        recordsSchedule: d.tables[0].getRecordsSchedule(),
+    }))).toEqual({
+        comment: "Pending comment\n",
+        name: "Renamed",
+        recordsSchedule: " \u00a0Pending schedule\n",
+    });
+
+    const saved = await page.evaluate(() => d.toXML());
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await comment.fill("Cancelled comment");
+    await recordsSchedule.fill("Cancelled schedule");
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+
+    await page.evaluate(() => d.tableManager.edit());
+    await comment.fill("Escaped comment");
+    await recordsSchedule.fill("Escaped schedule");
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("round trips exact scalar metadata and normalizes only XML whitespace", async ({ page }) => {
+    await page.goto("/");
+    const recordsSchedule = " \tRetain \u00a0 seven years\r\n第二行 ";
+    await load(page, `<sql><table name="Exact"><row name="Id"><datatype>integer</datatype><comment> \t\r\n</comment></row><records-schedule>&#32;&#9;Retain&#32;\u00a0&#32;seven years&#13;&#10;第二行&#32;</records-schedule><comment> Table&#13;&#10;comment </comment></table><table name="Blank"><comment> \t\r\n</comment><records-schedule> \t\r\n</records-schedule></table><table name="Empty"><comment/><records-schedule/></table></sql>`);
+    expect(await page.evaluate(() => ({
+        blankComment: d.tables[1].getComment(),
+        blankSchedule: d.tables[1].getRecordsSchedule(),
+        emptyComment: d.tables[2].getComment(),
+        emptySchedule: d.tables[2].getRecordsSchedule(),
+        rowComment: d.tables[0].rows[0].data.comment,
+        schedule: d.tables[0].getRecordsSchedule(),
+        tableComment: d.tables[0].getComment(),
+        helpers: [SQL.hasXmlContent(" \t\r\n"), SQL.hasXmlContent("\u00a0"), SQL.IO.hasXmlContent("\u00a0")],
+    }))).toEqual({
+        blankComment: "",
+        blankSchedule: "",
+        emptyComment: "",
+        emptySchedule: "",
+        rowComment: "",
+        schedule: recordsSchedule,
+        tableComment: " Table\r\ncomment ",
+        helpers: [false, true, true],
+    });
+
+    const beforeUnchangedSave = await page.evaluate(() => d.toXML());
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await expect(page.getByLabel("Comment")).toHaveValue(" Table\ncomment ");
+    await expect(page.getByLabel("Records schedule")).toHaveValue(" \tRetain \u00a0 seven years\n第二行 ");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.toXML())).toBe(beforeUnchangedSave);
+
+    const saved = await page.evaluate(() => d.toXML());
+    const parsed = await page.evaluate((xml) => {
+        const tables = new DOMParser().parseFromString(xml, "text/xml").querySelectorAll("table");
+        return Array.from(tables, (table) => Array.from(table.children, (child) => child.tagName));
+    }, saved);
+    expect(parsed).toEqual([["row", "comment", "records-schedule"], [], []]);
+    expect(saved).toContain("<records-schedule> \tRetain \u00a0 seven years&#13;\n第二行 </records-schedule>");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.tables[0].getRecordsSchedule())).toBe(recordsSchedule);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("rejects malformed comment and records schedule scalars transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype><comment>row</comment></row><comment>table</comment><records-schedule>schedule</records-schedule></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await page.getByLabel("Records schedule").fill("Unsaved schedule");
+    const invalid = [
+        `<sql><table name="T"><comment><!--x--></comment></table></sql>`,
+        `<sql><table name="T"><comment><![CDATA[text]]></comment></table></sql>`,
+        `<sql><table name="T"><comment><x/></comment></table></sql>`,
+        `<sql><table name="T"><comment>text<!--x--></comment></table></sql>`,
+        `<sql><table name="T"><comment>one</comment><comment>two</comment></table></sql>`,
+        `<sql><table name="T"><Comment>text</Comment></table></sql>`,
+        `<sql><comment>text</comment><table name="T"/></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype><comment><![CDATA[row]]></comment></row></table></sql>`,
+        `<sql><table name="T"><records-schedule><!--x--></records-schedule></table></sql>`,
+        `<sql><table name="T"><records-schedule><![CDATA[text]]></records-schedule></table></sql>`,
+        `<sql><table name="T"><records-schedule><x/></records-schedule></table></sql>`,
+        `<sql><table name="T"><records-schedule>text<x/></records-schedule></table></sql>`,
+        `<sql><table name="T"><records-schedule>one</records-schedule><records-schedule>two</records-schedule></table></sql>`,
+        `<sql><table name="T"><Records-Schedule>text</Records-Schedule></table></sql>`,
+        `<sql><records-schedule>text</records-schedule><table name="T"/></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype><records-schedule>text</records-schedule></row></table></sql>`,
+    ];
+    for (const xml of invalid) {
+        const result = await page.evaluate((value) => {
+            try {
+                d.fromXML(new DOMParser().parseFromString(value, "text/xml").documentElement);
+                return "loaded";
+            } catch (error) {
+                return error.message;
+            }
+        }, xml);
+        expect(result).not.toBe("loaded");
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+        await expect(page.getByLabel("Records schedule")).toHaveValue("Unsaved schedule");
+        await expect(page.locator("#window")).toBeVisible();
+    }
+});
+
+test("limits MSSQL records schedules without limiting EF", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "A".repeat(3750);
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Id"><datatype>integer</datatype></row><records-schedule>${boundary}</records-schedule></table></sql>`);
+    expect(await page.evaluate(() => d.io.getExportXml("mssql").safe)).toBe(true);
+    expect(await page.evaluate(() => d.io.getExportXml("ef").safe)).toBe(true);
+
+    const oversized = "\u{1F600}".repeat(1876);
+    await load(page, `<sql><table name="Item" schema="sales"><row name="Id"><datatype>integer</datatype></row><records-schedule>${oversized}</records-schedule></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const mssql = await page.evaluate(() => d.io.getExportXml("mssql"));
+    expect(mssql.safe).toBe(false);
+    expect(mssql.diagnostics).toContain("sales.Item records schedule is 7504 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the records schedule.");
+    expect(await page.evaluate(() => d.io.getSafeExportXml("mssql"))).toBeNull();
+    expect(await page.evaluate(() => d.io.getSafeExportXml("ef"))).not.toBeNull();
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
+test("warns once when configured exporters omit records schedules", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="One"><row name="Id"><datatype>integer</datatype></row><records-schedule>one</records-schedule></table><table name="Two"><row name="Id"><datatype>integer</datatype></row><records-schedule>two</records-schedule></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const results = await page.evaluate(() => CONFIG.EXPORT_TARGETS
+        .filter((target) => target.id !== "mssql" && target.id !== "ef")
+        .map((target) => ({ id: target.id, result: d.io.getExportXml(target.id) })));
+    for (const { id, result } of results) {
+        expect(result.safe).toBe(true);
+        expect(result.diagnostics.filter((message) => message.includes("records schedules"))).toEqual([
+            `${id} export omits table records schedules.`,
+        ]);
+    }
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    await load(page, `<sql><table name="People" schema="sales"><row name="Id"><datatype>integer</datatype></row><records-schedule>one</records-schedule></table><table name="People" schema="archive"><row name="Id"><datatype>integer</datatype></row><records-schedule>two</records-schedule></table></sql>`);
+    const blockedOriginal = await page.evaluate(() => d.toXML());
+    const blocked = await page.evaluate(() => d.io.getExportXml("sqlite"));
+    expect(blocked.safe).toBe(false);
+    expect(blocked.diagnostics).toContain("sqlite export omits table records schedules.");
+    expect(blocked.diagnostics).toContain("sqlite export maps qualified tables archive.People, sales.People to the same unqualified table name.");
+    expect(await page.evaluate(() => d.toXML())).toBe(blockedOriginal);
+});

@@ -122,4 +122,21 @@ public class MssqlExportTests
         StringAssert.Contains(sql, "@level1name=N'People''s'");
         StringAssert.Contains(sql, "@level2name=N'Birth]Date'");
     }
+
+    [TestMethod]
+    public void EmitsEscapedTableRecordsSchedule()
+    {
+        var sql = Transform("""
+            <sql><table name="People's" schema="Sec]ure">
+              <row name="Id" null="0"><datatype>int</datatype></row>
+              <records-schedule> Retain O'Brien&#13;&#10;表 </records-schedule>
+            </table></sql>
+            """);
+
+        StringAssert.Contains(sql, "@name=N'RecordsSchedule', @value=N' Retain O''Brien\r\n表 '");
+        StringAssert.Contains(sql, "@level0type=N'SCHEMA', @level0name=N'Sec]ure'");
+        StringAssert.Contains(sql, "@level1type=N'TABLE', @level1name=N'People''s'");
+        Assert.AreEqual(1, sql.Split("@name=N'RecordsSchedule'").Length - 1);
+        Assert.IsFalse(sql.Contains("@level2type", StringComparison.Ordinal));
+    }
 }

@@ -405,11 +405,14 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
     const allowedParents = {
         datatypes: ["sql"], legend: ["sql"], table: ["sql"], row: ["table"],
         key: ["table"], comment: ["table", "row"], classification: ["row"], datatype: ["row"],
-        default: ["row"], relation: ["row"], part: ["key"]
+        default: ["row"], relation: ["row"], part: ["key"], "records-schedule": ["table"]
     };
-    const singletons = { sql: ["datatypes", "legend"], table: ["comment"], row: ["datatype", "default", "comment", "classification"] };
+    const singletons = { sql: ["datatypes", "legend"], table: ["comment", "records-schedule"], row: ["datatype", "default", "comment", "classification"] };
     for (const element of [portable].concat(Array.from(portable.querySelectorAll("*")))) {
         const name = element.tagName.toLowerCase();
+        if ((name === "comment" || name === "records-schedule") && element.tagName !== name) {
+            throw new Error("Invalid model element case: " + name + ".");
+        }
         if (name === "classification" && element.tagName !== "classification") {
             throw new Error("Invalid model element case: classification.");
         }
@@ -430,6 +433,10 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
         if (name === "default" && element.childNodes.length &&
             (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
             throw new Error("Default must contain exactly one text node.");
+        }
+        if ((name === "comment" || name === "records-schedule") && element.childNodes.length &&
+            (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
+            throw new Error(name + " must contain exactly one text node.");
         }
         if (name === "classification") {
             if (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE) {

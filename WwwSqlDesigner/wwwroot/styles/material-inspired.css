@@ -416,7 +416,7 @@ label, input, select {
     overflow: hidden;
 }
 
-#tablename, #tableschema, #tablecomment {
+#tablename, #tableschema, #tablecomment, #tablerecordsschedule {
     margin-bottom: 10px;
 }
 
