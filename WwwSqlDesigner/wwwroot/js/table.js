@@ -99,14 +99,21 @@ SQL.Table.prototype.hideRelations = function () {
 SQL.Table.prototype.click = function (e) {
     SQL.events.stop(e);
     const t = SQL.events.target(e);
-    this.owner.tableManager.select(this);
 
     if (t != this.dom.title) {
         return;
     } /* click on row */
 
-    SQL.publish("tableclick", this);
-    this.owner.rowManager.select(false);
+    const rowManager = this.owner.rowManager;
+    const sourceRow = this.clickSourceRow || rowManager.selected;
+    const creating = this.clickCreating || rowManager.creating;
+    this.clickSourceRow = null;
+    this.clickCreating = false;
+    if (rowManager.select(false) === false) {
+        return;
+    }
+    this.owner.tableManager.select(this);
+    SQL.publish("tableclick", this, { sourceRow: sourceRow, creating: creating });
 };
 
 SQL.Table.prototype.dblclick = function (e) {
@@ -232,6 +239,15 @@ SQL.Table.prototype.down = function (e) {
     if (t != this.dom.title) {
         return;
     } /* on a row */
+
+    const rowManager = this.owner.rowManager;
+    const sourceRow = rowManager.selected;
+    const creating = rowManager.creating;
+    if (rowManager.select(false) === false) {
+        return;
+    }
+    this.clickSourceRow = sourceRow;
+    this.clickCreating = creating;
 
     /* touch? */
     let event;

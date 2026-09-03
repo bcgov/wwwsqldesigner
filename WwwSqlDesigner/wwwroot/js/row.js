@@ -61,14 +61,17 @@ SQL.Row.prototype.select = function () {
 
 SQL.Row.prototype.deselect = function () {
     if (!this.selected) {
-        return;
+        return true;
+    }
+    if (this.collapse() === false) {
+        return false;
     }
     this.selected = false;
     for (let relation of this.relations) {
         relation.dehighlight();
     }
     this.redraw();
-    this.collapse();
+    return true;
 };
 
 SQL.Row.prototype.setTitle = function (t) {
@@ -88,8 +91,15 @@ SQL.Row.prototype.setTitle = function (t) {
 
 SQL.Row.prototype.click = function (e) {
     /* clicked on row */
-    SQL.publish("rowclick", this);
-    this.owner.owner.rowManager.select(this);
+    SQL.events.stop(e);
+    const rowManager = this.owner.owner.rowManager;
+    const sourceRow = rowManager.selected;
+    const connecting = rowManager.connecting;
+    if (rowManager.select(this) === false) {
+        return;
+    }
+    SQL.publish("rowclick", this, { sourceRow: sourceRow, connecting: connecting });
+    this.owner.owner.tableManager.select(this.owner);
 };
 
 SQL.Row.prototype.dblclick = function (e) {
@@ -164,6 +174,7 @@ SQL.Row.prototype.buildEdit = function () {
     this.dom.name.type = "text";
     elms.push(["name", this.dom.name]);
     SQL.events.add(this.dom.name, "keypress", this.enter);
+    SQL.events.add(this.dom.name, "input", () => this.dom.name.setCustomValidity(""));
 
     this.dom.type = this.buildTypeSelect(this.data.type);
     elms.push(["type", this.dom.type]);
@@ -243,8 +254,20 @@ SQL.Row.prototype.expand = function () {
 
 SQL.Row.prototype.collapse = function () {
     if (!this.expanded) {
-        return;
+        return true;
     }
+    const title = this.dom.name.value;
+    const duplicate = this.owner.rows.some((row) =>
+        row !== this && row.getTitle() === title);
+    if (!title || duplicate) {
+        this.dom.name.setCustomValidity(
+            !title ? "Field name cannot be empty." : "A field with this name already exists."
+        );
+        this.dom.name.reportValidity();
+        this.dom.name.focus();
+        return false;
+    }
+    this.dom.name.setCustomValidity("");
     this.expanded = false;
     this.dom.container.classList.remove("expanded");
 
@@ -260,7 +283,8 @@ SQL.Row.prototype.collapse = function () {
     this.dom.container.appendChild(this.dom.content);
 
     this.update(data);
-    this.setTitle(this.dom.name.value);
+    this.setTitle(title);
+    return true;
 };
 
 SQL.Row.prototype.load = function () {
@@ -376,8 +400,8 @@ SQL.Row.prototype.destroy = function () {
     while (this.relations.length) {
         this.owner.owner.removeRelation(this.relations[0]);
     }
-    for (let key of this.keys) {
-        key.removeRow(this);
+    while (this.keys.length) {
+        this.keys[0].removeRow(this);
     }
 };
 

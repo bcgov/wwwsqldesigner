@@ -197,6 +197,149 @@ test("table editor validates schema identity and defaults blanks to dbo", async 
     expect(await page.evaluate(() => d.tables[0].getSchema())).toBe("dbo");
 });
 
+test("table editor rejects empty names before mutation and permits retry or transient cancel", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name=" Keep " schema="sales"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.tableManager.edit(); });
+    await page.locator("#tablename").fill(" \t ");
+    await page.locator("#windowok").click();
+    await expect(page.locator("#window")).toBeVisible();
+    await expect(page.locator("#tablename")).toBeFocused();
+    expect(await page.locator("#tablename").evaluate((input) => input.validationMessage)).not.toBe("");
+    expect(await page.evaluate(() => [d.tables[0].getTitle(), d.tables[0].getSchema()])).toEqual([" Keep ", "sales"]);
+    await page.locator("#tablename").fill(" Retried ");
+    expect(await page.locator("#tablename").evaluate((input) => input.validationMessage)).toBe("");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.tables[0].getTitle())).toBe(" Retried ");
+
+    await page.locator("#addtable").click();
+    await page.locator("#area").click({ position: { x: 300, y: 200 } });
+    await page.locator("#tablename").fill("");
+    await page.locator("#windowok").click();
+    expect(await page.evaluate(() => d.tables.length)).toBe(2);
+    await page.locator("#windowcancel").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual([" Retried "]);
+});
+
+test("row editor blocks empty and exact duplicate collapse while accepting exact distinctions", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.tables[0].rows[0].expand();
+    });
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.keyboard.press("Enter");
+    await expect(name).toBeFocused();
+    expect(await name.evaluate((input) => input.validationMessage)).not.toBe("");
+    expect(await page.evaluate(() => ({
+        selected: d.rowManager.selected.getTitle(),
+        expanded: d.tables[0].rows[0].expanded,
+        title: d.tables[0].rows[0].getTitle(),
+    }))).toEqual({ selected: "One", expanded: true, title: "One" });
+
+    await name.fill("Two");
+    await page.getByText("Two", { exact: true }).click();
+    expect(await page.evaluate(() => [d.rowManager.selected.getTitle(), d.tables[0].rows[0].expanded])).toEqual(["One", true]);
+    expect(await name.evaluate((input) => input.validationMessage)).not.toBe("");
+    await page.locator("#addrow").click();
+    expect(await page.evaluate(() => d.rowManager.selected.getTitle())).toBe("One");
+
+    await name.fill(" two ");
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => d.tables[0].rows[0].getTitle())).toBe(" two ");
+    await page.evaluate(() => { d.rowManager.select(d.tables[0].rows[1]); d.tables[0].rows[1].expand(); });
+    await page.locator("tbody.expanded input[type=text]").first().fill("TWO");
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => d.tables[0].rows[1].getTitle())).toBe("TWO");
+});
+
+test("invalid edited rows block add, table selection, and relation actions until corrected", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql>
+      <table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row></table>
+      <table x="320" y="320" name="Target"><row name="TargetId"><datatype>integer</datatype></row></table>
+      <table x="620" y="20" name="Other"><row name="OtherId"><datatype>integer</datatype></row></table>
+    </sql>`);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.tables[0].rows[0].expand();
+        d.rowManager.foreignconnect();
+    });
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+
+    await page.locator("#addrow").click();
+    expect(await page.evaluate(() => d.tables[0].rows.length)).toBe(1);
+    await page.getByText("Other", { exact: true }).click();
+    expect(await page.evaluate(() => d.tableManager.selection[0].getTitle())).toBe("Source");
+    await page.getByText("TargetId", { exact: true }).click();
+    expect(await page.evaluate(() => ({
+        relations: d.relations.length,
+        row: d.rowManager.selected.getTitle(),
+        table: d.tableManager.selection[0].getTitle(),
+    }))).toEqual({ relations: 0, row: "Id", table: "Source" });
+
+    await name.fill("SourceId");
+    await page.getByText("TargetId", { exact: true }).click();
+    expect(await page.evaluate(() => d.relations.length)).toBe(1);
+    expect(await page.evaluate(() => ({
+        source: d.relations[0].row1.getTitle(),
+        target: d.relations[0].row2.getTitle(),
+    }))).toEqual({ source: "SourceId", target: "TargetId" });
+
+    await page.getByText("Other", { exact: true }).click();
+    expect(await page.evaluate(() => d.tableManager.selection[0].getTitle())).toBe("Other");
+    await page.locator("#addrow").click();
+    expect(await page.evaluate(() => d.tables[2].rows.length)).toBe(2);
+});
+
+test("key dialog purges empty additions on Cancel, Escape, and OK", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    for (const close of ["#windowcancel", "Escape", "#windowok"]) {
+        await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.keyManager.open(d.tables[0]); });
+        await page.locator("#keyadd").click();
+        expect(await page.evaluate(() => d.tables[0].keys.length)).toBe(1);
+        if (close === "Escape") {
+            await page.keyboard.press(close);
+        } else {
+            await page.locator(close).click();
+        }
+        expect(await page.evaluate(() => d.tables[0].keys.length)).toBe(0);
+    }
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).not.toContain("<key ");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
+test("removing last key fields and keyed rows leaves no empty serialized keys", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row><key type="PRIMARY"><part>One</part></key><key type="INDEX"><part>One</part><part>Two</part></key></table></sql>`);
+    await page.evaluate(() => { d.tableManager.select(d.tables[0]); d.keyManager.open(d.tables[0]); });
+    await page.locator("#keyfields option").first().click();
+    await page.locator("#keyright").click();
+    expect(await page.evaluate(() => d.tables[0].keys.length)).toBe(1);
+    await page.locator("#windowok").click();
+
+    await page.evaluate(() => { d.rowManager.select(d.tables[0].rows[0]); window.confirm = () => true; });
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => ({
+        rows: d.tables[0].rows.map((row) => row.getTitle()),
+        keys: d.tables[0].keys.map((key) => key.rows.map((row) => row.getTitle())),
+    }))).toEqual({ rows: ["Two"], keys: [["Two"]] });
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => [d.tables[0].rows.length, d.tables[0].keys.length])).toEqual([0, 0]);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).not.toContain("<key ");
+    await load(page, saved);
+    expect(await page.evaluate(() => d.toXML())).toBe(saved);
+});
+
 test("metadata diagnostics and EF ZIP splitting preserve canonical XML", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="Item" schema="sales"><row name="Id"><datatype>integer</datatype><comment>{ public class Fake { } }</comment></row><comment>description</comment></table></sql>`);

@@ -49,13 +49,22 @@ SQL.TableManager = function (owner) {
     SQL.events.add(this.dom.edittable, "click", this.edit.bind(this));
     SQL.events.add(this.dom.tablekeys, "click", this.keys.bind(this));
     SQL.events.add(document, "keydown", this.press.bind(this));
-    SQL.events.add(this.dom.schema, "input", () => this.dom.schema.setCustomValidity(""));
-    SQL.events.add(this.dom.name, "input", () => this.dom.schema.setCustomValidity(""));
+    SQL.events.add(this.dom.schema, "input", () => {
+        this.dom.schema.setCustomValidity("");
+        this.dom.name.setCustomValidity("");
+    });
+    SQL.events.add(this.dom.name, "input", () => {
+        this.dom.name.setCustomValidity("");
+        this.dom.schema.setCustomValidity("");
+    });
 
     this.dom.container.parentNode.removeChild(this.dom.container);
 };
 
 SQL.TableManager.prototype.addRow = function (e) {
+    if (this.owner.rowManager.select(false) === false) {
+        return;
+    }
     const newrow = this.selection[0].addRow(_("newrow"));
     this.owner.rowManager.select(newrow);
     newrow.expand();
@@ -213,6 +222,7 @@ SQL.TableManager.prototype.edit = function (e, transientTable) {
     const title = this.selection[0].getTitle();
     this.dom.name.value = title;
     this.dom.schema.value = this.selection[0].getSchema();
+    this.dom.name.setCustomValidity("");
     this.dom.schema.setCustomValidity("");
     try {
         /* throws in ie6 */
@@ -231,6 +241,13 @@ SQL.TableManager.prototype.keys = function (e) {
 
 SQL.TableManager.prototype.save = function () {
     const selected = this.selection[0];
+    if (!this.dom.name.value.trim()) {
+        this.dom.name.setCustomValidity("Table name cannot be empty.");
+        this.dom.name.reportValidity();
+        this.dom.name.focus();
+        return false;
+    }
+    this.dom.name.setCustomValidity("");
     const schema = SQL.Designer.effectiveSchema(this.dom.schema.value);
     const identity = SQL.Designer.tableIdentity(schema, this.dom.name.value);
     const duplicate = this.owner.tables.some((table) => table !== selected &&

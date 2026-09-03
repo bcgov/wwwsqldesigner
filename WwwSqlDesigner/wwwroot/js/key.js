@@ -43,12 +43,16 @@ SQL.Key.prototype.removeRow = function (r) {
     if (idx == -1) {
         return;
     }
-    r.removeKey(this);
     this.rows.splice(idx, 1);
+    r.removeKey(this);
+    if (!this.rows.length) {
+        this.owner.removeKey(this);
+    }
 };
 
 SQL.Key.prototype.destroy = function () {
-    for (let row of this.rows) {
+    while (this.rows.length) {
+        const row = this.rows.pop();
         row.removeKey(this);
     }
 };

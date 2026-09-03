@@ -54,7 +54,9 @@ SQL.RowManager.prototype.select = function (row) {
         return;
     }
     if (this.selected) {
-        this.selected.deselect();
+        if (this.selected.deselect() === false) {
+            return false;
+        }
     }
 
     this.selected = row;
@@ -62,15 +64,16 @@ SQL.RowManager.prototype.select = function (row) {
         this.selected.select();
     }
     this.redraw();
+    return true;
 };
 
 SQL.RowManager.prototype.tableClick = function (e) {
     /* create relation after clicking target table */
-    if (!this.creating) {
+    if (!this.creating && !e.data.creating) {
         return;
     }
 
-    const r1 = this.selected;
+    const r1 = e.data.sourceRow;
     const t2 = e.target;
 
     let p = this.owner.getOption("pattern");
@@ -86,11 +89,11 @@ SQL.RowManager.prototype.tableClick = function (e) {
 
 SQL.RowManager.prototype.rowClick = function (e) {
     /* draw relation after clicking target row */
-    if (!this.connecting) {
+    if (!this.connecting && !e.data.connecting) {
         return;
     }
 
-    const r1 = this.selected;
+    const r1 = e.data.sourceRow;
     const r2 = e.target;
 
     if (r1 == r2) {
