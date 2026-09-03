@@ -42,6 +42,7 @@
     <string name="ai">Autoincrement</string>
     <string name="comment">Edit comment</string>
     <string name="commenttext">Enter comment for this field</string>
+    <string name="classification">Classification</string>
 
     <!-- windows & options -->
     <string name="windowok">OK</string>

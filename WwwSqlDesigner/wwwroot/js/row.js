@@ -14,6 +14,7 @@ SQL.Row = function (owner, title, data) {
     this.data.nll = true;
     this.data.ai = false;
     this.data.comment = "";
+    this.data.classification = "";
 
     if (data) {
         this.update(data);
@@ -197,6 +198,16 @@ SQL.Row.prototype.buildEdit = function () {
     this.dom.nll.type = "checkbox";
     elms.push(["null", this.dom.nll]);
 
+    this.dom.classification = SQL.dom.create("select");
+    this.dom.classification.setAttribute("aria-label", _("classification"));
+    for (const value of ["", "Public", "Protected A", "Protected B", "Protected C"]) {
+        const option = SQL.dom.create("option");
+        option.value = value;
+        option.textContent = value;
+        this.dom.classification.appendChild(option);
+    }
+    elms.push(["classification", this.dom.classification]);
+
     this.dom.comment = SQL.dom.create("span", { className: "comment" });
     this.dom.comment.innerHTML = "";
     this.dom.comment.appendChild(document.createTextNode(this.data.comment));
@@ -279,6 +290,7 @@ SQL.Row.prototype.collapse = function () {
         size: this.dom.size.value,
         nll: this.dom.nll.checked,
         ai: this.dom.ai.checked,
+        classification: this.dom.classification.value,
     };
 
     SQL.dom.clear(this.dom.container);
@@ -301,6 +313,7 @@ SQL.Row.prototype.load = function () {
     this.dom.size.value = this.data.size;
     this.dom.nll.checked = this.data.nll;
     this.dom.ai.checked = this.data.ai;
+    this.dom.classification.value = this.data.classification;
 };
 
 SQL.Row.prototype.redraw = function () {
@@ -429,13 +442,16 @@ SQL.Row.prototype.toXML = function () {
             (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
     }
     if (this.data.comment) { xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n"; }
+    if (this.data.classification) { xml += "<classification>" + SQL.escape(this.data.classification) + "</classification>\n"; }
     return xml + "</row>\n";
 };
 
 SQL.Row.prototype.fromXML = function (node) {
     const obj = { type: 0, size: "", nll: node.getAttribute("null") === "1", ai: node.getAttribute("autoincrement") === "1" };
-    const comment = node.getElementsByTagName("comment")[0];
+    const comment = SQL.Designer.directChild(node, "comment");
     if (comment && comment.firstChild) { obj.comment = comment.firstChild.nodeValue; }
+    const classification = SQL.Designer.directChild(node, "classification");
+    if (classification) { obj.classification = classification.textContent; }
     const datatype = SQL.Designer.directChild(node, "datatype");
     if (datatype) {
         const portable = SQL.PortableTypes.canonical(datatype.textContent);

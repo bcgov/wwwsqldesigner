@@ -404,12 +404,15 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
     }
     const allowedParents = {
         datatypes: ["sql"], legend: ["sql"], table: ["sql"], row: ["table"],
-        key: ["table"], comment: ["table", "row"], datatype: ["row"],
+        key: ["table"], comment: ["table", "row"], classification: ["row"], datatype: ["row"],
         default: ["row"], relation: ["row"], part: ["key"]
     };
-    const singletons = { sql: ["datatypes", "legend"], table: ["comment"], row: ["datatype", "default", "comment"] };
+    const singletons = { sql: ["datatypes", "legend"], table: ["comment"], row: ["datatype", "default", "comment", "classification"] };
     for (const element of [portable].concat(Array.from(portable.querySelectorAll("*")))) {
         const name = element.tagName.toLowerCase();
+        if (name === "classification" && element.tagName !== "classification") {
+            throw new Error("Invalid model element case: classification.");
+        }
         if (name === "sql" && element !== portable) {
             throw new Error("Misplaced model element: sql.");
         }
@@ -427,6 +430,15 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
         if (name === "default" && element.childNodes.length &&
             (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
             throw new Error("Default must contain exactly one text node.");
+        }
+        if (name === "classification") {
+            if (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE) {
+                throw new Error("Classification must contain exactly one text node.");
+            }
+            const value = element.firstChild.nodeValue;
+            if (["Public", "Protected A", "Protected B", "Protected C"].indexOf(value) === -1) {
+                throw new Error("Invalid column classification.");
+            }
         }
     }
     const tables = SQL.Designer.directChildren(portable, "table");
