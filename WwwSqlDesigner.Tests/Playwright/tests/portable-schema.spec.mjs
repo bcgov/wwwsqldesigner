@@ -38,6 +38,59 @@ test("rejects duplicate and unresolved schema identities transactionally", async
     }
 });
 
+test("validates table names transactionally while preserving valid whitespace identity", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const invalid = [
+        `<sql><table/></sql>`,
+        `<sql><table name=""/></sql>`,
+        `<sql><table name=" \t\r\n "/></sql>`,
+        `<sql><table name="\u00a0"/></sql>`,
+    ];
+    for (const xml of invalid) {
+        expect(await page.evaluate((value) => d.io.fromXMLText(value), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+
+    await load(page, `<sql><table name=" Item " schema=" Sales "><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => [d.tables[0].getTitle(), d.tables[0].getSchema()])).toEqual([" Item ", "Sales"]);
+    const spaced = await page.evaluate(() => d.toXML());
+    expect(spaced).toContain('name=" Item " schema="Sales"');
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name=" Item " schema="Sales"/><table name="item" schema=" sales "/></sql>`)).toBe(false);
+    expect(await page.evaluate(() => d.toXML())).toBe(spaced);
+});
+
+test("validates default node shape transactionally", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const invalid = [
+        `<default><x/></default>`,
+        `<default><!--x--></default>`,
+        `<default><![CDATA[value]]></default>`,
+        `<default>value<!--x--></default>`,
+        `<default>value<x/></default>`,
+        `<default><!--x--><!--y--></default>`,
+    ];
+    for (const value of invalid) {
+        const xml = `<sql><table name="T"><row name="Value"><datatype>text</datatype>${value}</row></table></sql>`;
+        expect(await page.evaluate((input) => d.io.fromXMLText(input), xml)).toBe(false);
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("accepts absent, empty, and ordinary text defaults", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Defaults"><row name="Absent"><datatype>text</datatype></row><row name="Empty"><datatype>text</datatype><default></default></row><row name="Text"><datatype>text</datatype><default>hello</default></row></table></sql>`);
+    const saved = await page.evaluate(() => d.toXML());
+    expect(saved).not.toContain('name="Absent"><datatype>text</datatype><default>');
+    expect(saved).not.toContain('name="Empty"><datatype>text</datatype><default>');
+    expect(saved).toContain("<default>'hello'</default>");
+});
+
 test("validates exact row names and key parts transactionally", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);

@@ -423,14 +423,22 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
                 throw new Error("Duplicate model element: " + childName + ".");
             }
         }
+        if (name === "default" && element.childNodes.length &&
+            (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
+            throw new Error("Default must contain exactly one text node.");
+        }
     }
     const tables = SQL.Designer.directChildren(portable, "table");
     const identities = new Map();
     const rowMaps = new Map();
     for (const table of tables) {
+        const tableName = table.getAttribute("name");
+        if (tableName === null || !String(tableName).trim().length) {
+            throw new Error("Table name cannot be empty.");
+        }
         const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
         table.setAttribute("schema", schema);
-        const identity = SQL.Designer.tableIdentity(schema, table.getAttribute("name"));
+        const identity = SQL.Designer.tableIdentity(schema, tableName);
         if (identities.has(identity)) {
             throw new Error("Duplicate table identity: [" + schema + "].[" + table.getAttribute("name") + "].");
         }
