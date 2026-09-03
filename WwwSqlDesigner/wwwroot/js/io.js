@@ -645,9 +645,27 @@ SQL.IO.prototype.getExportXml = function (target) {
     if (datatypes) { datatypes.setAttribute("db", target); }
     const supportsSchema = target === "mssql" || target === "ef";
     const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
-    if (!supportsSchema && Array.from(doc.querySelectorAll("sql > table")).some((table) =>
-        SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
-        diagnostics.push(target + " export omits non-default schema metadata.");
+    if (!supportsSchema) {
+        const tables = Array.from(doc.querySelectorAll("sql > table"));
+        if (tables.some((table) =>
+            SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
+            diagnostics.push(target + " export omits non-default schema metadata.");
+        }
+        const projected = new Map();
+        for (const table of tables) {
+            const identity = SQL.Designer.tableIdentity("", table.getAttribute("name"));
+            const sources = projected.get(identity) || [];
+            sources.push(SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
+                "." + table.getAttribute("name"));
+            projected.set(identity, sources);
+        }
+        for (const sources of projected.values()) {
+            if (sources.length < 2) { continue; }
+            diagnostics.push(target + " export maps qualified tables " +
+                sources.slice().sort().join(", ") +
+                " to the same unqualified table name.");
+            safe = false;
+        }
     }
     if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
         SQL.IO.hasXmlContent(comment.textContent))) {

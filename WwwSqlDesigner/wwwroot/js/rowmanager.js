@@ -81,6 +81,10 @@ SQL.RowManager.prototype.tableClick = function (e) {
     p = p.replace(/%t/g, t2.getTitle());
     p = p.replace(/%R/g, r1.getTitle());
 
+    if (t2.rows.some((row) => row.getTitle() === p)) {
+        alert(_("relationrowexists").replace("%s", p));
+        return;
+    }
     const r2 = t2.addRow(p, r1.data);
     r2.update({ type: SQL.Designer.getFKTypeFor(r1.data.type) });
     r2.update({ ai: false });

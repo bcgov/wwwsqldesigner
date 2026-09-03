@@ -151,6 +151,9 @@ SQL.TableManager.prototype.click = function (e) {
     /* finish adding new table */
     let newtable = false;
     if (this.adding) {
+        if (this.owner.rowManager.select(false) === false) {
+            return;
+        }
         this.adding = false;
         SQL.dom.removeClass("area", "adding");
         this.dom.addtable.value = this.oldvalue;

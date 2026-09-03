@@ -182,6 +182,100 @@ test("warns once when MSSQL omits FULLTEXT keys without mutating XML", async ({ 
     expect(await page.evaluate(() => d.toXML())).toBe(original);
 });
 
+test("blocks projected table collisions only for schema-dropping exports", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name=" Item " schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="item" schema="archive"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    for (const target of ["cubrid", "mysql", "oracle", "postgresql", "sqlalchemy", "sqlite", "vfp9", "web2py"]) {
+        expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).toBeNull();
+        await expect(page.locator("#iostatus")).toContainText(`${target} export omits non-default schema metadata.`);
+        await expect(page.locator("#iostatus")).toContainText("archive.item, sales. Item ");
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+    for (const target of ["mssql", "ef"]) {
+        expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).not.toBeNull();
+        expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+
+    await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="Two" schema="archive"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    expect(await page.evaluate(() => d.io.getSafeExportXml("mysql"))).not.toBeNull();
+    await expect(page.locator("#iostatus li")).toHaveCount(1);
+    await expect(page.locator("#iostatus")).toContainText("mysql export omits non-default schema metadata.");
+});
+
+test("relation creation rejects an exact target field collision and remains pending for retry", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row></table><table x="320" y="20" name="Target"><row name="Id_Source"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.rowManager.foreigncreate();
+    });
+    await page.evaluate(() => d.rowManager.tableClick({
+        data: { creating: true, sourceRow: d.tables[0].rows[0] },
+        target: d.tables[1],
+    }));
+    expect(await page.evaluate(() => ({
+        rows: d.tables[1].rows.map((row) => row.getTitle()),
+        relations: d.relations.length,
+        pending: d.rowManager.creating,
+    }))).toEqual({ rows: ["Id_Source"], relations: 0, pending: true });
+
+    await page.evaluate(() => d.tables[1].rows[0].setTitle("Existing"));
+    await page.evaluate(() => d.rowManager.tableClick({
+        data: { creating: true, sourceRow: d.tables[0].rows[0] },
+        target: d.tables[1],
+    }));
+    expect(await page.evaluate(() => ({
+        rows: d.tables[1].rows.map((row) => row.getTitle()),
+        relations: d.relations.length,
+        pending: d.rowManager.creating,
+        relation: [d.relations[0].row1.getTitle(), d.relations[0].row2.getTitle()],
+    }))).toEqual({
+        rows: ["Existing", "Id_Source"],
+        relations: 1,
+        pending: false,
+        relation: ["Id", "Id_Source"],
+    });
+});
+
+test("invalid row keeps new-table placement pending until one successful retry", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.rowManager.select(d.tables[0].rows[0]);
+        d.tables[0].rows[0].expand();
+    });
+    await page.locator("tbody.expanded input[type=text]").first().fill("");
+    await page.locator("#addtable").click();
+    await page.evaluate(() => d.tableManager.click({ clientX: 300, clientY: 200 }));
+    expect(await page.evaluate(() => ({
+        adding: d.tableManager.adding,
+        tables: d.tables.map((table) => table.getTitle()),
+        selectedTable: d.tableManager.selection[0].getTitle(),
+        selectedRow: d.rowManager.selected.getTitle(),
+    }))).toEqual({ adding: true, tables: ["Keep"], selectedTable: "Keep", selectedRow: "Id" });
+
+    await page.locator("tbody.expanded input[type=text]").first().fill("RetriedId");
+    await page.evaluate(() => d.tableManager.click({ clientX: 300, clientY: 200 }));
+    expect(await page.evaluate(() => ({
+        adding: d.tableManager.adding,
+        tables: d.tables.map((table) => table.getTitle()),
+        rows: d.tables[1].rows.map((row) => row.getTitle()),
+        selected: d.tableManager.selection[0] === d.tables[1],
+        transient: d.tableManager.transientTable === d.tables[1],
+    }))).toEqual({
+        adding: false,
+        tables: ["Keep", "new table"],
+        rows: ["id"],
+        selected: true,
+        transient: true,
+    });
+});
+
 test("table editor validates schema identity and defaults blanks to dbo", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="One" schema="sales"><row name="Id"><datatype>integer</datatype></row></table><table name="Two" schema="dbo"><row name="Id"><datatype>integer</datatype></row></table></sql>`);

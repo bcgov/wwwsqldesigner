@@ -27,6 +27,7 @@
     <string name="foreignconnectpending">click target row</string>
     <string name="foreigndisconnect">Remove foreign key</string>
     <string name="relationname">Enter relationship name</string>
+    <string name="relationrowexists">A field named "%s" already exists in the target table.</string>
     <string name="confirmtable">Really delete table</string>
     <string name="confirmrow">Really delete field</string>
 
