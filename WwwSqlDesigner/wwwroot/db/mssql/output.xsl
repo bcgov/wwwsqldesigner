@@ -26,9 +26,9 @@ GO
 
 <xsl:template match="/sql">
   <xsl:for-each select="table">
-    <xsl:variable name="schema" select="normalize-space(@schema)"/>
+    <xsl:variable name="schema" select="string(@schema)"/>
     <xsl:variable name="schema-lower" select="translate($schema,$upper,$lower)"/>
-    <xsl:if test="$schema!='' and $schema-lower!='dbo' and not(preceding-sibling::table[translate(normalize-space(@schema),$upper,$lower)=$schema-lower])">
+    <xsl:if test="$schema!='' and $schema-lower!='dbo' and not(preceding-sibling::table[translate(string(@schema),$upper,$lower)=$schema-lower])">
       <xsl:call-template name="emit-schema"><xsl:with-param name="schema" select="$schema"/></xsl:call-template>
     </xsl:if>
   </xsl:for-each>

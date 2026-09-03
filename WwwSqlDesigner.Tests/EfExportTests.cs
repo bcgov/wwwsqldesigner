@@ -160,6 +160,19 @@ public class EfExportTests
     }
 
     [TestMethod]
+    public void EfExportEscapesDescriptionsAtTheSqlServerBoundary()
+    {
+        var description = string.Concat(Enumerable.Repeat("A\"\\\r\n\t", 625));
+        Assert.AreEqual(3750, description.Length);
+
+        var generated = Transform("<sql><table name=\"Item\" schema=\"dbo\"><row name=\"Id\" null=\"0\"><datatype>int</datatype></row><comment>"
+            + SecurityElement.Escape(description) + "</comment></table></sql>");
+
+        StringAssert.Contains(generated, "HasComment(\"");
+        StringAssert.Contains(generated, "A\\\"\\\\\\r\\n\\t");
+    }
+
+    [TestMethod]
     public void GeneratedHostileCommentsCompileAndProduceSqlServerDescriptionMigrations()
     {
         var generated = Transform("""

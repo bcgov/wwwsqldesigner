@@ -49,6 +49,11 @@ test("validates exact row names and key parts transactionally", async ({ page })
         `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part></part></key></table></sql>`,
         `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>id</part></key></table></sql>`,
         `<sql><table name="T"><row name=" Id "><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><!--x-->Id</part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><![CDATA[Id]]></part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><x/></part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part><x/>Id</part></key></table></sql>`,
+        `<sql><table name="T"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>I<![CDATA[d]]></part></key></table></sql>`,
         `<sql><table name="Target"><row name="Id"><datatype>integer</datatype></row><row name="Id"><datatype>integer</datatype></row></table><table name="Source"><row name="Id"><datatype>integer</datatype><relation table="Target" row="Id"/></row></table></sql>`,
     ];
     for (const xml of cases) {
@@ -192,6 +197,43 @@ test("accepts descriptions at the SQL Server limit for MSSQL and EF", async ({ p
     for (const target of ["mssql", "ef"]) {
         expect(await page.evaluate((value) => d.io.getSafeExportXml(value), target)).not.toBeNull();
         expect(await page.evaluate(() => d.toXML())).toBe(original);
+    }
+});
+
+test("transforms an EF description at the SQL Server boundary in Chromium", async ({ page }) => {
+    await page.goto("/");
+    const boundary = "A".repeat(3750);
+    await load(page, `<sql><table name="Item"><row name="Id"><datatype>integer</datatype></row><comment>${boundary}</comment></table></sql>`);
+    const generated = await page.evaluate(async () => {
+        const stylesheet = await (await fetch("db/ef/output.xsl")).text();
+        return d.io.transformEf(stylesheet, d.io.getSafeExportXml("ef"), true);
+    });
+    expect(generated).toContain(`HasComment("${boundary}")`);
+});
+
+test("treats only XML whitespace as an absent description", async ({ page }) => {
+    await page.goto("/");
+    const nbspBoundary = "\u00a0".repeat(3750);
+    expect(await page.evaluate(() => [
+        SQL.IO.hasXmlContent(" \t\r\n"),
+        SQL.IO.hasXmlContent("\u00a0"),
+    ])).toEqual([false, true]);
+    await load(page, `<sql><table name="Item"><row name="Space"><datatype>text</datatype><comment> \t\r\n</comment></row></table></sql>`);
+    expect((await page.evaluate(() => d.io.getExportXml("sqlite"))).diagnostics).toEqual([]);
+    await load(page, `<sql><table name="Item"><row name="Nbsp"><datatype>text</datatype><comment>${nbspBoundary}</comment></row></table></sql>`);
+    for (const target of ["mssql", "ef"]) {
+        expect((await page.evaluate((value) => d.io.getExportXml(value), target)).safe).toBe(true);
+    }
+    const unsupported = await page.evaluate(() => d.io.getExportXml("sqlite"));
+    expect(unsupported.safe).toBe(true);
+    expect(unsupported.diagnostics).toEqual([
+        "sqlite export omits table and column descriptions.",
+    ]);
+    await load(page, `<sql><table name="Item"><row name="Nbsp"><datatype>text</datatype><comment>${nbspBoundary}\u00a0</comment></row></table></sql>`);
+    for (const target of ["mssql", "ef"]) {
+        const result = await page.evaluate((value) => d.io.getExportXml(value), target);
+        expect(result.safe).toBe(false);
+        expect(result.diagnostics).toContain("dbo.Item.Nbsp description is 7502 bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
     }
 });
 

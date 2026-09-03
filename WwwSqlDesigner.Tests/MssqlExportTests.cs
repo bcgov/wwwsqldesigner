@@ -69,6 +69,23 @@ public class MssqlExportTests
     }
 
     [TestMethod]
+    public void PreservesInternalSchemaWhitespaceWhenCreatingAndDeduplicating()
+    {
+        var sql = Transform("""
+            <sql>
+              <table name="One" schema="Sales  Region"><row name="Id"><datatype>int</datatype></row></table>
+              <table name="Two" schema="sales  region"><row name="Id"><datatype>int</datatype></row></table>
+              <table name="Three" schema="Sales Region"><row name="Id"><datatype>int</datatype></row></table>
+            </sql>
+            """);
+
+        Assert.AreEqual(1, sql.Split("IF SCHEMA_ID(N'Sales  Region') IS NULL").Length - 1);
+        Assert.AreEqual(1, sql.Split("IF SCHEMA_ID(N'Sales Region') IS NULL").Length - 1);
+        StringAssert.Contains(sql, "CREATE TABLE [Sales  Region].[One]");
+        StringAssert.Contains(sql, "CREATE TABLE [sales  region].[Two]");
+    }
+
+    [TestMethod]
     public void EmitsValidUniqueAndOmitsFulltextWithoutDanglingCommas()
     {
         var sql = Transform("""

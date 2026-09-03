@@ -624,6 +624,10 @@ SQL.IO.nvarcharByteLength = function (value) {
     return String(value || "").length * 2;
 };
 
+SQL.IO.hasXmlContent = function (value) {
+    return /[^ \t\r\n]/.test(String(value || ""));
+};
+
 /* Maps a serialized copy only; target selection never rewrites the editor. */
 SQL.IO.prototype.getExportXml = function (target) {
     const doc = this.parseXml(this.owner.toXML());
@@ -646,7 +650,7 @@ SQL.IO.prototype.getExportXml = function (target) {
         diagnostics.push(target + " export omits non-default schema metadata.");
     }
     if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
-        comment.textContent.trim() !== "")) {
+        SQL.IO.hasXmlContent(comment.textContent))) {
         diagnostics.push(target + " export omits table and column descriptions.");
     }
     if (supportsSchema) {
@@ -665,7 +669,7 @@ SQL.IO.prototype.getExportXml = function (target) {
             }
             for (const description of descriptions) {
                 const text = description.comment ? description.comment.textContent : "";
-                if (text.trim() === "") { continue; }
+                if (!SQL.IO.hasXmlContent(text)) { continue; }
                 const bytes = SQL.IO.nvarcharByteLength(text);
                 if (bytes > 7500) {
                     diagnostics.push(description.name + " description is " + bytes

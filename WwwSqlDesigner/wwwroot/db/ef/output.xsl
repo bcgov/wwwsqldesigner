@@ -130,7 +130,13 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
 
     <xsl:template name="csharp-string">
         <xsl:param name="value"/>
-        <xsl:if test="string-length($value)&gt;0">
+        <xsl:choose>
+        <xsl:when test="string-length($value)&gt;100">
+            <xsl:variable name="middle" select="floor(string-length($value) div 2)"/>
+            <xsl:call-template name="csharp-string"><xsl:with-param name="value" select="substring($value,1,$middle)"/></xsl:call-template>
+            <xsl:call-template name="csharp-string"><xsl:with-param name="value" select="substring($value,$middle + 1)"/></xsl:call-template>
+        </xsl:when>
+        <xsl:when test="string-length($value)&gt;0">
             <xsl:variable name="char" select="substring($value,1,1)"/>
             <xsl:choose>
                 <xsl:when test="$char='\'"><xsl:text>\\</xsl:text></xsl:when>
@@ -144,7 +150,8 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
                 <xsl:otherwise><xsl:value-of select="$char"/></xsl:otherwise>
             </xsl:choose>
             <xsl:call-template name="csharp-string"><xsl:with-param name="value" select="substring($value,2)"/></xsl:call-template>
-        </xsl:if>
+        </xsl:when>
+        </xsl:choose>
     </xsl:template>
 
     <xsl:template name="identifier">

@@ -453,7 +453,10 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
                 throw new Error("Key must contain at least one part.");
             }
             for (const part of parts) {
-                const name = part.textContent;
+                if (part.childNodes.length !== 1 || part.firstChild.nodeType !== Node.TEXT_NODE) {
+                    throw new Error("Key part must contain exactly one text node.");
+                }
+                const name = part.firstChild.nodeValue;
                 if (!name.length) {
                     throw new Error("Key part cannot be empty.");
                 }
