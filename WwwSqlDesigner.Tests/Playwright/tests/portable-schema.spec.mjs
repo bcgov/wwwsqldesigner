@@ -157,8 +157,15 @@ test("new table cancel and Escape discard only the transient table", async ({ pa
         await page.locator("#area").click({ position: { x: 300, y: 200 } });
     };
     await create();
+    await page.evaluate(() => {
+        d.rowManager.select(d.tables[1].rows[0]);
+        d.tables[1].rows[0].expand();
+    });
     await page.locator("#windowcancel").click();
-    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep"]);
+    expect(await page.evaluate(() => ({
+        tables: d.tables.map((table) => table.getTitle()),
+        selectedRow: d.rowManager.selected,
+    }))).toEqual({ tables: ["Keep"], selectedRow: null });
     await create();
     await page.keyboard.press("Escape");
     expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Keep"]);
@@ -206,17 +213,11 @@ test("blocks projected table collisions only for schema-dropping exports", async
 
 test("relation creation rejects an exact target field collision and remains pending for retry", async ({ page }) => {
     await page.goto("/");
-    await load(page, `<sql><table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row></table><table x="320" y="20" name="Target"><row name="Id_Source"><datatype>integer</datatype></row></table></sql>`);
+    await load(page, `<sql><table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table><table x="320" y="20" name="Target"><row name="Id_Source"><datatype>integer</datatype></row></table></sql>`);
     page.on("dialog", (dialog) => dialog.accept());
-    await page.evaluate(() => {
-        d.tableManager.select(d.tables[0]);
-        d.rowManager.select(d.tables[0].rows[0]);
-        d.rowManager.foreigncreate();
-    });
-    await page.evaluate(() => d.rowManager.tableClick({
-        data: { creating: true, sourceRow: d.tables[0].rows[0] },
-        target: d.tables[1],
-    }));
+    await page.getByText("Id", { exact: true }).click();
+    await page.locator("#foreigncreate").click();
+    await page.getByText("Target", { exact: true }).click();
     expect(await page.evaluate(() => ({
         rows: d.tables[1].rows.map((row) => row.getTitle()),
         relations: d.relations.length,
@@ -224,10 +225,7 @@ test("relation creation rejects an exact target field collision and remains pend
     }))).toEqual({ rows: ["Id_Source"], relations: 0, pending: true });
 
     await page.evaluate(() => d.tables[1].rows[0].setTitle("Existing"));
-    await page.evaluate(() => d.rowManager.tableClick({
-        data: { creating: true, sourceRow: d.tables[0].rows[0] },
-        target: d.tables[1],
-    }));
+    await page.getByText("Target", { exact: true }).click();
     expect(await page.evaluate(() => ({
         rows: d.tables[1].rows.map((row) => row.getTitle()),
         relations: d.relations.length,
@@ -239,6 +237,84 @@ test("relation creation rejects an exact target field collision and remains pend
         pending: false,
         relation: ["Id", "Id_Source"],
     });
+});
+
+test("invalid row removal is atomic and succeeds after correction", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("One", { exact: true }).dblclick();
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => ({
+        rows: d.tables[0].rows.map((row) => row.getTitle()),
+        selected: d.rowManager.selected.getTitle(),
+        expanded: d.rowManager.selected.expanded,
+    }))).toEqual({ rows: ["One", "Two"], selected: "One", expanded: true });
+    await name.fill("Retried");
+    await page.locator("#removerow").click();
+    expect(await page.evaluate(() => d.tables[0].rows.map((row) => row.getTitle()))).toEqual(["Two"]);
+});
+
+test("single and multi-table removal validate before destruction", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table x="20" y="20" name="One"><row name="A"><datatype>integer</datatype></row></table><table x="320" y="20" name="Two"><row name="B"><datatype>integer</datatype></row></table><table x="620" y="20" name="Three"><row name="C"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("A", { exact: true }).dblclick();
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.locator("#removetable").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["One", "Two", "Three"]);
+    await name.fill("A1");
+    await page.locator("#removetable").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Two", "Three"]);
+    await page.evaluate(() => {
+        d.tableManager.select(d.tables[0]);
+        d.tableManager.select(d.tables[1], true);
+    });
+    await page.locator("#removetable").click();
+    expect(await page.evaluate(() => d.tables.length)).toBe(0);
+});
+
+test("clear all is atomic for an invalid editor and recovers after correction", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table x="20" y="20" name="One"><row name="A"><datatype>integer</datatype></row></table><table x="320" y="20" name="Two"><row name="B"><datatype>integer</datatype></row></table></sql>`);
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.getByText("A", { exact: true }).dblclick();
+    const name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    await page.locator("#cleartables").click();
+    expect(await page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["One", "Two"]);
+    await name.fill("A1");
+    await page.locator("#cleartables").click();
+    expect(await page.evaluate(() => d.tables.length)).toBe(0);
+});
+
+test("valid replacement discards an invalid editor while rejected import preserves it", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
+    await page.getByText("Id", { exact: true }).dblclick();
+    let name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><table name="Replacement"><row name="NewId"><datatype>integer</datatype></row></table></sql>`)).toBe(true);
+    expect(await page.evaluate(() => ({
+        tables: d.tables.map((table) => table.getTitle()),
+        selected: d.rowManager.selected,
+    }))).toEqual({ tables: ["Replacement"], selected: null });
+
+    await page.getByText("NewId", { exact: true }).dblclick();
+    name = page.locator("tbody.expanded input[type=text]").first();
+    await name.fill("");
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><table name="Bad"/><table name="bad"/></sql>`)).toBe(false);
+    expect(await page.evaluate(() => ({
+        tables: d.tables.map((table) => table.getTitle()),
+        selected: d.rowManager.selected.getTitle(),
+        expanded: d.rowManager.selected.expanded,
+        input: d.rowManager.selected.dom.name.value,
+    }))).toEqual({ tables: ["Replacement"], selected: "NewId", expanded: true, input: "" });
 });
 
 test("invalid row keeps new-table placement pending until one successful retry", async ({ page }) => {

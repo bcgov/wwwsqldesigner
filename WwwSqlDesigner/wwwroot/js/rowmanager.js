@@ -67,6 +67,26 @@ SQL.RowManager.prototype.select = function (row) {
     return true;
 };
 
+SQL.RowManager.prototype.discardSelection = function (owner) {
+    const row = this.selected;
+    if (!row || (owner && row !== owner && row.owner !== owner)) {
+        return;
+    }
+    if (row.expanded) {
+        row.expanded = false;
+        row.dom.container.classList.remove("expanded");
+        SQL.dom.clear(row.dom.container);
+        row.dom.container.appendChild(row.dom.content);
+    }
+    row.selected = false;
+    for (let relation of row.relations) {
+        relation.dehighlight();
+    }
+    row.redraw();
+    this.selected = null;
+    this.redraw();
+};
+
 SQL.RowManager.prototype.tableClick = function (e) {
     /* create relation after clicking target table */
     if (!this.creating && !e.data.creating) {
@@ -83,6 +103,7 @@ SQL.RowManager.prototype.tableClick = function (e) {
 
     if (t2.rows.some((row) => row.getTitle() === p)) {
         alert(_("relationrowexists").replace("%s", p));
+        this.beginCreate(r1);
         return;
     }
     const r2 = t2.addRow(p, r1.data);
@@ -113,9 +134,17 @@ SQL.RowManager.prototype.foreigncreate = function (e) {
     if (this.creating) {
         this.endCreate();
     } else {
-        this.creating = true;
-        this.dom.foreigncreate.value = "[" + _("foreignpending") + "]";
+        this.beginCreate();
     }
+};
+
+SQL.RowManager.prototype.beginCreate = function (sourceRow) {
+    if (sourceRow) {
+        this.select(sourceRow);
+        this.owner.tableManager.select(sourceRow.owner);
+    }
+    this.creating = true;
+    this.dom.foreigncreate.value = "[" + _("foreignpending") + "]";
 };
 
 SQL.RowManager.prototype.foreignconnect = function (e) {
@@ -168,8 +197,12 @@ SQL.RowManager.prototype.remove = function (e) {
     if (!result) {
         return;
     }
-    const t = this.selected.owner;
-    this.selected.owner.removeRow(this.selected);
+    const row = this.selected;
+    const t = row.owner;
+    if (this.select(false) === false) {
+        return;
+    }
+    t.removeRow(row);
 
     let next = false;
     if (t.rows) {

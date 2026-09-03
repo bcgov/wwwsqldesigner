@@ -188,8 +188,6 @@ SQL.Designer.prototype.addTable = function (name, x, y) {
 };
 
 SQL.Designer.prototype.removeTable = function (t) {
-    this.tableManager.select(false);
-    this.rowManager.select(false);
     const idx = this.tables.indexOf(t);
     if (idx == -1) {
         return;
@@ -497,6 +495,8 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
 SQL.Designer.prototype.fromXML = function (node) {
     const prepared = this.validatePortableImport(this.preparePortableImport(node));
     const portable = prepared.node;
+    this.rowManager.discardSelection();
+    this.tableManager.select(false);
     this.clearTables();
     window.DATATYPES = SQL.PortableTypes.registry();
     this.typeIndex = false;

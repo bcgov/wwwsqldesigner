@@ -195,6 +195,10 @@ SQL.TableManager.prototype.clear = function (e) {
     if (!result) {
         return;
     }
+    if (this.owner.rowManager.select(false) === false) {
+        return;
+    }
+    this.select(false);
     this.owner.clearTables();
 };
 
@@ -207,7 +211,11 @@ SQL.TableManager.prototype.remove = function (e) {
     if (!result) {
         return;
     }
+    if (this.owner.rowManager.select(false) === false) {
+        return;
+    }
     const sel = this.selection.slice(0);
+    this.select(false);
     for (let table of sel) {
         this.owner.removeTable(table);
     }
@@ -217,6 +225,10 @@ SQL.TableManager.prototype.edit = function (e, transientTable) {
     this.transientTable = transientTable || null;
     this.owner.window.open(_("edittable"), this.dom.container, this.save, () => {
         if (transientTable && this.owner.tables.indexOf(transientTable) !== -1) {
+            this.owner.rowManager.discardSelection(transientTable);
+            if (this.selection.indexOf(transientTable) !== -1) {
+                this.select(false);
+            }
             this.owner.removeTable(transientTable);
         }
         this.transientTable = null;
