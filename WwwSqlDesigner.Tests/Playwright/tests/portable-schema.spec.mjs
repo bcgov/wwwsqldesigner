@@ -263,6 +263,105 @@ test("relation creation rejects an exact target field collision and remains pend
     });
 });
 
+test("options reject an empty relationship pattern atomically and preserve the corrected value", async ({ page }) => {
+        await page.goto("/");
+        await page.evaluate(() => {
+            const values = {
+                locale: "en", efnamespace: "Original.Namespace", efcontext: "OriginalContext",
+                snap: "10", pattern: "%R_%T", style: "wwwsqldesigner", hide: "",
+                vector: "", showsize: "", showtype: "",
+            };
+            window.optionWrites = [];
+            d.getOption = (name) => values[name];
+            d.setOption = (name, value) => {
+                optionWrites.push([name, value]);
+                values[name] = value;
+            };
+        });
+        await page.locator("#options").click();
+        await page.locator("#optionefnamespace").fill("Bad..Namespace");
+        await page.locator("#optionefcontext").fill("Bad-Context");
+        await page.locator("#optionpattern").fill(" \t ");
+        await page.locator("#windowok").click();
+        await expect(page.locator("#optionefnamespace")).toBeFocused();
+        await page.locator("#optionefnamespace").fill("Retried.Namespace");
+        await page.locator("#windowok").click();
+        await expect(page.locator("#optionefcontext")).toBeFocused();
+        await page.locator("#optionefcontext").fill("RetriedContext");
+        await page.locator("#windowok").click();
+        await expect(page.locator("#optionpattern")).toBeFocused();
+        expect(await page.evaluate(() => optionWrites)).toEqual([]);
+        await page.locator("#optionpattern").fill(" %R_retry ");
+        await page.locator("#windowok").click();
+        expect(await page.evaluate(() => ({
+            pattern: optionWrites.find(([name]) => name === "pattern")[1],
+            count: optionWrites.length,
+        }))).toEqual({ pattern: " %R_retry ", count: 10 });
+});
+
+test("legacy empty relationship patterns remain pending without mutation and recover", async ({ page }) => {
+        await page.goto("/");
+        await load(page, `<sql><table x="20" y="20" name="Source"><row name="Id"><datatype>integer</datatype></row><key type="PRIMARY"><part>Id</part></key></table><table x="320" y="20" name="Target"/></sql>`);
+        await page.evaluate(() => {
+            const getOption = d.getOption.bind(d);
+            d.getOption = (name) => name === "pattern" ? " \t " : getOption(name);
+        });
+        page.on("dialog", (dialog) => dialog.accept());
+        await page.getByText("Id", { exact: true }).click();
+        await page.locator("#foreigncreate").click();
+        await page.getByText("Target", { exact: true }).click();
+        expect(await page.evaluate(() => ({
+            rows: d.tables[1].rows.length, relations: d.relations.length,
+            pending: d.rowManager.creating, source: d.rowManager.selected.getTitle(),
+        }))).toEqual({ rows: 0, relations: 0, pending: true, source: "Id" });
+        await page.evaluate(() => {
+            const getOption = d.getOption;
+            d.getOption = (name) => name === "pattern" ? "%R_retry" : getOption(name);
+        });
+        await page.getByText("Target", { exact: true }).click();
+        expect(await page.evaluate(() => ({
+            rows: d.tables[1].rows.map((row) => row.getTitle()),
+            relations: d.relations.length, pending: d.rowManager.creating,
+        }))).toEqual({ rows: ["Id_retry"], relations: 1, pending: false });
+});
+
+test("row dblclick expands only the row selected by preceding click events", async ({ page }) => {
+        await page.goto("/");
+        await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);
+        await page.getByText("One", { exact: true }).dblclick();
+        await page.locator("tbody.expanded input[type=text]").first().fill("");
+        await page.getByText("Two", { exact: true }).dblclick();
+        expect(await page.evaluate(() => ({
+            selected: d.rowManager.selected.getTitle(),
+            expanded: d.tables[0].rows.map((row) => row.expanded),
+        }))).toEqual({ selected: "One", expanded: [true, false] });
+        await page.locator("tbody.expanded input[type=text]").first().fill("One fixed");
+        await page.getByText("Two", { exact: true }).dblclick();
+        expect(await page.evaluate(() => ({
+            selected: d.rowManager.selected && d.rowManager.selected.getTitle(),
+            expanded: d.tables[0].rows.map((row) => row.expanded),
+        }))).toEqual({ selected: false, expanded: [false, false] });
+        await page.getByText("Two", { exact: true }).dblclick();
+        expect(await page.evaluate(() => ({
+            selected: d.rowManager.selected.getTitle(),
+            expanded: d.tables[0].rows.map((row) => row.expanded),
+        }))).toEqual({ selected: "Two", expanded: [false, true] });
+});
+
+test("table title dblclick edits only a sole selected table", async ({ page }) => {
+        await page.goto("/");
+        await load(page, `<sql><table x="20" y="20" name="One"/><table x="320" y="20" name="Two"/></sql>`);
+        await page.evaluate(() => {
+            d.tableManager.select(d.tables[0]);
+            d.tableManager.select(d.tables[1], true);
+        });
+        await page.getByText("One", { exact: true }).dblclick();
+        await expect(page.locator("#window")).toBeHidden();
+        await page.getByText("Two", { exact: true }).dblclick();
+        await expect(page.locator("#window")).toBeVisible();
+        await expect(page.locator("#tablename")).toHaveValue("Two");
+});
+
 test("invalid row removal is atomic and succeeds after correction", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="T"><row name="One"><datatype>integer</datatype></row><row name="Two"><datatype>integer</datatype></row></table></sql>`);

@@ -118,7 +118,8 @@ SQL.Table.prototype.click = function (e) {
 
 SQL.Table.prototype.dblclick = function (e) {
     const t = SQL.events.target(e);
-    if (t == this.dom.title) {
+    const selection = this.owner.tableManager.selection;
+    if (t == this.dom.title && selection.length == 1 && selection[0] === this) {
         this.owner.tableManager.edit();
     }
 };

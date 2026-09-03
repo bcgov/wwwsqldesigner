@@ -101,6 +101,11 @@ SQL.RowManager.prototype.tableClick = function (e) {
     p = p.replace(/%t/g, t2.getTitle());
     p = p.replace(/%R/g, r1.getTitle());
 
+    if (!p.trim()) {
+        alert(_("relationrowempty"));
+        this.beginCreate(r1);
+        return;
+    }
     if (t2.rows.some((row) => row.getTitle() === p)) {
         alert(_("relationrowexists").replace("%s", p));
         this.beginCreate(r1);

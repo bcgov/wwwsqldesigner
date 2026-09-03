@@ -106,7 +106,9 @@ SQL.Row.prototype.dblclick = function (e) {
     /* dblclicked on row */
     SQL.events.prevent(e);
     SQL.events.stop(e);
-    this.expand();
+    if (this.owner.owner.rowManager.selected === this) {
+        this.expand();
+    }
 };
 
 SQL.Row.prototype.update = function (data) {
