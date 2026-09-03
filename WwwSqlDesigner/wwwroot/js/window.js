@@ -65,6 +65,10 @@ SQL.Window.prototype.key = function (e) {
         return;
     }
     if (e.keyCode == 13) {
+        const target = SQL.events.target(e);
+        if (target && target.nodeName.toLowerCase() === "textarea") {
+            return;
+        }
         this.ok(e);
     }
     if (e.keyCode == 27) {

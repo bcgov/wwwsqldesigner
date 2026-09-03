@@ -13,6 +13,7 @@
     <string name="tablenamelabel">Name</string>
     <string name="tableschemalabel">Schema</string>
     <string name="tablecommentlabel">Comment</string>
+    <string name="tablerecordsschedulelabel">Records schedule</string>
 
     <!-- row management -->
     <string name="addrow">Add field</string>

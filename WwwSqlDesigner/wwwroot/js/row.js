@@ -115,6 +115,9 @@ SQL.Row.prototype.dblclick = function (e) {
 SQL.Row.prototype.update = function (data) {
     /* update subset of row data */
     const des = SQL.Designer;
+    if ("comment" in data && !SQL.hasXmlContent(data.comment)) {
+        data.comment = "";
+    }
     if (data.nll && data.def && data.def.match(/^null$/i)) {
         data.def = null;
     }
@@ -247,7 +250,7 @@ SQL.Row.prototype.changeComment = function (e) {
     if (c === null) {
         return;
     }
-    this.data.comment = c;
+    this.data.comment = SQL.hasXmlContent(c) ? c : "";
     this.dom.comment.innerHTML = "";
     this.dom.comment.appendChild(document.createTextNode(this.data.comment));
 };
@@ -441,7 +444,7 @@ SQL.Row.prototype.toXML = function () {
             '" row="' + SQL.escape(relation.row1.getTitle()).replace(/"/g, "&quot;") +
             (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
     }
-    if (this.data.comment) { xml += "<comment>" + SQL.escape(this.data.comment) + "</comment>\n"; }
+    if (SQL.hasXmlContent(this.data.comment)) { xml += "<comment>" + SQL.escapeXmlText(this.data.comment) + "</comment>\n"; }
     if (this.data.classification) { xml += "<classification>" + SQL.escape(this.data.classification) + "</classification>\n"; }
     return xml + "</row>\n";
 };
@@ -449,7 +452,7 @@ SQL.Row.prototype.toXML = function () {
 SQL.Row.prototype.fromXML = function (node) {
     const obj = { type: 0, size: "", nll: node.getAttribute("null") === "1", ai: node.getAttribute("autoincrement") === "1" };
     const comment = SQL.Designer.directChild(node, "comment");
-    if (comment && comment.firstChild) { obj.comment = comment.firstChild.nodeValue; }
+    if (comment) { obj.comment = comment.textContent; }
     const classification = SQL.Designer.directChild(node, "classification");
     if (classification) { obj.classification = classification.textContent; }
     const datatype = SQL.Designer.directChild(node, "datatype");

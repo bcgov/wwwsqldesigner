@@ -46,6 +46,14 @@ const SQL = {
             .replace(/</g, "&lt;");
     },
 
+    escapeXmlText: function (str) {
+        return this.escape(str).replace(/\r/g, "&#13;");
+    },
+
+    hasXmlContent: function (value) {
+        return /[^ \t\r\n]/.test(String(value || ""));
+    },
+
     dom: {
         get: function (id) {
             return document.getElementById(id);

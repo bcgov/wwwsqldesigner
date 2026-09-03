@@ -10,6 +10,7 @@ SQL.Table = function (owner, name, x, y, z) {
     this.selected = false;
     SQL.Visual.apply(this);
     this.data.comment = "";
+    this.data.recordsSchedule = "";
     this.schema = SQL.Designer.effectiveSchema();
 
     this.setTitle(name);
@@ -302,8 +303,12 @@ SQL.Table.prototype.toXML = function () {
         xml += key.toXML();
     }
     const c = this.getComment();
-    if (c) {
-        xml += "<comment>" + SQL.escape(c) + "</comment>\n";
+    if (SQL.hasXmlContent(c)) {
+        xml += "<comment>" + SQL.escapeXmlText(c) + "</comment>\n";
+    }
+    const recordsSchedule = this.getRecordsSchedule();
+    if (SQL.hasXmlContent(recordsSchedule)) {
+        xml += "<records-schedule>" + SQL.escapeXmlText(recordsSchedule) + "</records-schedule>\n";
     }
     xml += "</table>\n";
     return xml;
@@ -326,14 +331,10 @@ SQL.Table.prototype.fromXML = function (node) {
         const k = this.addKey();
         k.fromXML(key);
     }
-    for (let ch of node.childNodes) {
-        if (ch.tagName &&
-            ch.tagName.toLowerCase() == "comment" &&
-            ch.firstChild
-        ) {
-            this.setComment(ch.firstChild.nodeValue);
-        }
-    }
+    const comment = SQL.Designer.directChild(node, "comment");
+    this.setComment(comment ? comment.textContent : "");
+    const recordsSchedule = SQL.Designer.directChild(node, "records-schedule");
+    this.setRecordsSchedule(recordsSchedule ? recordsSchedule.textContent : "");
 };
 
 SQL.Table.prototype.getSchema = function () {
@@ -364,12 +365,20 @@ SQL.Table.prototype.findNamedRow = function (n) {
 };
 
 SQL.Table.prototype.setComment = function (c) {
-    this.data.comment = c;
+    this.data.comment = SQL.hasXmlContent(c) ? c : "";
     this.dom.title.title = this.data.comment;
 };
 
 SQL.Table.prototype.getComment = function () {
     return this.data.comment;
+};
+
+SQL.Table.prototype.setRecordsSchedule = function (value) {
+    this.data.recordsSchedule = SQL.hasXmlContent(value) ? value : "";
+};
+
+SQL.Table.prototype.getRecordsSchedule = function () {
+    return this.data.recordsSchedule;
 };
 
 SQL.Table.prototype.move = function (e) {

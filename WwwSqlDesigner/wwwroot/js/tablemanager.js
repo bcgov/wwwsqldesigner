@@ -7,6 +7,7 @@ SQL.TableManager = function (owner) {
         name: SQL.dom.get("tablename"),
         schema: SQL.dom.get("tableschema"),
         comment: SQL.dom.get("tablecomment"),
+        recordsSchedule: SQL.dom.get("tablerecordsschedule"),
     };
     this.selection = [];
     this.adding = false;
@@ -26,7 +27,7 @@ SQL.TableManager = function (owner) {
         elm.value = _(id);
     }
 
-    ids = ["tablenamelabel", "tableschemalabel", "tablecommentlabel"];
+    ids = ["tablenamelabel", "tableschemalabel", "tablecommentlabel", "tablerecordsschedulelabel"];
     for (let id of ids) {
         const elm = SQL.dom.get(id);
         elm.innerHTML = _(id);
@@ -232,6 +233,7 @@ SQL.TableManager.prototype.edit = function (e, transientTable) {
             this.owner.removeTable(transientTable);
         }
         this.transientTable = null;
+        this.originalScalarValues = null;
     });
 
     const title = this.selection[0].getTitle();
@@ -241,7 +243,12 @@ SQL.TableManager.prototype.edit = function (e, transientTable) {
     this.dom.schema.setCustomValidity("");
     try {
         /* throws in ie6 */
-        this.dom.comment.value = this.selection[0].getComment();
+        this.originalScalarValues = {
+            comment: this.selection[0].getComment(),
+            recordsSchedule: this.selection[0].getRecordsSchedule()
+        };
+        this.dom.comment.value = this.originalScalarValues.comment;
+        this.dom.recordsSchedule.value = this.originalScalarValues.recordsSchedule;
     } catch (e) { }
 
     /* pre-select table name */
@@ -275,8 +282,14 @@ SQL.TableManager.prototype.save = function () {
     this.dom.schema.setCustomValidity("");
     selected.setSchema(schema);
     selected.setTitle(this.dom.name.value);
-    selected.setComment(this.dom.comment.value);
+    const original = this.originalScalarValues || { comment: "", recordsSchedule: "" };
+    const normalizedComment = original.comment.replace(/\r\n?/g, "\n");
+    const normalizedRecordsSchedule = original.recordsSchedule.replace(/\r\n?/g, "\n");
+    selected.setComment(this.dom.comment.value === normalizedComment ? original.comment : this.dom.comment.value);
+    selected.setRecordsSchedule(this.dom.recordsSchedule.value === normalizedRecordsSchedule ?
+        original.recordsSchedule : this.dom.recordsSchedule.value);
     this.transientTable = null;
+    this.originalScalarValues = null;
 };
 
 SQL.TableManager.prototype.press = function (e) {

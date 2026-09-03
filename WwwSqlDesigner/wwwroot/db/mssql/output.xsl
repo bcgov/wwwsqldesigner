@@ -67,6 +67,11 @@ GO
 GO
 </xsl:text>
   </xsl:for-each>
+  <xsl:for-each select="table[normalize-space(records-schedule)!='']">
+    <xsl:text>EXEC sys.sp_addextendedproperty @name=N'RecordsSchedule', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="records-schedule"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
+GO
+</xsl:text>
+  </xsl:for-each>
   <xsl:for-each select="table/row[normalize-space(comment)!='']">
     <xsl:text>EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@name"/></xsl:call-template><xsl:text>, @level2type=N'COLUMN', @level2name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
 GO
