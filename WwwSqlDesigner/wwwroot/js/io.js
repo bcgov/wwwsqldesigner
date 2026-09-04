@@ -635,7 +635,14 @@ SQL.IO.prototype.getExportXml = function (target) {
         const datatype = SQL.Designer.directChild(row, "datatype");
         const portable = SQL.PortableTypes.canonical(datatype ? datatype.textContent : "");
         const mapped = portable ? SQL.PortableTypes.map(portable, target) : { safe: false, diagnostics: ["Invalid portable datatype."], type: "" };
-        diagnostics.push.apply(diagnostics, mapped.diagnostics);
+        if (target === "ef" && !mapped.safe) {
+            const table = row.parentElement;
+            const columnName = SQL.Designer.effectiveSchema(table.getAttribute("schema")) + "." +
+                table.getAttribute("name") + "." + row.getAttribute("name");
+            diagnostics.push.apply(diagnostics, mapped.diagnostics.map((message) => columnName + ": " + message));
+        } else {
+            diagnostics.push.apply(diagnostics, mapped.diagnostics);
+        }
         safe = safe && mapped.safe;
         if (mapped.safe && datatype) { datatype.textContent = mapped.type; }
     }

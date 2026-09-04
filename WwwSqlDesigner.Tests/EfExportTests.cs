@@ -316,7 +316,67 @@ public class EfExportTests
             """, GeneratedContextParameters());
 
         StringAssert.Contains(generated, "Property(e => e.PublicId).HasAnnotation(\"DataClassification\", \"Public\")");
-        StringAssert.Contains(generated, "Property(e => e.Secret).HasComment(\"Note\").HasAnnotation(\"DataClassification\", \"Protected B\")");
+        StringAssert.Contains(generated, "Property(e => e.Secret).HasMaxLength(20).HasComment(\"Note\").HasAnnotation(\"DataClassification\", \"Protected B\")");
+    }
+
+    [TestMethod]
+    public void EfExportMapsPortableFacetsAndReferenceTypeNullability()
+    {
+        var generated = Transform("""
+            <sql><table name="FacetTypes" schema="dbo">
+              <row name="Amount" null="0"><datatype>decimal( 18 , 4 )</datatype><comment>Money</comment><classification>Protected B</classification></row>
+              <row name="OptionalAmount" null="1"><datatype>numeric(9,0)</datatype></row>
+              <row name="LegacyAmount" null="0"><datatype>dec(7, 2)</datatype></row>
+              <row name="Name" null="0"><datatype>string(80)</datatype></row>
+              <row name="OptionalName" null="1"><datatype>nvarchar(max)</datatype></row>
+              <row name="Code" null="0"><datatype>char(12)</datatype></row>
+              <row name="Payload" null="0"><datatype>binary(32)</datatype></row>
+              <row name="OptionalPayload" null="1"><datatype>varbinary(max)</datatype></row>
+              <row name="LegacyImage" null="0"><datatype>image</datatype></row>
+            </table></sql>
+            """);
+
+        StringAssert.Contains(generated, "public decimal Amount { get; set; }");
+        StringAssert.Contains(generated, "public decimal? OptionalAmount { get; set; }");
+        StringAssert.Contains(generated, "public decimal LegacyAmount { get; set; }");
+        StringAssert.Contains(generated, "public string Name { get; set; } = null!;");
+        StringAssert.Contains(generated, "public string? OptionalName { get; set; }");
+        StringAssert.Contains(generated, "public string Code { get; set; } = null!;");
+        StringAssert.Contains(generated, "public byte[] Payload { get; set; } = null!;");
+        StringAssert.Contains(generated, "public byte[]? OptionalPayload { get; set; }");
+        StringAssert.Contains(generated, "public byte[] LegacyImage { get; set; } = null!;");
+        const string amountChain = "Property(e => e.Amount).HasPrecision(18, 4).HasComment(\"Money\").HasAnnotation(\"DataClassification\", \"Protected B\")";
+        Assert.AreEqual(1, generated.Split(amountChain, StringSplitOptions.None).Length - 1);
+        StringAssert.Contains(generated, "Property(e => e.OptionalAmount).HasPrecision(9, 0)");
+        StringAssert.Contains(generated, "Property(e => e.LegacyAmount).HasPrecision(7, 2)");
+        StringAssert.Contains(generated, "Property(e => e.Name).HasMaxLength(80)");
+        StringAssert.Contains(generated, "Property(e => e.Code).HasMaxLength(12)");
+        StringAssert.Contains(generated, "Property(e => e.Payload).HasMaxLength(32)");
+        Assert.IsFalse(generated.Contains("HasMaxLength(max)", StringComparison.Ordinal));
+        Assert.IsFalse(generated.Contains("Property(e => e.OptionalName)", StringComparison.Ordinal));
+        Assert.IsFalse(generated.Contains("Property(e => e.OptionalPayload)", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void EfExportPreservesStringAndBinaryLengthAliases()
+    {
+        var generated = Transform("""
+            <sql><table name="Aliases" schema="dbo">
+              <row name="CharValue" null="0"><datatype>char(1)</datatype></row>
+              <row name="VarcharValue" null="0"><datatype>varchar(2)</datatype></row>
+              <row name="NcharValue" null="0"><datatype>nchar(3)</datatype></row>
+              <row name="NvarcharValue" null="0"><datatype>nvarchar(4)</datatype></row>
+              <row name="BinaryValue" null="0"><datatype>binary(5)</datatype></row>
+              <row name="VarbinaryValue" null="0"><datatype>varbinary(6)</datatype></row>
+            </table></sql>
+            """);
+
+        StringAssert.Contains(generated, "Property(e => e.CharValue).HasMaxLength(1)");
+        StringAssert.Contains(generated, "Property(e => e.VarcharValue).HasMaxLength(2)");
+        StringAssert.Contains(generated, "Property(e => e.NcharValue).HasMaxLength(3)");
+        StringAssert.Contains(generated, "Property(e => e.NvarcharValue).HasMaxLength(4)");
+        StringAssert.Contains(generated, "Property(e => e.BinaryValue).HasMaxLength(5)");
+        StringAssert.Contains(generated, "Property(e => e.VarbinaryValue).HasMaxLength(6)");
     }
 
     [TestMethod]

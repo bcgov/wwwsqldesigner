@@ -45,6 +45,34 @@ SQL.PortableTypes = {
         const dialect = (target || "").toLowerCase(); const adapter = this.targetAdapters[dialect] || {}; const direct = adapter[type.kind]; const fallback = !direct && (adapter.text || adapter.string); const result = { type: direct || fallback || "", diagnostics: [], safe: !!(direct || fallback) };
         if (!result.safe) { result.diagnostics.push(this.formatToken(type) + " cannot be represented by " + dialect + "."); return result; }
         if (fallback) { result.diagnostics.push(this.formatToken(type) + " is exported as " + fallback + " in " + dialect + "."); return result; }
+        if (dialect === "ef" && /^(decimal|string|binary)$/.test(type.kind)) {
+            if (!type.facets) { return result; }
+            if (type.kind === "decimal") {
+                const match = type.facets.match(/^\s*([0-9]+)\s*,\s*([0-9]+)\s*$/);
+                const precision = match ? Number(match[1]) : 0;
+                const scale = match ? Number(match[2]) : 0;
+                if (!match || precision < 1 || precision > 2147483647 || scale > precision || scale > 2147483647) {
+                    result.safe = false;
+                    result.diagnostics.push(this.formatToken(type) + " is invalid for EF; decimal facets must be ASCII integers p,s with 1 <= p <= 2147483647 and 0 <= s <= p.");
+                    return result;
+                }
+                result.type += "(" + precision + "," + scale + ")";
+                return result;
+            }
+            if (/^max$/i.test(type.facets)) {
+                result.type += "(max)";
+                return result;
+            }
+            const match = type.facets.match(/^\s*([0-9]+)\s*$/);
+            const length = match ? Number(match[1]) : 0;
+            if (!match || length < 1 || length > 2147483647) {
+                result.safe = false;
+                result.diagnostics.push(this.formatToken(type) + " is invalid for EF; length must be max or an ASCII integer n with 1 <= n <= 2147483647.");
+                return result;
+            }
+            result.type += "(" + length + ")";
+            return result;
+        }
         if (type.facets && /^(decimal|string)$/.test(type.kind) && !/\(/.test(result.type)) { result.type += "(" + type.facets + ")";
         }
         if (type.kind === "binary" && type.facets) {
