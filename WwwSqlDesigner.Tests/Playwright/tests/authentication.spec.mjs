@@ -20,7 +20,7 @@ test("shows an accessible sign out control and submits the antiforgery token whe
     await expect(signOut).toBeVisible();
     await expect(page.locator("#options + #logout-form")).toBeVisible();
     await expect(page.locator("#logout-form")).toHaveAttribute("action", "/account/logout");
-    await expect(page.locator("#logout-form input[name='returnUrl']")).toHaveValue("/");
+    await expect(page.locator("#logout-form input[name='returnUrl']")).toHaveValue("/account/login?returnUrl=%2F");
     await expect(page.locator("#logout-form input[name='__RequestVerificationToken']")).toHaveValue("test-token");
 
     const logoutRequestPromise = page.waitForRequest((request) =>
@@ -30,7 +30,7 @@ test("shows an accessible sign out control and submits the antiforgery token whe
     const logoutRequest = await logoutRequestPromise;
     const form = new URLSearchParams(logoutRequest.postData() || "");
 
-    expect(form.get("returnUrl")).toBe("/");
+    expect(form.get("returnUrl")).toBe("/account/login?returnUrl=%2F");
     expect(form.get("__RequestVerificationToken")).toBe("test-token");
 });
 

@@ -70,7 +70,7 @@
             <input type="button" id="options" />
 
             <form method="post" action="/account/logout" id="logout-form" hidden>
-                <input type="hidden" name="returnUrl" value="/" />
+                <input type="hidden" name="returnUrl" value="/account/login?returnUrl=%2F" />
                 <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
                 <input type="submit" value="Sign out" />
             </form>
