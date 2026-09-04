@@ -43,6 +43,17 @@
     <div id="controls">
         <div id="bar">
             <div id="toggle"></div>
+            <div id="account-controls">
+                <form method="get" action="/account/login" id="signin-form" hidden>
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <input type="submit" id="signin-link" value="Sign in" />
+                </form>
+                <form method="post" action="/account/logout" id="logout-form" hidden>
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
+                    <input type="submit" value="Sign out" />
+                </form>
+            </div>
             <input type="button" id="saveload" />
 
             <hr />
@@ -68,11 +79,6 @@
 
             <input type="button" id="options" />
 
-            <form method="post" action="/account/logout" id="logout-form" hidden>
-                <input type="hidden" name="returnUrl" value="/account/login?returnUrl=%2F" />
-                <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
-                <input type="submit" value="Sign out" />
-            </form>
         </div>
 
         <div id="rubberband"></div>
@@ -287,7 +293,7 @@
                     </div>
                     <div id="iostatus" role="status" aria-live="polite" hidden></div>
                 </div>
-                <div class="io-form-group">
+                <div class="io-form-group" id="server-import-group">
                     <div class="io-label-row">
                         <label for="serverimportdatabase" id="serverimportdatabaselabel"></label>
                     </div>
@@ -396,25 +402,42 @@
     </div>
 
     <script type="text/javascript">
+        const signInForm = document.getElementById("signin-form");
         const logoutForm = document.getElementById("logout-form");
+        const serverSourceButton = document.querySelector('[data-source="server"]');
+        let d;
+        const setAuthenticationState = (enabled, authenticated, token) => {
+            const authEnabled = enabled === true;
+            const isAuthenticated = authEnabled && authenticated === true;
+            window.__wwwSqlAuthenticated = isAuthenticated;
+            signInForm.hidden = !authEnabled || isAuthenticated;
+            logoutForm.hidden = !isAuthenticated || !token;
+            serverSourceButton.disabled = !isAuthenticated;
+            serverSourceButton.setAttribute("aria-disabled", isAuthenticated ? "false" : "true");
+            if (isAuthenticated && token) {
+                document.getElementById("logout-antiforgery-token").value = token;
+            }
+            if (d && d.io) {
+                d.io.setAuthenticated(window.__wwwSqlAuthenticated);
+            }
+        };
+        window.__wwwSqlSetAuthenticationState = setAuthenticationState;
         fetch("/account/status", { credentials: "same-origin" })
             .then(async (response) => {
                 if (!response.ok) {
+                    setAuthenticationState(true, false);
                     return;
                 }
 
-                const canSignOut = await response.json();
+                const status = await response.json();
                 const token = response.headers.get("X-CSRF-TOKEN");
-                if (canSignOut && token) {
-                    document.getElementById("logout-antiforgery-token").value = token;
-                    logoutForm.hidden = false;
-                }
+                setAuthenticationState(status.enabled, status.authenticated, token);
             })
             .catch(() => {
-                return;
+                setAuthenticationState(true, false);
             });
 
-        const d = new SQL.Designer();
+        d = new SQL.Designer();
     </script>
 </body>
 

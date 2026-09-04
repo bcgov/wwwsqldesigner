@@ -113,7 +113,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             var result = controller.Status() as OkObjectResult;
 
             Assert.IsNotNull(result);
-            Assert.AreEqual(false, result.Value);
+            var status = result.Value as AuthStatusResponse;
+            Assert.IsNotNull(status);
+            Assert.IsFalse(status.Enabled);
+            Assert.IsFalse(status.Authenticated);
         }
 
     }

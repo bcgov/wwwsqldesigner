@@ -155,15 +155,24 @@ SQL.Designer.prototype.init2 = function () {
     const regexKeyword = url.match(/keyword=([^&]+)/);
     const regexVersion = url.match(/version=([^&]+)/);
     const regexOwnerId = url.match(/ownerId=([^&]+)/);
-    if (regexKeyword && regexVersion) {
-        const keyword = regexKeyword[1];
-        const version = regexVersion[1];
-        this.io.serverload(false, decodeURIComponent(keyword), decodeURIComponent(version), regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null);
-    } else if (regexKeyword) {
-        const keyword = regexKeyword[1];
-        this.io.serverload(false, decodeURIComponent(keyword), null, regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null);
-    }
+    this._serverDeepLink = regexKeyword ? {
+        keyword: decodeURIComponent(regexKeyword[1]),
+        version: regexVersion ? decodeURIComponent(regexVersion[1]) : null,
+        ownerId: regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null
+    } : null;
+    this._serverDeepLinkLoaded = false;
+    this.io.updateServerUi();
+    this.loadServerDeepLink();
     document.body.style.visibility = "visible";
+};
+
+SQL.Designer.prototype.loadServerDeepLink = function () {
+    if (!this.io || !this.io._authenticated || !this._serverDeepLink || this._serverDeepLinkLoaded) {
+        return;
+    }
+    this._serverDeepLinkLoaded = true;
+    const link = this._serverDeepLink;
+    this.io.serverload(false, link.keyword, link.version, link.ownerId);
 };
 
 SQL.Designer.prototype.getMaxZ = function () {

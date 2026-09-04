@@ -217,6 +217,10 @@ label, input, select {
     text-transform: none;
 }
 
+#bar #account-controls [hidden] {
+    display: none !important;
+}
+
 #bar input:hover {
     background-color: #de2665;
     color: #fff;

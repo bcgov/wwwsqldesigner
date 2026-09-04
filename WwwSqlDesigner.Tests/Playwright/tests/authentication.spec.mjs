@@ -6,7 +6,7 @@ test("shows an accessible sign out control and submits the antiforgery token whe
             status: 200,
             contentType: "application/json",
             headers: { "X-CSRF-TOKEN": "test-token" },
-            body: JSON.stringify(true),
+            body: JSON.stringify({ enabled: true, authenticated: true }),
         });
     });
     await page.route("**/account/logout", async (route) => {
@@ -16,11 +16,16 @@ test("shows an accessible sign out control and submits the antiforgery token whe
     await page.goto("/");
 
     const signOut = page.getByRole("button", { name: "Sign out" });
+    await expect(page.locator("#signin-link")).toBeHidden();
     await expect(signOut).toBeVisible();
-    await expect(page.locator("#options + #logout-form")).toBeVisible();
+    await expect(page.locator("#account-controls #logout-form")).toBeVisible();
     await expect(page.locator("#logout-form")).toHaveAttribute("action", "/account/logout");
-    await expect(page.locator("#logout-form input[name='returnUrl']")).toHaveValue("/account/login?returnUrl=%2F");
+    await expect(page.locator("#logout-form input[name='returnUrl']")).toHaveValue("/");
     await expect(page.locator("#logout-form input[name='__RequestVerificationToken']")).toHaveValue("test-token");
+    await page.locator("#saveload").click();
+    await expect(page.locator('[data-source="server"]')).toBeEnabled();
+    await expect(page.locator("#ioshare")).toBeVisible();
+    await page.keyboard.press("Escape");
 
     const logoutRequestPromise = page.waitForRequest((request) =>
         new URL(request.url()).pathname === "/account/logout"
@@ -29,7 +34,7 @@ test("shows an accessible sign out control and submits the antiforgery token whe
     const logoutRequest = await logoutRequestPromise;
     const form = new URLSearchParams(logoutRequest.postData() || "");
 
-    expect(form.get("returnUrl")).toBe("/account/login?returnUrl=%2F");
+    expect(form.get("returnUrl")).toBe("/");
     expect(form.get("__RequestVerificationToken")).toBe("test-token");
 });
 
@@ -38,14 +43,40 @@ test("keeps sign out hidden when the user is anonymous", async ({ page }) => {
         await route.fulfill({
             status: 200,
             contentType: "application/json",
-            body: JSON.stringify(false),
+            body: JSON.stringify({ enabled: true, authenticated: false }),
         });
     });
 
     await page.goto("/");
 
     await expect(page.locator("#logout-form")).toBeHidden();
-    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+    await page.locator("#saveload").click();
+    await expect(page.locator('[data-source="server"]')).toBeVisible();
+    await expect(page.locator('[data-source="server"]')).toBeDisabled();
+    await expect(page.locator('[data-source="server"]')).toHaveAttribute("aria-disabled", "true");
+    await expect(page.locator("#signin-link")).toHaveAttribute("type", "submit");
+    await expect(page.locator("#logout-form input[type='submit']")).toHaveAttribute("type", "submit");
+    await expect(page.locator("#signin-form")).toHaveAttribute("action", "/account/login");
+    await expect(page.locator("#signin-form input[name='returnUrl']")).toHaveValue("/");
+});
+
+test("hides both account controls when authentication is disabled", async ({ page }) => {
+    await page.route("**/account/status", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ enabled: false, authenticated: false }),
+        });
+    });
+
+    await page.goto("/");
+
+    await expect(page.locator("#signin-link")).toBeHidden();
+    await expect(page.locator("#logout-form")).toBeHidden();
+    await page.locator("#saveload").click();
+    await expect(page.locator('[data-source="server"]')).toBeVisible();
+    await expect(page.locator('[data-source="server"]')).toBeDisabled();
 });
 
 test("keeps sign out hidden when authentication status is unavailable", async ({ page }) => {

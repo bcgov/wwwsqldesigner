@@ -114,26 +114,6 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 
-app.Use(async (context, next) =>
-{
-    var isAppShellRequest =
-        context.Request.Path == "/"
-        || context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase);
-
-    if (keycloakSettings.IsConfigured
-        && isAppShellRequest
-        && context.User.Identity?.IsAuthenticated != true)
-    {
-        var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
-        await context.ChallengeAsync(
-            OpenIdConnectDefaults.AuthenticationScheme,
-            new AuthenticationProperties { RedirectUri = returnUrl });
-        return;
-    }
-
-    await next();
-});
-
 app.UseDefaultFiles();
 app.UseStaticFiles();
 

@@ -4,6 +4,7 @@ SQL.IO = function (owner) {
     this.lastUsedName =
         ""; /* last used name with local storage */
     this._csrfToken = "";
+    this._authenticated = window.__wwwSqlAuthenticated === true;
     this._serverModelState = "none";
     this._serverModels = [];
     this._currentOwnerId = "";
@@ -82,6 +83,7 @@ SQL.IO = function (owner) {
     this._serverGrants = [];
     this._clientModelNames = [];
     this.updateServerModelControls();
+    this.updateServerUi();
 
     this.dom.container.parentNode.removeChild(this.dom.container);
     this.dom.container.style.visibility = "";
@@ -112,8 +114,11 @@ SQL.IO = function (owner) {
     });
     SQL.events.add(this.dom.serverloadname, "input", this.updateIoType.bind(this));
     SQL.events.add(this.dom.serverloadmodel, "change", () => {
-        this.dom.serverloadname.value = this.dom.serverloadmodel.value;
-        this.updateServerModelChoices(true);
+        if (this.dom.iotype.value === "server") {
+            this.updateServerModelChoices(true);
+            return;
+        }
+        this.updateServerModelControls();
     });
     SQL.events.add(this.dom.servergrantid, "input", () => {
         if (this.dom.servergrantid.value) this.dom.servergrantgroup.value = "";
@@ -138,6 +143,41 @@ SQL.IO = function (owner) {
     SQL.events.add(this.dom.backend, "change", this.serverlist.bind(this));
     SQL.events.add(document, "keydown", this.press.bind(this));
     this.build();
+};
+
+SQL.IO.prototype.setAuthenticated = function (authenticated) {
+    this._authenticated = authenticated === true;
+    this.updateServerUi();
+    if (!this._authenticated) {
+        this._serverModels = [];
+        this._serverModelState = "none";
+        this._serverGrants = [];
+        if (this.dom.iotype.value === "server") {
+            this.dom.iotype.value = "browser";
+        }
+        this.updateIoType();
+        return;
+    }
+    this.owner.loadServerDeepLink();
+};
+
+SQL.IO.prototype.updateServerUi = function () {
+    const enabled = this._authenticated;
+    this.dom.iosourcebuttons
+        .filter((button) => button.getAttribute("data-source") === "server")
+        .forEach((button) => {
+            button.hidden = false;
+            button.disabled = !enabled;
+            button.setAttribute("aria-disabled", enabled ? "false" : "true");
+        });
+    ["ioshare", "server-import-group"]
+        .forEach((id) => {
+            const element = SQL.dom.get(id);
+            if (element) {
+                element.hidden = !enabled;
+            }
+        });
+    this.updateServerModelControls();
 };
 
 SQL.IO.prototype.shareclick = function () {
@@ -235,15 +275,16 @@ SQL.IO.prototype.build = function () {
 SQL.IO.prototype.click = function () {
     /* open io dialog */
     this.build();
-    this.dom.serverloadname.value = this._name || "";
-    this.dom.clientlocalname.value = "";
+    this.dom.serverloadname.value = this.dom.iotype.value === "browser"
+        ? this.lastUsedName || ""
+        : this._name || "";
     this.refreshClientStorageModels();
     this.updateIoType();
     this.refreshExportTargetLabel();
     this.owner.window.open(_("saveload"), this.dom.container);
     this.dom.serverloadname.focus();
     this.syncClientColumnHeight();
-    if (!this._serverModels.length) {
+    if (this._authenticated && !this._serverModels.length) {
         this.serverlist(null, true);
     }
 };
@@ -268,12 +309,12 @@ SQL.IO.prototype.loadCurrent = function () {
 
 SQL.IO.prototype.updateIoType = function () {
     const type = this.dom.iotype.value;
-    const server = type === "server";
+    const server = type === "server" && this._authenticated;
     const browser = type === "browser";
     this.dom.serverloadmodel.disabled = type === "xml";
     this.dom.serverowner.disabled = !server;
     this.dom.serverloadversion.disabled = !server;
-    this.dom.serverlist.disabled = this.dom.serverloadmodel.disabled;
+    this.dom.serverlist.disabled = !server;
     if (browser) {
         this.renderClientModelChoices();
     } else if (server) {
@@ -428,7 +469,8 @@ SQL.IO.prototype.clientlocalsave = function () {
         return;
     }
 
-    key = "wwwsqldesigner_databases_" + (key || "default");
+    const modelName = key || "default";
+    key = "wwwsqldesigner_databases_" + modelName;
 
     try {
         localStorage.setItem(key, xml);
@@ -461,7 +503,8 @@ SQL.IO.prototype.clientlocalload = function () {
         return;
     }
 
-    key = "wwwsqldesigner_databases_" + (key || "default");
+    const modelName = key || "default";
+    key = "wwwsqldesigner_databases_" + modelName;
 
     let xml;
     try {
@@ -481,7 +524,9 @@ SQL.IO.prototype.clientlocalload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
-        this.dom.serverloadname.value = "";
+        this.lastUsedName = modelName;
+        this.owner.setOption("lastUsedName", modelName);
+        this.dom.serverloadname.value = modelName;
         this.updateServerModelControls();
     }
 };
@@ -966,6 +1011,7 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {
+    if (!this._authenticated) return;
     const name = keyword || this.dom.serverloadname.value.trim() || prompt(_("serversaveprompt"), this._name);
     if (!name) {
         return;
@@ -1004,6 +1050,7 @@ SQL.IO.prototype.quicksave = function (e) {
 };
 
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
+    if (!this._authenticated) return;
     if (typeof keyword === "undefined") {
         keyword = this.dom.serverloadmodel.value || this.dom.serverloadname.value.trim();
         if (keyword) {
@@ -1035,6 +1082,7 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
 };
 
 SQL.IO.prototype.serverlist = function (e, preserveOutput, after) {
+    if (!this._authenticated) return;
     if (preserveOutput) {
         this.setActionLabel("serverlist", "");
     }
@@ -1142,6 +1190,7 @@ SQL.IO.prototype.getKnownShareRecipient = function () {
 };
 
 SQL.IO.prototype.refreshShareState = function () {
+    if (!this._authenticated) return;
     if (this._serverModelState !== "owned" || !this._name) {
         this._serverGrants = [];
         this.refreshGrantChoices();
@@ -1187,6 +1236,7 @@ SQL.IO.prototype.refreshGrantChoices = function () {
 };
 
 SQL.IO.prototype.copyCurrentOwnerId = function () {
+    if (!this._authenticated) return;
     this.setActionLabel("servercopy", "");
     if (!this._currentOwnerId) {
         this.serverlist(null, true, () => {
@@ -1226,6 +1276,7 @@ SQL.IO.prototype.copyTextFallback = function (value, callback) {
 };
 
 SQL.IO.prototype.servershare = function () {
+    if (!this._authenticated) return;
     if (this._serverModelState !== "owned" || !this._name) {
         return;
     }
@@ -1269,6 +1320,7 @@ SQL.IO.prototype.servershare = function () {
 };
 
 SQL.IO.prototype.serverunshare = function () {
+    if (!this._authenticated) return;
     if (this._serverModelState !== "owned" || !this._name) {
         return;
     }
@@ -1301,6 +1353,7 @@ SQL.IO.prototype.serverunshare = function () {
 };
 
 SQL.IO.prototype.serverimport = function (e) {
+    if (!this._authenticated) return;
     const name = this.dom.serverimportdatabase.value.trim();
     if (!name) {
         return;
@@ -1319,6 +1372,14 @@ SQL.IO.prototype.serverimport = function (e) {
 
 SQL.IO.prototype.check = function (code) {
     switch (code) {
+        case 401:
+            if (window.__wwwSqlSetAuthenticationState) {
+                window.__wwwSqlSetAuthenticationState(true, false);
+            } else {
+                this.setAuthenticated(false);
+            }
+            alert(_("httpresponse") + ": HTTP 401 - authentication required");
+            return false;
         case 403:
             alert(_("httpresponse") + ": HTTP 403 - access denied");
             return false;

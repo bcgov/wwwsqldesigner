@@ -7,6 +7,17 @@ async function load(page, xml) {
 
 const tokens = ["integer", "decimal(10,2)", "float", "string(100)", "text", "boolean", "date", "time", "datetime", "datetime-with-time-zone", "binary(16)", "uuid", "json", "xml"];
 
+test.beforeEach(async ({ page }) => {
+    await page.route("**/account/status", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            headers: { "X-CSRF-TOKEN": "test-token" },
+            body: JSON.stringify({ enabled: true, authenticated: true }),
+        });
+    });
+});
+
 test("round-trips legacy schemas and resolves same names by schema", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><datatypes db="portable"/>
@@ -894,6 +905,8 @@ test("round-trips XML through Client browser storage", async ({ page }) => {
     await page.locator("#saveload").click();
     await page.locator('[data-source="browser"]').click();
     await page.locator("#serverloadmodel").selectOption("Client round trip");
+    await expect(page.locator("#serverloadmodel")).toHaveValue("Client round trip");
+    await expect(page.locator("#serverloadname")).toHaveValue("Client round trip");
     await page.locator("#ioload").click();
     await expect.poll(() => page.evaluate(() => d.toXML().replace(/created="[^"]*" modified="[^"]*"/, 'created="" modified=""'))).toBe(original);
 });
@@ -1126,14 +1139,19 @@ test("loads the newest server model from the name and version form", async ({ pa
     await expect(page.locator("#serverlist")).toHaveText("Refreshed");
     await expect(page.locator("#serverlist")).toHaveText("Refresh", { timeout: 3000 });
     await expect(page.locator("#serverloadmodel option")).toHaveCount(2);
+    await page.locator("#serverloadname").fill("Save name");
     await page.locator("#serverloadmodel").selectOption("Shared");
+    await expect(page.locator("#serverloadmodel")).toHaveValue("Shared");
+    await expect(page.locator("#serverloadname")).toHaveValue("Save name");
     await expect(page.locator('#serverloadversion option[value=""]')).toHaveText("Latest");
     await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("keyword=Shared");
     await expect.poll(() => loadRequest && loadRequest.url()).not.toContain("version=");
+    await expect(page.locator("#serverloadname")).toHaveValue("Shared");
 
     loadRequest = null;
     await page.locator("#saveload").click();
+    await expect(page.locator("#serverloadname")).toHaveValue("Shared");
     await page.locator("#serverloadmodel").selectOption("Shared");
     await page.locator("#serverloadversion").selectOption("2");
     await page.locator("#ioload").click();
@@ -1198,6 +1216,7 @@ test("preserves the server catalogue and diagram when refresh fails", async ({ p
     await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="StillHere" /></sql>');
     const original = await page.evaluate(() => d.toXML());
     await page.locator("#saveload").click();
+    await expect(page.locator('[data-source="server"]')).toBeVisible();
     await page.locator('[data-source="server"]').click();
     await page.evaluate(() => {
         d.io._serverModels = [{ keyword: "Existing", version: 1, ownerId: "owner" }];

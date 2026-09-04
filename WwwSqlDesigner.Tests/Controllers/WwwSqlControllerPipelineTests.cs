@@ -30,7 +30,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             var response = await client.GetAsync("/account/status");
 
             response.EnsureSuccessStatusCode();
-            Assert.IsTrue(await response.Content.ReadFromJsonAsync<bool>());
+            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>();
+            Assert.IsNotNull(status);
+            Assert.IsTrue(status.Enabled);
+            Assert.IsTrue(status.Authenticated);
             Assert.IsTrue(response.Headers.TryGetValues("X-CSRF-TOKEN", out var tokens));
             Assert.IsFalse(string.IsNullOrWhiteSpace(tokens.Single()));
         }
@@ -49,7 +52,63 @@ namespace WwwSqlDesigner.Controllers.Tests
             var response = await client.SendAsync(request);
 
             response.EnsureSuccessStatusCode();
-            Assert.IsFalse(await response.Content.ReadFromJsonAsync<bool>());
+            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>();
+            Assert.IsNotNull(status);
+            Assert.IsTrue(status.Enabled);
+            Assert.IsFalse(status.Authenticated);
+        }
+
+        [TestMethod]
+        public async Task AnonymousUserCanLoadApplicationShell()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/");
+            request.Headers.Add("X-Test-Anonymous", "true");
+
+            var response = await client.SendAsync(request);
+
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+            StringAssert.Contains(await response.Content.ReadAsStringAsync(), "id=\"saveload\"");
+        }
+
+        [TestMethod]
+        public async Task AnonymousUserCanLoadIndexApplicationShell()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/index.html");
+            request.Headers.Add("X-Test-Anonymous", "true");
+
+            var response = await client.SendAsync(request);
+
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [TestMethod]
+        public async Task AnonymousUserCannotAccessServerModelListOrLoad()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            using var listRequest = new HttpRequestMessage(HttpMethod.Get, "/backend/netcore-ef/list");
+            listRequest.Headers.Add("X-Test-Anonymous", "true");
+            using var loadRequest = new HttpRequestMessage(HttpMethod.Get, "/backend/netcore-ef/load?keyword=protected");
+            loadRequest.Headers.Add("X-Test-Anonymous", "true");
+
+            var listResponse = await client.SendAsync(listRequest);
+            var loadResponse = await client.SendAsync(loadRequest);
+
+            Assert.AreEqual(HttpStatusCode.Unauthorized, listResponse.StatusCode);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, loadResponse.StatusCode);
         }
 
         [TestMethod]
