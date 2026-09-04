@@ -47,3 +47,16 @@ test("keeps sign out hidden when the user is anonymous", async ({ page }) => {
     await expect(page.locator("#logout-form")).toBeHidden();
     await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });
+
+test("keeps sign out hidden when authentication status is unavailable", async ({ page }) => {
+    const pageErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(error));
+    await page.route("**/account/status", async (route) => {
+        await route.fulfill({ status: 503, body: "unavailable" });
+    });
+
+    await page.goto("/");
+
+    await expect(page.locator("#logout-form")).toBeHidden();
+    expect(pageErrors).toHaveLength(0);
+});

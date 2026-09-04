@@ -411,8 +411,7 @@
                 }
             })
             .catch(() => {
-                authStatus.textContent = "Auth: unavailable";
-                authStatus.hidden = false;
+                return;
             });
 
         const d = new SQL.Designer();
