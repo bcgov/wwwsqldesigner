@@ -15,6 +15,7 @@ test("shows an accessible sign out control and submits the antiforgery token whe
 
     await page.goto("/");
 
+    await expect(page.locator("#authstatus")).toHaveText("Auth: signed in");
     const signOut = page.getByRole("button", { name: "Sign out" });
     await expect(signOut).toBeVisible();
     await expect(page.locator("#options + #logout-form")).toBeVisible();
@@ -44,6 +45,7 @@ test("keeps sign out hidden when the user is anonymous", async ({ page }) => {
 
     await page.goto("/");
 
+    await expect(page.locator("#authstatus")).toHaveText("Auth: signed out");
     await expect(page.locator("#logout-form")).toBeHidden();
     await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });
