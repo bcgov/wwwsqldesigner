@@ -53,6 +53,23 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
+        public async Task SignedOutAppShellLoadsOnceBeforeTheNextRefreshChallenges()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/?signedOut=1");
+            request.Headers.Add("X-Test-Anonymous", "true");
+
+            var response = await client.SendAsync(request);
+
+            response.EnsureSuccessStatusCode();
+            StringAssert.Contains(await response.Content.ReadAsStringAsync(), "WWW SQL Designer");
+        }
+
+        [TestMethod]
         public async Task LogoutWithoutAntiforgeryTokenReturnsBadRequest()
         {
             using var factory = new TestApplicationFactory();

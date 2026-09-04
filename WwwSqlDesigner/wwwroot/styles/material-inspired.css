@@ -17,7 +17,7 @@ body {
     user-select: none;
 }
 
-input[type=button] {
+input[type=button], input[type=submit] {
     font-family: verdana, sans-serif;
     -webkit-appearance: button;
     font-weight: 500;
@@ -677,6 +677,10 @@ label, input, select {
     height: 1px;
     border: none;
     margin: 25px 0px 25px 0px;
+}
+
+#optionspanel #logout-form input[type=submit] {
+    width: 100%;
 }
 
 .small {

@@ -45,12 +45,6 @@
             <div id="toggle"></div>
             <input type="button" id="saveload" />
 
-            <form method="post" action="/account/logout" id="logout-form" hidden>
-                <input type="hidden" name="returnUrl" value="/" />
-                <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
-                <input type="submit" value="Sign out" />
-            </form>
-
             <hr />
 
             <input type="button" id="addtable" />
@@ -179,6 +173,14 @@
         <hr />
 
         * <span class="small" id="optionsnotice"></span>
+
+        <hr />
+
+        <form method="post" action="/account/logout" id="logout-form" hidden>
+            <input type="hidden" name="returnUrl" value="/?signedOut=1" />
+            <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
+            <input type="submit" value="Sign out" />
+        </form>
     </div>
 
     <div id="loadsavepanel">
@@ -396,6 +398,12 @@
     </div>
 
     <script type="text/javascript">
+        const signedOutUrl = new URL(window.location.href);
+        if (signedOutUrl.searchParams.get("signedOut") === "1") {
+            signedOutUrl.searchParams.delete("signedOut");
+            window.history.replaceState({}, document.title, signedOutUrl.pathname + signedOutUrl.search);
+        }
+
         const logoutForm = document.getElementById("logout-form");
         fetch("/account/status", { credentials: "same-origin" })
             .then(async (response) => {
