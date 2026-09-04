@@ -79,7 +79,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                     OpenIdConnectDefaults.AuthenticationScheme
                 },
                 result.AuthenticationSchemes.ToArray());
-            Assert.AreEqual("/?signedOut=1", result.Properties?.RedirectUri);
+            Assert.AreEqual("/", result.Properties?.RedirectUri);
         }
 
         [TestMethod]
@@ -93,7 +93,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             CollectionAssert.AreEqual(
                 new[] { CookieAuthenticationDefaults.AuthenticationScheme },
                 result.AuthenticationSchemes.ToArray());
-            Assert.AreEqual("/?signedOut=1", result.Properties?.RedirectUri);
+            Assert.AreEqual("/", result.Properties?.RedirectUri);
         }
 
         [TestMethod]

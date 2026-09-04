@@ -47,9 +47,7 @@ namespace WwwSqlDesigner.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult Logout(string? returnUrl = null)
         {
-            var safeReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
-                ? "/?signedOut=1"
-                : GetSafeReturnUrl(returnUrl);
+            var safeReturnUrl = GetSafeReturnUrl(returnUrl);
             if (!_keycloakSettings.IsConfigured)
             {
                 return SignOut(

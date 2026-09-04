@@ -122,7 +122,6 @@ app.Use(async (context, next) =>
 
     if (keycloakSettings.IsConfigured
         && isAppShellRequest
-        && context.Request.Query["signedOut"] != "1"
         && context.User.Identity?.IsAuthenticated != true)
     {
         var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
