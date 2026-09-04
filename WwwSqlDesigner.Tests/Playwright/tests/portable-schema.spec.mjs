@@ -1263,6 +1263,69 @@ test("normalizes unlimited strings and avoids invalid binary facets", async ({ p
     expect(await page.evaluate(() => SQL.PortableTypes.map({ kind: "binary", facets: "16" }, "mssql").type)).toBe("varbinary(16)");
 });
 
+test("validates and canonicalizes portable EF facets without mutating the model", async ({ page }) => {
+    await page.goto("/");
+    await load(page, `<sql format="portable-v1"><datatypes db="portable"/><table name="Facets" schema="sales">
+      <row name="Amount" null="1"><datatype>decimal( 00018 , 0004 )</datatype></row>
+      <row name="Name" null="0"><datatype>string( 00080 )</datatype></row>
+      <row name="UnlimitedName" null="0"><datatype>string(MAX)</datatype></row>
+      <row name="Payload" null="1"><datatype>binary( 00032 )</datatype></row>
+      <row name="UnlimitedPayload" null="1"><datatype>binary(max)</datatype></row>
+      <row name="LimitAmount" null="1"><datatype>decimal(2147483647,2147483647)</datatype></row>
+      <row name="LimitName" null="1"><datatype>string(2147483647)</datatype></row>
+      <row name="LimitPayload" null="1"><datatype>binary(2147483647)</datatype></row>
+    </table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const mapped = await page.evaluate(() => d.io.getExportXml("ef"));
+
+    expect(mapped.safe).toBe(true);
+    expect(mapped.diagnostics).toEqual([]);
+    expect(mapped.xml).toContain("<datatype>decimal(18,4)</datatype>");
+    expect(mapped.xml).toContain("<datatype>string(80)</datatype>");
+    expect(mapped.xml).toContain("<datatype>string(max)</datatype>");
+    expect(mapped.xml).toContain("<datatype>binary(32)</datatype>");
+    expect(mapped.xml).toContain("<datatype>binary(max)</datatype>");
+    expect(mapped.xml).toContain("<datatype>decimal(2147483647,2147483647)</datatype>");
+    expect(mapped.xml).toContain("<datatype>string(2147483647)</datatype>");
+    expect(mapped.xml).toContain("<datatype>binary(2147483647)</datatype>");
+    expect(await page.evaluate(() => ["decimal", "string", "binary"].map((kind) =>
+        SQL.PortableTypes.map({ kind, facets: "" }, "ef").type))).toEqual(["decimal", "string", "binary"]);
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
+test("blocks invalid EF facets with column-qualified diagnostics", async ({ page }) => {
+    await page.goto("/");
+    const invalid = [
+        ["DecimalMissingScale", "decimal(10)"],
+        ["DecimalZeroPrecision", "decimal(0,0)"],
+        ["DecimalScaleOverPrecision", "decimal(2,3)"],
+        ["DecimalNegative", "decimal(10,-1)"],
+        ["DecimalUnicodeDigits", "decimal(١٠,٢)"],
+        ["DecimalOverInt32", "decimal(2147483648,0)"],
+        ["StringZero", "string(0)"],
+        ["StringSigned", "string(+1)"],
+        ["StringFraction", "string(1.5)"],
+        ["StringOverInt32", "string(2147483648)"],
+        ["BinaryList", "binary(1,0)"],
+        ["BinaryOverInt32", "binary(2147483648)"],
+    ];
+    const rows = invalid.map(([name, datatype]) =>
+        `<row name="${name}" null="1"><datatype>${datatype}</datatype></row>`).join("");
+    await load(page, `<sql format="portable-v1"><datatypes db="portable"/><table name="Invalid" schema="sales">${rows}</table></sql>`);
+    const original = await page.evaluate(() => d.toXML());
+    const result = await page.evaluate(() => d.io.getExportXml("ef"));
+
+    expect(result.safe).toBe(false);
+    expect(result.diagnostics).toHaveLength(invalid.length);
+    for (const [name] of invalid) {
+        expect(result.diagnostics.some((message) => message.startsWith(`sales.Invalid.${name}: `))).toBe(true);
+    }
+    await page.locator("#saveload").click();
+    expect(await page.evaluate(() => d.io.getSafeExportXml("ef"))).toBeNull();
+    await expect(page.locator("#iostatus")).toContainText("no download was created");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
 test("maps MySQL and SQLite uuid and timezone fallbacks", async ({ page }) => {
     await page.goto("/");
     const mysql = await page.evaluate(() => SQL.PortableTypes.map({ kind: "datetime-with-time-zone", facets: "" }, "mysql"));

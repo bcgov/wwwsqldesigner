@@ -16,6 +16,7 @@ const model = `
     <row name="Order Id" null="0"><datatype>int</datatype><relation table="Order" row="Id" /></row>
     <row name="Description" null="1"><datatype>nvarchar(100)</datatype></row>
     <row name="Payload#" null="0"><datatype>varbinary(32)</datatype></row>
+    <row name="Amount" null="1"><datatype>decimal(18,2)</datatype><comment>Money</comment><classification>Protected B</classification></row>
   </table>
   <table name="Order Item"><row name="Id" null="0"><datatype>int</datatype></row></table>
   <table name="Order-Item"><row name="Id" null="0"><datatype>int</datatype></row></table>
@@ -67,8 +68,33 @@ test("downloads an EF ZIP with the configured context and table sources", async 
     await expect(await archive.file("ExampleContext.cs").async("string")).toContain("public class ExampleContext : DbContext");
     await expect(await archive.file("_2024_Order_Item_.cs").async("string")).toContain("public string? Description { get; set; }");
     await expect(await archive.file("_2024_Order_Item_.cs").async("string")).toContain("public byte[] Payload_ { get; set; } = null!;");
+    await expect(await archive.file("_2024_Order_Item_.cs").async("string")).toContain("public decimal? Amount { get; set; }");
     await expect(await archive.file("ExampleContext.cs").async("string")).toContain("using System;");
     await expect(await archive.file("ExampleContext.cs").async("string")).toContain("HasOne<Order>().WithMany().HasForeignKey(e => e.Order_Id)");
+    await expect(await archive.file("ExampleContext.cs").async("string")).toContain("Property(e => e.Description).HasMaxLength(100)");
+    await expect(await archive.file("ExampleContext.cs").async("string")).toContain("Property(e => e.Payload_).HasMaxLength(32)");
+    await expect(await archive.file("ExampleContext.cs").async("string")).toContain("Property(e => e.Amount).HasPrecision(18, 2).HasComment(\"Money\").HasAnnotation(\"DataClassification\", \"Protected B\")");
+});
+
+test("blocks invalid portable facets before loading the EF generator", async ({ page }) => {
+    await page.goto("/");
+    const xml = `<sql format="portable-v1"><datatypes db="portable"/><table name="Invalid" schema="sales">
+      <row name="Amount" null="0"><datatype>decimal(10)</datatype></row>
+    </table></sql>`;
+    await page.evaluate((value) => {
+        d.fromXML(new DOMParser().parseFromString(value, "text/xml").documentElement);
+        window.efStylesheetRequested = false;
+        d.io.getXSL = () => { window.efStylesheetRequested = true; };
+    }, xml);
+    const original = await page.evaluate(() => d.toXML());
+    await page.locator("#saveload").click();
+    await page.locator("#exporttarget").selectOption("ef");
+    await page.locator("#clientsql").click();
+
+    expect(await page.evaluate(() => window.efStylesheetRequested)).toBe(false);
+    await expect(page.locator("#iostatus")).toContainText("sales.Invalid.Amount");
+    await expect(page.locator("#iostatus")).toContainText("no download was created");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
 });
 
 test("rejects DTD-bearing XML before EF ZIP export", async ({ page }) => {

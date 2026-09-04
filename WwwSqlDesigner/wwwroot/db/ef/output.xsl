@@ -45,22 +45,24 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
 
     <xsl:template match="row">
         <xsl:variable name="type" select="translate(normalize-space(datatype), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')" />
-        <xsl:variable name="referenceType" select="contains($type, 'char') or contains($type, 'text') or contains($type, 'xml') or contains($type, 'binary') or $type = 'image' or $type = 'json' or $type = 'jsonb'" />
+        <xsl:variable name="typeName" select="normalize-space(substring-before(concat($type, '('), '('))" />
+        <xsl:variable name="binaryType" select="$typeName = 'binary' or $typeName = 'varbinary' or $typeName = 'image'" />
+        <xsl:variable name="referenceType" select="$typeName = 'string' or $typeName = 'char' or $typeName = 'varchar' or $typeName = 'nchar' or $typeName = 'nvarchar' or $typeName = 'text' or $typeName = 'ntext' or $typeName = 'xml' or $binaryType or $typeName = 'json' or $typeName = 'jsonb'" />
         <xsl:text>        public </xsl:text>
         <xsl:choose>
-            <xsl:when test="contains($type, 'binary') or $type = 'image'">byte[]</xsl:when>
-            <xsl:when test="$type = 'bigint' or $type = 'bigserial' or $type = 'serial8'">long</xsl:when>
-            <xsl:when test="$type = 'smallint'">short</xsl:when>
-            <xsl:when test="$type = 'tinyint'">byte</xsl:when>
-            <xsl:when test="$type = 'int' or $type = 'integer' or $type = 'serial' or $type = 'serial4'">int</xsl:when>
-            <xsl:when test="$type = 'decimal' or $type = 'numeric' or $type = 'money' or $type = 'smallmoney'">decimal</xsl:when>
-            <xsl:when test="$type = 'real'">float</xsl:when>
-            <xsl:when test="$type = 'float' or $type = 'double precision'">double</xsl:when>
-            <xsl:when test="$type = 'bit' or $type = 'bool' or $type = 'boolean'">bool</xsl:when>
-            <xsl:when test="$type = 'uniqueidentifier' or $type = 'uuid'">Guid</xsl:when>
-            <xsl:when test="$type = 'time' or $type = 'time without time zone' or $type = 'time with time zone'">TimeSpan</xsl:when>
-            <xsl:when test="$type = 'datetimeoffset' or $type = 'timestamp with time zone'">DateTimeOffset</xsl:when>
-            <xsl:when test="$type = 'date' or contains($type, 'date') or contains($type, 'timestamp')">DateTime</xsl:when>
+            <xsl:when test="$binaryType">byte[]</xsl:when>
+            <xsl:when test="$typeName = 'bigint' or $typeName = 'bigserial' or $typeName = 'serial8'">long</xsl:when>
+            <xsl:when test="$typeName = 'smallint'">short</xsl:when>
+            <xsl:when test="$typeName = 'tinyint'">byte</xsl:when>
+            <xsl:when test="$typeName = 'int' or $typeName = 'integer' or $typeName = 'serial' or $typeName = 'serial4'">int</xsl:when>
+            <xsl:when test="$typeName = 'decimal' or $typeName = 'numeric' or $typeName = 'dec' or $typeName = 'money' or $typeName = 'smallmoney'">decimal</xsl:when>
+            <xsl:when test="$typeName = 'real'">float</xsl:when>
+            <xsl:when test="$typeName = 'float' or $typeName = 'double precision'">double</xsl:when>
+            <xsl:when test="$typeName = 'bit' or $typeName = 'bool' or $typeName = 'boolean'">bool</xsl:when>
+            <xsl:when test="$typeName = 'uniqueidentifier' or $typeName = 'uuid'">Guid</xsl:when>
+            <xsl:when test="$typeName = 'time' or $typeName = 'time without time zone' or $typeName = 'time with time zone'">TimeSpan</xsl:when>
+            <xsl:when test="$typeName = 'datetimeoffset' or $typeName = 'timestamp with time zone'">DateTimeOffset</xsl:when>
+            <xsl:when test="$typeName = 'date' or contains($typeName, 'date') or contains($typeName, 'timestamp')">DateTime</xsl:when>
             <xsl:when test="$referenceType">string</xsl:when>
             <xsl:otherwise>string</xsl:otherwise>
         </xsl:choose>
@@ -89,9 +91,17 @@ namespace </xsl:text><xsl:value-of select="$namespace" /><xsl:text>
     <xsl:template match="table" mode="mapping">
         <xsl:text>        modelBuilder.Entity&lt;</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="@name"/><xsl:with-param name="node" select="."/></xsl:call-template><xsl:text>&gt;().ToTable("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>", "</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="@schema"/></xsl:call-template><xsl:text>")</xsl:text><xsl:if test="normalize-space(comment)!=''"><xsl:text>.HasComment("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:if test="normalize-space(records-schedule)!=''"><xsl:text>.HasAnnotation("RecordsSchedule", "</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="records-schedule"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:text>;
 </xsl:text>
-        <xsl:for-each select="row[normalize-space(comment)!='' or classification]">
-            <xsl:text>        modelBuilder.Entity&lt;</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="../@name"/><xsl:with-param name="node" select=".."/></xsl:call-template><xsl:text>&gt;().Property(e =&gt; e.</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="@name"/><xsl:with-param name="node" select="."/></xsl:call-template><xsl:text>)</xsl:text><xsl:if test="normalize-space(comment)!=''"><xsl:text>.HasComment("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:if test="classification"><xsl:text>.HasAnnotation("DataClassification", "</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="classification"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:text>;
+        <xsl:for-each select="row">
+            <xsl:variable name="type" select="translate(normalize-space(datatype), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')" />
+            <xsl:variable name="typeName" select="normalize-space(substring-before(concat($type, '('), '('))" />
+            <xsl:variable name="facets" select="normalize-space(substring-before(substring-after($type, '('), ')'))" />
+            <xsl:variable name="decimalType" select="$typeName = 'decimal' or $typeName = 'numeric' or $typeName = 'dec'" />
+            <xsl:variable name="lengthType" select="$typeName = 'string' or $typeName = 'char' or $typeName = 'varchar' or $typeName = 'nchar' or $typeName = 'nvarchar' or $typeName = 'binary' or $typeName = 'varbinary' or $typeName = 'image'" />
+            <xsl:variable name="hasFacetMapping" select="contains($type, '(') and $facets != '' and $facets != 'max' and ($decimalType or $lengthType)" />
+            <xsl:if test="normalize-space(comment)!='' or classification or $hasFacetMapping">
+            <xsl:text>        modelBuilder.Entity&lt;</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="../@name"/><xsl:with-param name="node" select=".."/></xsl:call-template><xsl:text>&gt;().Property(e =&gt; e.</xsl:text><xsl:call-template name="identifier"><xsl:with-param name="name" select="@name"/><xsl:with-param name="node" select="."/></xsl:call-template><xsl:text>)</xsl:text><xsl:if test="$decimalType and $hasFacetMapping"><xsl:text>.HasPrecision(</xsl:text><xsl:value-of select="normalize-space(substring-before($facets, ','))"/><xsl:text>, </xsl:text><xsl:value-of select="normalize-space(substring-after($facets, ','))"/><xsl:text>)</xsl:text></xsl:if><xsl:if test="$lengthType and not($decimalType) and $hasFacetMapping"><xsl:text>.HasMaxLength(</xsl:text><xsl:value-of select="$facets"/><xsl:text>)</xsl:text></xsl:if><xsl:if test="normalize-space(comment)!=''"><xsl:text>.HasComment("</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:if test="classification"><xsl:text>.HasAnnotation("DataClassification", "</xsl:text><xsl:call-template name="csharp-string"><xsl:with-param name="value" select="classification"/></xsl:call-template><xsl:text>")</xsl:text></xsl:if><xsl:text>;
 </xsl:text>
+            </xsl:if>
         </xsl:for-each>
     </xsl:template>
 
