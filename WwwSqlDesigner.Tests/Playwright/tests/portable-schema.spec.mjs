@@ -1026,7 +1026,7 @@ test("exposes owner-only sharing controls for server models", async ({ page }) =
     })).toBe("");
 });
 
-test("sends sharing grants as JSON", async ({ page }) => {
+test("sends sharing grants as JSON without trimming target IDs", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();
     let request;
@@ -1040,14 +1040,38 @@ test("sends sharing grants as JSON", async ({ page }) => {
         d.io._csrfToken = "token";
         d.io._serverModelState = "owned";
         d.io.updateServerModelControls();
-        d.io.dom.serverknownuser.add(new Option("user-id", "user-id"));
-        d.io.dom.serverknownuser.value = "user-id";
-        d.io.dom.serverknownuser.dispatchEvent(new Event("change"));
     });
+    await page.locator("#servergrantid").fill(" user-id ");
     await page.locator("#servershare").click();
     await expect.poll(() => request && request.headers()["content-type"]).toBe("application/json");
-    expect(request.postData()).toBe(JSON.stringify({ targetType: "User", targetId: "user-id", permission: "View" }));
+    expect(request.postData()).toBe(JSON.stringify({ targetType: "User", targetId: " user-id ", permission: "View" }));
 });
+
+for (const [status, message] of [[400, "Bad Request"], [409, "Conflict"]]) {
+    test(`surfaces HTTP ${status} sharing failures`, async ({ page }) => {
+        const dialogs = [];
+        page.on("dialog", async (dialog) => {
+            dialogs.push(dialog.message());
+            await dialog.accept();
+        });
+        await page.goto("/");
+        await page.locator("#saveload").click();
+        await page.route("**/backend/netcore-ef/access/grant**", async (route) => {
+            await route.fulfill({ status });
+        });
+        await page.evaluate(() => {
+            d.io._name = "Saved";
+            d.io._csrfToken = "token";
+            d.io._serverModelState = "owned";
+            d.io.updateServerModelControls();
+        });
+
+        await page.locator("#servergrantid").fill("user-id");
+        await page.locator("#servershare").click();
+
+        await expect.poll(() => dialogs.at(-1)).toBe(`Server response: ${message}`);
+    });
+}
 
 test("sends sharing revokes through the Unshare control", async ({ page }) => {
     await page.goto("/");
@@ -1196,6 +1220,7 @@ test("prefers the current owner and isolates versions for duplicate server model
             { keyword: "Duplicate", version: 3, ownerId: "other-owner" },
             { keyword: "Duplicate", version: 2, ownerId: "current-owner" },
             { keyword: "Duplicate", version: 1, ownerId: "current-owner" },
+            { keyword: "Duplicate", version: 0, ownerId: null },
         ];
         d.io.updateServerModelChoices();
     });
@@ -1206,6 +1231,37 @@ test("prefers the current owner and isolates versions for duplicate server model
     await expect(page.locator("#serverloadversion option")).toHaveText(["Latest", "v3"]);
     await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("ownerId=other-owner");
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="server"]').click();
+    await page.locator("#serverowner").selectOption({ label: "Public models" });
+    await expect(page.locator("#serverloadversion option")).toHaveText(["Latest", "v0"]);
+    loadRequest = null;
+    await page.locator("#ioload").click();
+    await expect.poll(() => loadRequest
+        ? new URL(loadRequest.url()).searchParams.get("globalOwner")
+        : null).toBe("true");
+});
+
+test("loads an explicitly global duplicate-name deep link", async ({ page }) => {
+    let loadRequest;
+    await page.route("**/backend/netcore-ef/load/**", async (route) => {
+        loadRequest = route.request();
+        const parameters = new URL(loadRequest.url()).searchParams;
+        const table = parameters.get("globalOwner") === "true" ? "Global" : "Ambiguous";
+        await route.fulfill({
+            status: 200,
+            contentType: "text/xml",
+            body: `<sql><datatypes db="mssql" /><table name="${table}" /></sql>`,
+        });
+    });
+
+    await page.goto("/?keyword=Duplicate&ownerId=other-owner&globalOwner=true");
+    await expect.poll(() => loadRequest && loadRequest.url()).toBeTruthy();
+    const parameters = new URL(loadRequest.url()).searchParams;
+    expect(parameters.get("keyword")).toBe("Duplicate");
+    expect(parameters.get("globalOwner")).toBe("true");
+    expect(parameters.has("ownerId")).toBe(false);
+    await expect.poll(() => page.evaluate(() => d.tables.map((table) => table.getTitle()))).toEqual(["Global"]);
 });
 
 test("preserves the server catalogue and diagram when refresh fails", async ({ page }) => {

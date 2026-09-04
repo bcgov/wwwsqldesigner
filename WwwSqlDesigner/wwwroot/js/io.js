@@ -1037,13 +1037,16 @@ SQL.IO.prototype.quicksave = function (e) {
     this.serversave(e, this._name);
 };
 
-SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
+SQL.IO.prototype.serverload = function (e, keyword, version, ownerId, globalOwner) {
     if (!this._serverAvailable) return;
     if (typeof keyword === "undefined") {
         keyword = this.dom.serverloadmodel.value || this.dom.serverloadname.value.trim();
         if (keyword) {
             version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
-            ownerId = this.dom.serverowner.value || null;
+            globalOwner = this.dom.serverowner.selectedIndex > 0 && this.dom.serverowner.value === "";
+            ownerId = this.dom.serverowner.selectedIndex > 0 && !globalOwner
+                ? this.dom.serverowner.value
+                : null;
         }
     }
     const name = keyword || prompt(_("serverloadprompt"), this.dom.serverloadname.value.trim() || this._name);
@@ -1060,7 +1063,9 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
     if (version !== null && version !== undefined) {
         url += "&version=" + encodeURIComponent(version);
     }
-    if (ownerId) {
+    if (globalOwner) {
+        url += "&globalOwner=true";
+    } else if (ownerId !== null && ownerId !== undefined) {
         url += "&ownerId=" + encodeURIComponent(ownerId);
     }
     const h = this.owner.getXhrHeaders();
@@ -1111,13 +1116,15 @@ SQL.IO.prototype.updateServerModelControls = function () {
 SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     const name = this.dom.serverloadmodel.value || "";
     const allMatches = this._serverModels.filter((model) => model.keyword === name);
-    const ownerIds = Array.from(new Set(allMatches.map((model) => model.ownerId)));
-    const selectedOwner = preferSelectedOwner && ownerIds.indexOf(this.dom.serverowner.value) !== -1
+    const ownerIds = Array.from(new Set(allMatches.map((model) => model.ownerId || "")));
+    const selectedOwner = preferSelectedOwner
+        && this.dom.serverowner.selectedIndex > 0
+        && ownerIds.indexOf(this.dom.serverowner.value) !== -1
         ? this.dom.serverowner.value
         : (ownerIds.indexOf(this._currentOwnerId) !== -1
             ? this._currentOwnerId
             : (ownerIds.length ? ownerIds[0] : ""));
-    const matches = allMatches.filter((model) => !selectedOwner || model.ownerId === selectedOwner);
+    const matches = allMatches.filter((model) => (model.ownerId || "") === selectedOwner);
     SQL.dom.clear(this.dom.serverloadmodel);
     const modelNames = Array.from(new Set(this._serverModels.map((model) => model.keyword)));
     const placeholder = SQL.dom.create("option");
@@ -1150,7 +1157,7 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
         option.textContent = ownerId === this._currentOwnerId
             ? this._currentOwnerLabel
             : (ownerId || "Public models");
-        option.selected = ownerId === selectedOwner && selectedOwner !== "";
+        option.selected = ownerId === selectedOwner;
         this.dom.serverowner.appendChild(option);
     }
     this.dom.serverloadversion.disabled = matches.length === 0;
@@ -1160,10 +1167,10 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
 };
 
 SQL.IO.prototype.getShareRecipient = function () {
-    const userId = this.dom.servergrantid.value.trim();
-    const group = this.dom.servergrantgroup.value.trim();
-    if (userId) return { targetType: "User", targetId: userId };
-    if (group) return { targetType: "Group", targetId: group };
+    const userId = this.dom.servergrantid.value;
+    const group = this.dom.servergrantgroup.value;
+    if (userId.trim()) return { targetType: "User", targetId: userId };
+    if (group.trim()) return { targetType: "Group", targetId: group };
     return null;
 };
 
@@ -1371,6 +1378,8 @@ SQL.IO.prototype.check = function (code) {
         case 403:
             alert(_("httpresponse") + ": HTTP 403 - access denied");
             return false;
+        case 400:
+        case 409:
         case 201:
         case 404:
         case 500:
