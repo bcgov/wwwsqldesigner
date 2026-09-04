@@ -30,7 +30,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             var response = await client.GetAsync("/account/status");
 
             response.EnsureSuccessStatusCode();
-            Assert.IsTrue(await response.Content.ReadFromJsonAsync<bool>());
+            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>();
+            Assert.IsNotNull(status);
+            Assert.IsTrue(status.Authenticated);
+            Assert.AreEqual("pipeline-test", status.User);
             Assert.IsTrue(response.Headers.TryGetValues("X-CSRF-TOKEN", out var tokens));
             Assert.IsFalse(string.IsNullOrWhiteSpace(tokens.Single()));
         }
@@ -49,7 +52,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             var response = await client.SendAsync(request);
 
             response.EnsureSuccessStatusCode();
-            Assert.IsFalse(await response.Content.ReadFromJsonAsync<bool>());
+            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>();
+            Assert.IsNotNull(status);
+            Assert.IsFalse(status.Authenticated);
+            Assert.IsNull(status.User);
         }
 
         [TestMethod]
