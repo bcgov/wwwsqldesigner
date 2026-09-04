@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using WwwSqlDesigner.Authentication;
 
 namespace WwwSqlDesigner.Controllers
@@ -44,7 +45,7 @@ namespace WwwSqlDesigner.Controllers
                 && User.Identity?.IsAuthenticated == true;
             return Ok(new AuthStatusResponse(
                 authenticated,
-                authenticated ? User.Identity?.Name : null));
+                authenticated ? GetUserDisplayName() : null));
         }
 
         [AllowAnonymous]
@@ -74,6 +75,22 @@ namespace WwwSqlDesigner.Controllers
             }
 
             return Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
+        }
+
+        private string? GetUserDisplayName()
+        {
+            var name = User.FindFirst("name")?.Value;
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+
+            var givenName = User.FindFirst("given_name")?.Value;
+            var familyName = User.FindFirst("family_name")?.Value;
+            var fullName = $"{givenName} {familyName}".Trim();
+            return !string.IsNullOrWhiteSpace(fullName)
+                ? fullName
+                : User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
         }
 
         [AllowAnonymous]

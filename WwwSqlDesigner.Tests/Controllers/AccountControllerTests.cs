@@ -135,7 +135,11 @@ namespace WwwSqlDesigner.Controllers.Tests
                     HttpContext = new DefaultHttpContext
                     {
                         User = new ClaimsPrincipal(new ClaimsIdentity(
-                            new[] { new Claim(ClaimTypes.Name, "test-user") },
+                            new[]
+                            {
+                                new Claim(ClaimTypes.Name, "opaque-user-id"),
+                                new Claim("name", "Test User")
+                            },
                             "Test"))
                     }
                 }
@@ -147,7 +151,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var status = result.Value as AuthStatusResponse;
             Assert.IsNotNull(status);
             Assert.IsTrue(status.Authenticated);
-            Assert.AreEqual("test-user", status.User);
+            Assert.AreEqual("Test User", status.User);
         }
 
     }

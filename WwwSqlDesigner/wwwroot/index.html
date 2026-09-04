@@ -410,8 +410,8 @@
                 const status = await response.json();
                 const canSignOut = status.authenticated === true;
                 authStatus.textContent = canSignOut
-                    ? `Auth: signed in as ${status.user || "unknown user"}`
-                    : "Auth: signed out";
+                    ? `Signed in: ${status.user || "unknown user"}`
+                    : "Signed out";
                 authStatus.hidden = false;
                 const token = response.headers.get("X-CSRF-TOKEN");
                 if (canSignOut && token) {
