@@ -54,7 +54,11 @@ namespace WwwSqlDesigner.Controllers
             DataModel? model;
             if (!version.HasValue)
             {
-                model = await query.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(x => x.Keyword == keyword);
+                model = await query
+                    .Where(x => x.Keyword == keyword)
+                    .OrderByDescending(x => x.CreatedAt)
+                    .ThenByDescending(x => x.Version)
+                    .FirstOrDefaultAsync();
             }
             else
             {
