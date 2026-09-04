@@ -1,8 +1,6 @@
 SQL.IO = function (owner) {
     this.owner = owner;
     this._name = ""; /* last used name with server load/save */
-    this.lastUsedName =
-        owner.getOption("lastUsedName") || ""; /* last used name with local storage */
     this._csrfToken = "";
     this._authenticated = window.__wwwSqlAuthenticated === true;
     this._serverAvailable = window.__wwwSqlServerAvailable === true;
@@ -285,7 +283,7 @@ SQL.IO.prototype.click = function () {
     /* open io dialog */
     this.build();
     this.dom.serverloadname.value = this.dom.iotype.value === "browser"
-        ? this.lastUsedName || ""
+        ? ""
         : this._name || "";
     this.refreshClientStorageModels();
     this.updateIoType();
@@ -442,21 +440,6 @@ SQL.IO.prototype.clientload = function () {
     input.click();
 };
 
-SQL.IO.prototype.promptName = function (title, suffix) {
-    const lastUsedName = this.owner.getOption("lastUsedName") || this.lastUsedName;
-    let name = prompt(_(title), lastUsedName);
-    if (!name) {
-        return null;
-    }
-    if (suffix && name.endsWith(suffix)) {
-        // remove suffix from name
-        name = name.substring(0, name.length - 4);
-    }
-    this.owner.setOption("lastUsedName", name);
-    this.lastUsedName = name; // save this also in variable in case cookies are disabled
-    return name;
-};
-
 SQL.IO.prototype.clientlocalsave = function () {
     if (!window.localStorage) {
         alert("Sorry, your browser does not seem to support localStorage.");
@@ -487,8 +470,6 @@ SQL.IO.prototype.clientlocalsave = function () {
             throw new Error("Content verification failed");
         }
         const modelName = key.substring("wwwsqldesigner_databases_".length);
-        this.lastUsedName = modelName;
-        this.owner.setOption("lastUsedName", modelName);
         this.refreshClientStorageModels();
         this.dom.clientlocalmodel.value = modelName;
         this.updateClientStorageControls();
@@ -533,8 +514,6 @@ SQL.IO.prototype.clientlocalload = function () {
     if (this.fromXMLText(xml)) {
         this._serverModelState = "none";
         this._name = "";
-        this.lastUsedName = modelName;
-        this.owner.setOption("lastUsedName", modelName);
         this.dom.serverloadname.value = modelName;
         this.updateServerModelControls();
     }
