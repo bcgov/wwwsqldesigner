@@ -45,6 +45,12 @@
             <div id="toggle"></div>
             <input type="button" id="saveload" />
 
+            <form method="post" action="/account/logout" id="logout-form" hidden>
+                <input type="hidden" name="returnUrl" value="/" />
+                <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
+                <input type="submit" value="Sign out" />
+            </form>
+
             <hr />
 
             <input type="button" id="addtable" />
@@ -390,6 +396,24 @@
     </div>
 
     <script type="text/javascript">
+        const logoutForm = document.getElementById("logout-form");
+        fetch("/account/status", { credentials: "same-origin" })
+            .then(async (response) => {
+                if (!response.ok) {
+                    return;
+                }
+
+                const canSignOut = await response.json();
+                const token = response.headers.get("X-CSRF-TOKEN");
+                if (canSignOut && token) {
+                    document.getElementById("logout-antiforgery-token").value = token;
+                    logoutForm.hidden = false;
+                }
+            })
+            .catch(() => {
+                // Keep sign out hidden when authentication status cannot be confirmed.
+            });
+
         const d = new SQL.Designer();
     </script>
 </body>

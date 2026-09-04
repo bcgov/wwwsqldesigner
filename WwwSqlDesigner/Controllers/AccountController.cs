@@ -35,6 +35,14 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [AllowAnonymous]
+        [HttpGet("status")]
+        public IActionResult Status()
+        {
+            return Ok(_keycloakSettings.IsConfigured
+                && User.Identity?.IsAuthenticated == true);
+        }
+
+        [AllowAnonymous]
         [HttpPost("logout")]
         [ValidateAntiForgeryToken]
         public IActionResult Logout(string? returnUrl = null)

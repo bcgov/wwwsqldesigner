@@ -19,6 +19,58 @@ namespace WwwSqlDesigner.Controllers.Tests
     public class WwwSqlControllerPipelineTests
     {
         [TestMethod]
+        public async Task AuthenticatedUserGetsSignOutAvailabilityAndAntiforgeryToken()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            var response = await client.GetAsync("/account/status");
+
+            response.EnsureSuccessStatusCode();
+            Assert.IsTrue(await response.Content.ReadFromJsonAsync<bool>());
+            Assert.IsTrue(response.Headers.TryGetValues("X-CSRF-TOKEN", out var tokens));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(tokens.Single()));
+        }
+
+        [TestMethod]
+        public async Task AnonymousUserDoesNotGetSignOutAvailability()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/account/status");
+            request.Headers.Add("X-Test-Anonymous", "true");
+
+            var response = await client.SendAsync(request);
+
+            response.EnsureSuccessStatusCode();
+            Assert.IsFalse(await response.Content.ReadFromJsonAsync<bool>());
+        }
+
+        [TestMethod]
+        public async Task LogoutWithoutAntiforgeryTokenReturnsBadRequest()
+        {
+            using var factory = new TestApplicationFactory();
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+
+            using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["returnUrl"] = "/"
+            });
+            var response = await client.PostAsync("/account/logout", content);
+
+            Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [TestMethod]
         public async Task SaveWithoutAntiforgeryTokenReturnsBadRequest()
         {
             using var factory = new TestApplicationFactory();
@@ -219,6 +271,11 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             protected override Task<AuthenticateResult> HandleAuthenticateAsync()
             {
+                if (Request.Headers.ContainsKey("X-Test-Anonymous"))
+                {
+                    return Task.FromResult(AuthenticateResult.NoResult());
+                }
+
                 var identity = new ClaimsIdentity(
                     new[]
                     {
@@ -232,5 +289,6 @@ namespace WwwSqlDesigner.Controllers.Tests
                         "Test")));
             }
         }
+
     }
 }
