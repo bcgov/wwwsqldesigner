@@ -405,20 +405,25 @@
         const signInForm = document.getElementById("signin-form");
         const logoutForm = document.getElementById("logout-form");
         const serverSourceButton = document.querySelector('[data-source="server"]');
+        const returnUrl = window.location.pathname + window.location.search;
+        signInForm.querySelector("input[name='returnUrl']").value = returnUrl;
+        logoutForm.querySelector("input[name='returnUrl']").value = returnUrl;
         let d;
         const setAuthenticationState = (enabled, authenticated, token) => {
             const authEnabled = enabled === true;
             const isAuthenticated = authEnabled && authenticated === true;
+            const serverAvailable = !authEnabled || isAuthenticated;
             window.__wwwSqlAuthenticated = isAuthenticated;
+            window.__wwwSqlServerAvailable = serverAvailable;
             signInForm.hidden = !authEnabled || isAuthenticated;
             logoutForm.hidden = !isAuthenticated || !token;
-            serverSourceButton.disabled = !isAuthenticated;
-            serverSourceButton.setAttribute("aria-disabled", isAuthenticated ? "false" : "true");
+            serverSourceButton.disabled = !serverAvailable;
+            serverSourceButton.setAttribute("aria-disabled", serverAvailable ? "false" : "true");
             if (isAuthenticated && token) {
                 document.getElementById("logout-antiforgery-token").value = token;
             }
             if (d && d.io) {
-                d.io.setAuthenticated(window.__wwwSqlAuthenticated);
+                d.io.setAuthenticationState(isAuthenticated, serverAvailable);
             }
         };
         window.__wwwSqlSetAuthenticationState = setAuthenticationState;

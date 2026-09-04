@@ -69,6 +69,13 @@ test("hides both account controls when authentication is disabled", async ({ pag
             body: JSON.stringify({ enabled: false, authenticated: false }),
         });
     });
+    await page.route("**/backend/netcore-ef/list", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ models: [], currentOwnerId: "", currentOwnerLabel: "", groups: [] }),
+        });
+    });
 
     await page.goto("/");
 
@@ -76,7 +83,26 @@ test("hides both account controls when authentication is disabled", async ({ pag
     await expect(page.locator("#logout-form")).toBeHidden();
     await page.locator("#saveload").click();
     await expect(page.locator('[data-source="server"]')).toBeVisible();
-    await expect(page.locator('[data-source="server"]')).toBeDisabled();
+    await expect(page.locator('[data-source="server"]')).toBeEnabled();
+    await expect(page.locator("#ioshare")).toBeVisible();
+    await expect(page.locator("#server-import-group")).toBeVisible();
+    await page.locator('[data-source="server"]').click();
+    await expect(page.locator("#serverlist")).toBeEnabled();
+});
+
+test("preserves the current path and query in the sign-in return URL", async ({ page }) => {
+    await page.route("**/account/status", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ enabled: true, authenticated: false }),
+        });
+    });
+
+    await page.goto("/index.html?keyword=orders%20model&version=4&ownerId=user-1");
+
+    await expect(page.locator("#signin-form input[name='returnUrl']"))
+        .toHaveValue("/index.html?keyword=orders%20model&version=4&ownerId=user-1");
 });
 
 test("keeps sign out hidden when authentication status is unavailable", async ({ page }) => {

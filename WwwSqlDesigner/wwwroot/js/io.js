@@ -5,6 +5,7 @@ SQL.IO = function (owner) {
         ""; /* last used name with local storage */
     this._csrfToken = "";
     this._authenticated = window.__wwwSqlAuthenticated === true;
+    this._serverAvailable = window.__wwwSqlServerAvailable === true;
     this._serverModelState = "none";
     this._serverModels = [];
     this._currentOwnerId = "";
@@ -118,6 +119,9 @@ SQL.IO = function (owner) {
             this.updateServerModelChoices(true);
             return;
         }
+        if (this.dom.clientlocalmodel.value) {
+            this.dom.clientlocalname.value = this.dom.clientlocalmodel.value;
+        }
         this.updateServerModelControls();
     });
     SQL.events.add(this.dom.servergrantid, "input", () => {
@@ -145,10 +149,11 @@ SQL.IO = function (owner) {
     this.build();
 };
 
-SQL.IO.prototype.setAuthenticated = function (authenticated) {
+SQL.IO.prototype.setAuthenticationState = function (authenticated, serverAvailable) {
     this._authenticated = authenticated === true;
+    this._serverAvailable = serverAvailable === true;
     this.updateServerUi();
-    if (!this._authenticated) {
+    if (!this._serverAvailable) {
         this._serverModels = [];
         this._serverModelState = "none";
         this._serverGrants = [];
@@ -161,8 +166,12 @@ SQL.IO.prototype.setAuthenticated = function (authenticated) {
     this.owner.loadServerDeepLink();
 };
 
+SQL.IO.prototype.setAuthenticated = function (authenticated) {
+    this.setAuthenticationState(authenticated, authenticated);
+};
+
 SQL.IO.prototype.updateServerUi = function () {
-    const enabled = this._authenticated;
+    const enabled = this._serverAvailable;
     this.dom.iosourcebuttons
         .filter((button) => button.getAttribute("data-source") === "server")
         .forEach((button) => {
@@ -284,7 +293,7 @@ SQL.IO.prototype.click = function () {
     this.owner.window.open(_("saveload"), this.dom.container);
     this.dom.serverloadname.focus();
     this.syncClientColumnHeight();
-    if (this._authenticated && !this._serverModels.length) {
+    if (this._serverAvailable && !this._serverModels.length) {
         this.serverlist(null, true);
     }
 };
@@ -309,7 +318,7 @@ SQL.IO.prototype.loadCurrent = function () {
 
 SQL.IO.prototype.updateIoType = function () {
     const type = this.dom.iotype.value;
-    const server = type === "server" && this._authenticated;
+    const server = type === "server" && this._serverAvailable;
     const browser = type === "browser";
     this.dom.serverloadmodel.disabled = type === "xml";
     this.dom.serverowner.disabled = !server;
@@ -1011,7 +1020,7 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     const name = keyword || this.dom.serverloadname.value.trim() || prompt(_("serversaveprompt"), this._name);
     if (!name) {
         return;
@@ -1050,7 +1059,7 @@ SQL.IO.prototype.quicksave = function (e) {
 };
 
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     if (typeof keyword === "undefined") {
         keyword = this.dom.serverloadmodel.value || this.dom.serverloadname.value.trim();
         if (keyword) {
@@ -1082,7 +1091,7 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId) {
 };
 
 SQL.IO.prototype.serverlist = function (e, preserveOutput, after) {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     if (preserveOutput) {
         this.setActionLabel("serverlist", "");
     }
@@ -1190,7 +1199,7 @@ SQL.IO.prototype.getKnownShareRecipient = function () {
 };
 
 SQL.IO.prototype.refreshShareState = function () {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     if (this._serverModelState !== "owned" || !this._name) {
         this._serverGrants = [];
         this.refreshGrantChoices();
@@ -1200,7 +1209,7 @@ SQL.IO.prototype.refreshShareState = function () {
     const bp = this.owner.getOption("xhrpath");
     const url = bp + "backend/" + this.dom.backend.value + "/access?keyword=" + encodeURIComponent(this._name);
     SQL.request(url, (data, code) => {
-        if (code < 200 || code >= 300) {
+        if (!this.check(code) || code < 200 || code >= 300) {
             this._serverGrants = [];
             this.updateServerModelControls();
             return;
@@ -1236,7 +1245,7 @@ SQL.IO.prototype.refreshGrantChoices = function () {
 };
 
 SQL.IO.prototype.copyCurrentOwnerId = function () {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     this.setActionLabel("servercopy", "");
     if (!this._currentOwnerId) {
         this.serverlist(null, true, () => {
@@ -1276,7 +1285,7 @@ SQL.IO.prototype.copyTextFallback = function (value, callback) {
 };
 
 SQL.IO.prototype.servershare = function () {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     if (this._serverModelState !== "owned" || !this._name) {
         return;
     }
@@ -1320,7 +1329,7 @@ SQL.IO.prototype.servershare = function () {
 };
 
 SQL.IO.prototype.serverunshare = function () {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     if (this._serverModelState !== "owned" || !this._name) {
         return;
     }
@@ -1353,7 +1362,7 @@ SQL.IO.prototype.serverunshare = function () {
 };
 
 SQL.IO.prototype.serverimport = function (e) {
-    if (!this._authenticated) return;
+    if (!this._serverAvailable) return;
     const name = this.dom.serverimportdatabase.value.trim();
     if (!name) {
         return;
@@ -1376,7 +1385,7 @@ SQL.IO.prototype.check = function (code) {
             if (window.__wwwSqlSetAuthenticationState) {
                 window.__wwwSqlSetAuthenticationState(true, false);
             } else {
-                this.setAuthenticated(false);
+                this.setAuthenticationState(false, false);
             }
             alert(_("httpresponse") + ": HTTP 401 - authentication required");
             return false;
@@ -1429,7 +1438,7 @@ SQL.IO.prototype.loadresponse = function (data, code, headers) {
 SQL.IO.prototype.listresponse = function (data, code, headers, preserveOutput) {
     this.setCsrfToken(headers);
     this.owner.window.hideThrobber();
-    if (preserveOutput ? code < 200 || code >= 300 : !this.check(code)) {
+    if (!this.check(code) || code < 200 || code >= 300) {
         return;
     }
     if (!preserveOutput) {

@@ -167,7 +167,7 @@ SQL.Designer.prototype.init2 = function () {
 };
 
 SQL.Designer.prototype.loadServerDeepLink = function () {
-    if (!this.io || !this.io._authenticated || !this._serverDeepLink || this._serverDeepLinkLoaded) {
+    if (!this.io || !this.io._serverAvailable || !this._serverDeepLink || this._serverDeepLinkLoaded) {
         return;
     }
     this._serverDeepLinkLoaded = true;
