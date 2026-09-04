@@ -113,45 +113,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var result = controller.Status() as OkObjectResult;
 
             Assert.IsNotNull(result);
-            var status = result.Value as AuthStatusResponse;
-            Assert.IsNotNull(status);
-            Assert.IsFalse(status.Authenticated);
-            Assert.IsNull(status.User);
-        }
-
-        [TestMethod]
-        public void StatusIncludesAuthenticatedUserName()
-        {
-            var controller = new AccountController(new KeycloakSettings
-            {
-                Enabled = true,
-                Authority = "https://example.test/realms/test",
-                ClientId = "client",
-                ClientSecret = "secret"
-            })
-            {
-                ControllerContext = new ControllerContext
-                {
-                    HttpContext = new DefaultHttpContext
-                    {
-                        User = new ClaimsPrincipal(new ClaimsIdentity(
-                            new[]
-                            {
-                                new Claim(ClaimTypes.Name, "opaque-user-id"),
-                                new Claim("name", "Test User")
-                            },
-                            "Test"))
-                    }
-                }
-            };
-
-            var result = controller.Status() as OkObjectResult;
-
-            Assert.IsNotNull(result);
-            var status = result.Value as AuthStatusResponse;
-            Assert.IsNotNull(status);
-            Assert.IsTrue(status.Authenticated);
-            Assert.AreEqual("Test User", status.User);
+            Assert.AreEqual(false, result.Value);
         }
 
     }

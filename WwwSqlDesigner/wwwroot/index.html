@@ -39,7 +39,6 @@
 
 <body>
     <div id="area"></div>
-    <div id="authstatus" role="status" aria-live="polite" hidden></div>
 
     <div id="controls">
         <div id="bar">
@@ -398,21 +397,13 @@
 
     <script type="text/javascript">
         const logoutForm = document.getElementById("logout-form");
-        const authStatus = document.getElementById("authstatus");
         fetch("/account/status", { credentials: "same-origin" })
             .then(async (response) => {
                 if (!response.ok) {
-                    authStatus.textContent = "Auth: unavailable";
-                    authStatus.hidden = false;
                     return;
                 }
 
-                const status = await response.json();
-                const canSignOut = status.authenticated === true;
-                authStatus.textContent = canSignOut
-                    ? `Signed in: ${status.user || "unknown user"}`
-                    : "Signed out";
-                authStatus.hidden = false;
+                const canSignOut = await response.json();
                 const token = response.headers.get("X-CSRF-TOKEN");
                 if (canSignOut && token) {
                     document.getElementById("logout-antiforgery-token").value = token;

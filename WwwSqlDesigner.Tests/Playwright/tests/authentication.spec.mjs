@@ -6,7 +6,7 @@ test("shows an accessible sign out control and submits the antiforgery token whe
             status: 200,
             contentType: "application/json",
             headers: { "X-CSRF-TOKEN": "test-token" },
-            body: JSON.stringify({ authenticated: true, user: "test-user" }),
+            body: JSON.stringify(true),
         });
     });
     await page.route("**/account/logout", async (route) => {
@@ -15,7 +15,6 @@ test("shows an accessible sign out control and submits the antiforgery token whe
 
     await page.goto("/");
 
-    await expect(page.locator("#authstatus")).toHaveText("Signed in: test-user");
     const signOut = page.getByRole("button", { name: "Sign out" });
     await expect(signOut).toBeVisible();
     await expect(page.locator("#options + #logout-form")).toBeVisible();
@@ -39,13 +38,12 @@ test("keeps sign out hidden when the user is anonymous", async ({ page }) => {
         await route.fulfill({
             status: 200,
             contentType: "application/json",
-            body: JSON.stringify({ authenticated: false, user: null }),
+            body: JSON.stringify(false),
         });
     });
 
     await page.goto("/");
 
-    await expect(page.locator("#authstatus")).toHaveText("Signed out");
     await expect(page.locator("#logout-form")).toBeHidden();
     await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });
