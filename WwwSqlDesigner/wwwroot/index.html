@@ -43,6 +43,17 @@
     <div id="controls">
         <div id="bar">
             <div id="toggle"></div>
+            <div id="account-controls">
+                <form method="get" action="/account/login" id="signin-form" hidden>
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <input type="submit" id="signin-link" value="Sign in" />
+                </form>
+                <form method="post" action="/account/logout" id="logout-form" hidden>
+                    <input type="hidden" name="returnUrl" value="/" />
+                    <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
+                    <input type="submit" value="Sign out" />
+                </form>
+            </div>
             <input type="button" id="saveload" />
 
             <hr />
@@ -67,6 +78,7 @@
             <hr />
 
             <input type="button" id="options" />
+
         </div>
 
         <div id="rubberband"></div>
@@ -281,7 +293,7 @@
                     </div>
                     <div id="iostatus" role="status" aria-live="polite" hidden></div>
                 </div>
-                <div class="io-form-group">
+                <div class="io-form-group" id="server-import-group">
                     <div class="io-label-row">
                         <label for="serverimportdatabase" id="serverimportdatabaselabel"></label>
                     </div>
@@ -390,7 +402,47 @@
     </div>
 
     <script type="text/javascript">
-        const d = new SQL.Designer();
+        const signInForm = document.getElementById("signin-form");
+        const logoutForm = document.getElementById("logout-form");
+        const serverSourceButton = document.querySelector('[data-source="server"]');
+        const returnUrl = window.location.pathname + window.location.search;
+        signInForm.querySelector("input[name='returnUrl']").value = returnUrl;
+        logoutForm.querySelector("input[name='returnUrl']").value = returnUrl;
+        let d;
+        const setAuthenticationState = (enabled, authenticated, token) => {
+            const authEnabled = enabled === true;
+            const isAuthenticated = authEnabled && authenticated === true;
+            const serverAvailable = !authEnabled || isAuthenticated;
+            window.__wwwSqlAuthenticated = isAuthenticated;
+            window.__wwwSqlServerAvailable = serverAvailable;
+            signInForm.hidden = !authEnabled || isAuthenticated;
+            logoutForm.hidden = !isAuthenticated || !token;
+            serverSourceButton.disabled = !serverAvailable;
+            serverSourceButton.setAttribute("aria-disabled", serverAvailable ? "false" : "true");
+            if (isAuthenticated && token) {
+                document.getElementById("logout-antiforgery-token").value = token;
+            }
+            if (d && d.io) {
+                d.io.setAuthenticationState(isAuthenticated, serverAvailable);
+            }
+        };
+        window.__wwwSqlSetAuthenticationState = setAuthenticationState;
+        fetch("/account/status", { credentials: "same-origin" })
+            .then(async (response) => {
+                if (!response.ok) {
+                    setAuthenticationState(true, false);
+                    return;
+                }
+
+                const status = await response.json();
+                const token = response.headers.get("X-CSRF-TOKEN");
+                setAuthenticationState(status.enabled, status.authenticated, token);
+            })
+            .catch(() => {
+                setAuthenticationState(true, false);
+            });
+
+        d = new SQL.Designer();
     </script>
 </body>
 

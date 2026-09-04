@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Security.Claims;
 using WwwSqlDesigner.Authentication;
 
 namespace WwwSqlDesigner.Controllers.Tests
@@ -78,6 +80,43 @@ namespace WwwSqlDesigner.Controllers.Tests
                 },
                 result.AuthenticationSchemes.ToArray());
             Assert.AreEqual("/", result.Properties?.RedirectUri);
+        }
+
+        [TestMethod]
+        public void LogoutUsesOnlyCookieWhenKeycloakIsDisabled()
+        {
+            var controller = new AccountController(new KeycloakSettings());
+
+            var result = controller.Logout() as SignOutResult;
+
+            Assert.IsNotNull(result);
+            CollectionAssert.AreEqual(
+                new[] { CookieAuthenticationDefaults.AuthenticationScheme },
+                result.AuthenticationSchemes.ToArray());
+            Assert.AreEqual("/", result.Properties?.RedirectUri);
+        }
+
+        [TestMethod]
+        public void StatusDoesNotOfferSignOutWhenKeycloakIsDisabled()
+        {
+            var controller = new AccountController(new KeycloakSettings())
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = new ClaimsPrincipal(new ClaimsIdentity("Test"))
+                    }
+                }
+            };
+
+            var result = controller.Status() as OkObjectResult;
+
+            Assert.IsNotNull(result);
+            var status = result.Value as AuthStatusResponse;
+            Assert.IsNotNull(status);
+            Assert.IsFalse(status.Enabled);
+            Assert.IsFalse(status.Authenticated);
         }
 
     }

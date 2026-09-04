@@ -17,7 +17,7 @@ body {
     user-select: none;
 }
 
-input[type=button] {
+input[type=button], input[type=submit] {
     font-family: verdana, sans-serif;
     -webkit-appearance: button;
     font-weight: 500;
@@ -215,6 +215,10 @@ label, input, select {
     line-height: 1.3;
     opacity: .7;
     text-transform: none;
+}
+
+#bar #account-controls [hidden] {
+    display: none !important;
 }
 
 #bar input:hover {

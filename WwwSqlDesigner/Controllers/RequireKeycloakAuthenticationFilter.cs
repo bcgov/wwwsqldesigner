@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using WwwSqlDesigner.Authentication;
@@ -26,7 +25,7 @@ namespace WwwSqlDesigner.Controllers
                 return Task.CompletedTask;
             }
 
-            context.Result = new ChallengeResult(OpenIdConnectDefaults.AuthenticationScheme);
+            context.Result = new UnauthorizedResult();
             return Task.CompletedTask;
         }
     }

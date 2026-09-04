@@ -7,6 +7,8 @@ using WwwSqlDesigner.Authentication;
 
 namespace WwwSqlDesigner.Controllers
 {
+    public sealed record AuthStatusResponse(bool Enabled, bool Authenticated);
+
     [Route("account")]
     public class AccountController : Controller
     {
@@ -32,6 +34,16 @@ namespace WwwSqlDesigner.Controllers
             };
 
             return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("status")]
+        public IActionResult Status()
+        {
+            return Ok(new AuthStatusResponse(
+                _keycloakSettings.IsConfigured,
+                _keycloakSettings.IsConfigured
+                    && User.Identity?.IsAuthenticated == true));
         }
 
         [AllowAnonymous]
