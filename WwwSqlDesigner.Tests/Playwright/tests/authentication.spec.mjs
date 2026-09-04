@@ -15,9 +15,9 @@ test("shows an accessible sign out control and submits the antiforgery token whe
 
     await page.goto("/");
 
-    await page.getByRole("button", { name: "Options" }).click();
     const signOut = page.getByRole("button", { name: "Sign out" });
     await expect(signOut).toBeVisible();
+    await expect(page.locator("#options + #logout-form")).toBeVisible();
     await expect(page.locator("#logout-form")).toHaveAttribute("action", "/account/logout");
     await expect(page.locator("#logout-form input[name='returnUrl']")).toHaveValue("/?signedOut=1");
     await expect(page.locator("#logout-form input[name='__RequestVerificationToken']")).toHaveValue("test-token");

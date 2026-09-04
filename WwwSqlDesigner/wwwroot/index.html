@@ -67,6 +67,12 @@
             <hr />
 
             <input type="button" id="options" />
+
+            <form method="post" action="/account/logout" id="logout-form" hidden>
+                <input type="hidden" name="returnUrl" value="/?signedOut=1" />
+                <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
+                <input type="submit" value="Sign out" />
+            </form>
         </div>
 
         <div id="rubberband"></div>
@@ -173,14 +179,6 @@
         <hr />
 
         * <span class="small" id="optionsnotice"></span>
-
-        <hr />
-
-        <form method="post" action="/account/logout" id="logout-form" hidden>
-            <input type="hidden" name="returnUrl" value="/?signedOut=1" />
-            <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
-            <input type="submit" value="Sign out" />
-        </form>
     </div>
 
     <div id="loadsavepanel">

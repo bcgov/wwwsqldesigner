@@ -679,10 +679,6 @@ label, input, select {
     margin: 25px 0px 25px 0px;
 }
 
-#optionspanel #logout-form input[type=submit] {
-    width: 100%;
-}
-
 .small {
     font-size: 85%;
 }
