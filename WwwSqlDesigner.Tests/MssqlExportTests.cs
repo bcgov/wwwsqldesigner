@@ -47,6 +47,44 @@ public class MssqlExportTests
     }
 
     [TestMethod]
+    public void EmitsIdempotentTableAndColumnDescriptionsOnly()
+    {
+        var sql = Transform("""
+            <sql><table name="T]ab'le" schema="S]ch'éma">
+              <row name="C]ol'umn" null="1"><datatype>nvarchar(20)</datatype>
+                <comment>列's description</comment><classification>Protected C</classification>
+              </row>
+              <comment>表's description</comment>
+              <records-schedule>Keep O'Brien</records-schedule>
+            </table></sql>
+            """);
+
+        const string objectId = "OBJECT_ID(N'[S]]ch''éma].[T]]ab''le]', N'U')";
+        const string tableArguments = "@name=N'MS_Description', @value=N'表''s description', @level0type=N'SCHEMA', @level0name=N'S]ch''éma', @level1type=N'TABLE', @level1name=N'T]ab''le'";
+        const string columnArguments = "@name=N'MS_Description', @value=N'列''s description', @level0type=N'SCHEMA', @level0name=N'S]ch''éma', @level1type=N'TABLE', @level1name=N'T]ab''le', @level2type=N'COLUMN', @level2name=N'C]ol''umn'";
+
+        Assert.AreEqual(2, sql.Split("IF EXISTS (").Length - 1);
+        Assert.AreEqual(2, sql.Split("FROM sys.extended_properties").Length - 1);
+        Assert.AreEqual(2, sql.Split("WHERE class = 1").Length - 1);
+        Assert.AreEqual(2, sql.Split("AND name = N'MS_Description'").Length - 1);
+        Assert.AreEqual(2, sql.Split("ELSE").Length - 1);
+        StringAssert.Contains(sql, $"AND major_id = {objectId}");
+        StringAssert.Contains(sql, "AND minor_id = 0");
+        StringAssert.Contains(sql, $"AND minor_id = COLUMNPROPERTY({objectId}, N'C]ol''umn', 'ColumnId')");
+        StringAssert.Contains(sql, $"EXEC sys.sp_updateextendedproperty {tableArguments};");
+        StringAssert.Contains(sql, $"EXEC sys.sp_addextendedproperty {tableArguments};");
+        StringAssert.Contains(sql, $"EXEC sys.sp_updateextendedproperty {columnArguments};");
+        StringAssert.Contains(sql, $"EXEC sys.sp_addextendedproperty {columnArguments};");
+        Assert.AreEqual(2, sql.Split("EXEC sys.sp_updateextendedproperty").Length - 1);
+        StringAssert.Contains(sql, "EXEC sys.sp_addextendedproperty @name=N'DataClassification'");
+        StringAssert.Contains(sql, "EXEC sys.sp_addextendedproperty @name=N'RecordsSchedule'");
+        Assert.IsFalse(sql.Contains("sp_updateextendedproperty @name=N'DataClassification'", StringComparison.Ordinal));
+        Assert.IsFalse(sql.Contains("sp_updateextendedproperty @name=N'RecordsSchedule'", StringComparison.Ordinal));
+        Assert.IsTrue(sql.LastIndexOf("CREATE TABLE", StringComparison.Ordinal) <
+            sql.IndexOf("FROM sys.extended_properties", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void CreatesEscapedSchemasOnceBeforeTables()
     {
         var sql = Transform("""

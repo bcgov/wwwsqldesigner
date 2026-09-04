@@ -15,6 +15,25 @@
 <xsl:template name="sql-string"><xsl:param name="value"/><xsl:choose><xsl:when test="string-length($value)&gt;100"><xsl:variable name="middle" select="floor(string-length($value) div 2)"/><xsl:call-template name="sql-string"><xsl:with-param name="value" select="substring($value,1,$middle)"/></xsl:call-template><xsl:call-template name="sql-string"><xsl:with-param name="value" select="substring($value,$middle + 1)"/></xsl:call-template></xsl:when><xsl:otherwise><xsl:call-template name="replace"><xsl:with-param name="text" select="$value"/><xsl:with-param name="find" select="&quot;'&quot;"/><xsl:with-param name="with" select="&quot;''&quot;"/></xsl:call-template></xsl:otherwise></xsl:choose></xsl:template>
 <xsl:template name="sql-unicode-literal"><xsl:param name="value"/><xsl:text>N'</xsl:text><xsl:call-template name="sql-string"><xsl:with-param name="value" select="$value"/></xsl:call-template><xsl:text>'</xsl:text></xsl:template>
 <xsl:template name="qualified"><xsl:param name="schema"/><xsl:param name="name"/><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$schema"/></xsl:call-template><xsl:text>.</xsl:text><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$name"/></xsl:call-template></xsl:template>
+<xsl:template name="emit-description">
+  <xsl:param name="value"/><xsl:param name="schema"/><xsl:param name="table"/><xsl:param name="column"/>
+  <xsl:variable name="has-column" select="string($column)!=''"/>
+  <xsl:variable name="qualified-table"><xsl:call-template name="qualified"><xsl:with-param name="schema" select="$schema"/><xsl:with-param name="name" select="$table"/></xsl:call-template></xsl:variable>
+  <xsl:variable name="arguments"><xsl:text> @name=N'MS_Description', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="$value"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="$schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="$table"/></xsl:call-template><xsl:if test="$has-column"><xsl:text>, @level2type=N'COLUMN', @level2name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="$column"/></xsl:call-template></xsl:if></xsl:variable>
+  <xsl:text>IF EXISTS (
+  SELECT 1
+  FROM sys.extended_properties
+  WHERE class = 1
+    AND major_id = OBJECT_ID(</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="string($qualified-table)"/></xsl:call-template><xsl:text>, N'U')
+    AND minor_id = </xsl:text><xsl:choose><xsl:when test="$has-column"><xsl:text>COLUMNPROPERTY(OBJECT_ID(</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="string($qualified-table)"/></xsl:call-template><xsl:text>, N'U'), </xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="$column"/></xsl:call-template><xsl:text>, 'ColumnId')</xsl:text></xsl:when><xsl:otherwise><xsl:text>0</xsl:text></xsl:otherwise></xsl:choose><xsl:text>
+    AND name = N'MS_Description'
+)
+  EXEC sys.sp_updateextendedproperty</xsl:text><xsl:value-of select="$arguments"/><xsl:text>;
+ELSE
+  EXEC sys.sp_addextendedproperty</xsl:text><xsl:value-of select="$arguments"/><xsl:text>;
+GO
+</xsl:text>
+</xsl:template>
 <xsl:template name="emit-schema">
     <xsl:param name="schema"/>
       <xsl:variable name="identifier"><xsl:call-template name="sql-identifier"><xsl:with-param name="value" select="$schema"/></xsl:call-template></xsl:variable>
@@ -63,9 +82,7 @@ GO
 </xsl:text>
   </xsl:for-each>
   <xsl:for-each select="table[normalize-space(comment)!='']">
-    <xsl:text>EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
-GO
-</xsl:text>
+    <xsl:call-template name="emit-description"><xsl:with-param name="value" select="comment"/><xsl:with-param name="schema" select="@schema"/><xsl:with-param name="table" select="@name"/></xsl:call-template>
   </xsl:for-each>
   <xsl:for-each select="table[normalize-space(records-schedule)!='']">
     <xsl:text>EXEC sys.sp_addextendedproperty @name=N'RecordsSchedule', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="records-schedule"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
@@ -73,9 +90,7 @@ GO
 </xsl:text>
   </xsl:for-each>
   <xsl:for-each select="table/row[normalize-space(comment)!='']">
-    <xsl:text>EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="comment"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@name"/></xsl:call-template><xsl:text>, @level2type=N'COLUMN', @level2name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
-GO
-</xsl:text>
+    <xsl:call-template name="emit-description"><xsl:with-param name="value" select="comment"/><xsl:with-param name="schema" select="../@schema"/><xsl:with-param name="table" select="../@name"/><xsl:with-param name="column" select="@name"/></xsl:call-template>
   </xsl:for-each>
   <xsl:for-each select="table/row[classification]">
     <xsl:text>EXEC sys.sp_addextendedproperty @name=N'DataClassification', @value=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="classification"/></xsl:call-template><xsl:text>, @level0type=N'SCHEMA', @level0name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@schema"/></xsl:call-template><xsl:text>, @level1type=N'TABLE', @level1name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="../@name"/></xsl:call-template><xsl:text>, @level2type=N'COLUMN', @level2name=</xsl:text><xsl:call-template name="sql-unicode-literal"><xsl:with-param name="value" select="@name"/></xsl:call-template><xsl:text>;
