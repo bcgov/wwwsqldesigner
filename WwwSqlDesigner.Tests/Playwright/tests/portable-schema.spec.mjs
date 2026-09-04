@@ -911,6 +911,19 @@ test("round-trips XML through Client browser storage", async ({ page }) => {
     await expect.poll(() => page.evaluate(() => d.toXML().replace(/created="[^"]*" modified="[^"]*"/, 'created="" modified=""'))).toBe(original);
 });
 
+test("restores the last Client model name after a page reload", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.clear());
+    await load(page, '<sql format="portable-v1"><datatypes db="portable" /><table name="ReloadedModel" /></sql>');
+    await page.locator("#saveload").click();
+    await page.locator("#serverloadname").fill("Reloaded model");
+    await page.locator("#iosave").click();
+
+    await page.reload();
+    await page.locator("#saveload").click();
+    await expect(page.locator("#serverloadname")).toHaveValue("Reloaded model");
+});
+
 test("keeps Client and Server model choices isolated", async ({ page }) => {
     await page.goto("/");
     await page.locator("#saveload").click();

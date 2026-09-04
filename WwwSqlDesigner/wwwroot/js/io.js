@@ -2,7 +2,7 @@ SQL.IO = function (owner) {
     this.owner = owner;
     this._name = ""; /* last used name with server load/save */
     this.lastUsedName =
-        ""; /* last used name with local storage */
+        owner.getOption("lastUsedName") || ""; /* last used name with local storage */
     this._csrfToken = "";
     this._authenticated = window.__wwwSqlAuthenticated === true;
     this._serverAvailable = window.__wwwSqlServerAvailable === true;
