@@ -1220,6 +1220,7 @@ test("prefers the current owner and isolates versions for duplicate server model
             { keyword: "Duplicate", version: 3, ownerId: "other-owner" },
             { keyword: "Duplicate", version: 2, ownerId: "current-owner" },
             { keyword: "Duplicate", version: 1, ownerId: "current-owner" },
+            { keyword: "Duplicate", version: 4, ownerId: "" },
             { keyword: "Duplicate", version: 0, ownerId: null },
         ];
         d.io.updateServerModelChoices();
@@ -1231,6 +1232,17 @@ test("prefers the current owner and isolates versions for duplicate server model
     await expect(page.locator("#serverloadversion option")).toHaveText(["Latest", "v3"]);
     await page.locator("#ioload").click();
     await expect.poll(() => loadRequest && loadRequest.url()).toContain("ownerId=other-owner");
+    await page.locator("#saveload").click();
+    await page.locator('[data-source="server"]').click();
+    const emptyOwnerIndex = await page.locator("#serverowner option").evaluateAll((options) =>
+        options.findIndex((option, index) =>
+            index > 0 && option.value === "" && option.dataset.globalOwner !== "true"));
+    await page.locator("#serverowner").selectOption({ index: emptyOwnerIndex });
+    await expect(page.locator("#serverloadversion option")).toHaveText(["Latest", "v4"]);
+    loadRequest = null;
+    await page.locator("#ioload").click();
+    await expect.poll(() => loadRequest ? new URL(loadRequest.url()).searchParams.get("ownerId") : null).toBe("");
+    await expect.poll(() => loadRequest ? new URL(loadRequest.url()).searchParams.has("globalOwner") : false).toBe(false);
     await page.locator("#saveload").click();
     await page.locator('[data-source="server"]').click();
     await page.locator("#serverowner").selectOption({ label: "Public models" });

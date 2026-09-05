@@ -87,7 +87,9 @@
     <string name="serverimportprompt">Ange namnet på databasen som ska importeras:</string>
     <string name="httpresponse">Serversvar</string>
     <string name="http201">Sparad</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Ej funnen</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Intert serverfel</string>
     <string name="http501">Ej implementerat</string>
     <string name="http503">Service Unavailable</string>

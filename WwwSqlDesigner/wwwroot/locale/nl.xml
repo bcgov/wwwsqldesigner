@@ -92,7 +92,9 @@
     <string name="serverimportprompt">Enter name of database to be imported:</string>
     <string name="httpresponse">Reactie van server</string>
     <string name="http201">Opgeslagen</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Niet gevonden</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Interne Server Fout</string>
     <string name="http501">Niet geimplementeerd</string>
     <string name="http503">Niet beschikbaar</string>

@@ -93,7 +93,9 @@
     <string name="serverimportprompt">Geben Sie den Namen der zu importierenden Datenbank ein:</string>
     <string name="httpresponse">Server Antwort</string>
     <string name="http201">gespeichert</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Nicht gefunden</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Interner Server Fehler</string>
     <string name="http501">Nicht implementiert</string>
     <string name="http503">Dienst nicht erreichbar</string>

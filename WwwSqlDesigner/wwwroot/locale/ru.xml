@@ -93,7 +93,9 @@
     <string name="serverimportprompt">Введите имя импортируемой базы данных:</string>
     <string name="httpresponse">Ответ сервера</string>
     <string name="http201">Сохранено</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Не найдено</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Внутренняя ошибка сервера</string>
     <string name="http501">Не реализовано</string>
     <string name="http503">Служба недоступна</string>

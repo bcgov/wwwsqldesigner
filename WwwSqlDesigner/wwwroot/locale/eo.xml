@@ -90,7 +90,9 @@
     <string name="serverimportprompt">Entajpi la nomon de datumbazo importenda:</string>
     <string name="httpresponse">Respondo de servilo</string>
     <string name="http201">Konservita</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Netrovita</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Interna Servilo Eraro</string>
     <string name="http501">Ne funkciigata</string>
     <string name="http503">Servo Nedisponebla</string>

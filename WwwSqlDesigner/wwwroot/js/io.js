@@ -1043,7 +1043,9 @@ SQL.IO.prototype.serverload = function (e, keyword, version, ownerId, globalOwne
         keyword = this.dom.serverloadmodel.value || this.dom.serverloadname.value.trim();
         if (keyword) {
             version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
-            globalOwner = this.dom.serverowner.selectedIndex > 0 && this.dom.serverowner.value === "";
+            const selectedOwner = this.dom.serverowner.options[this.dom.serverowner.selectedIndex];
+            globalOwner = this.dom.serverowner.selectedIndex > 0
+                && selectedOwner.dataset.globalOwner === "true";
             ownerId = this.dom.serverowner.selectedIndex > 0 && !globalOwner
                 ? this.dom.serverowner.value
                 : null;
@@ -1116,15 +1118,19 @@ SQL.IO.prototype.updateServerModelControls = function () {
 SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     const name = this.dom.serverloadmodel.value || "";
     const allMatches = this._serverModels.filter((model) => model.keyword === name);
-    const ownerIds = Array.from(new Set(allMatches.map((model) => model.ownerId || "")));
+    const ownerIds = Array.from(new Set(allMatches.map((model) => model.ownerId)));
+    const selectedOption = this.dom.serverowner.options[this.dom.serverowner.selectedIndex];
+    const selectedOptionOwner = selectedOption && selectedOption.dataset.globalOwner === "true"
+        ? null
+        : this.dom.serverowner.value;
     const selectedOwner = preferSelectedOwner
         && this.dom.serverowner.selectedIndex > 0
-        && ownerIds.indexOf(this.dom.serverowner.value) !== -1
-        ? this.dom.serverowner.value
+        && ownerIds.indexOf(selectedOptionOwner) !== -1
+        ? selectedOptionOwner
         : (ownerIds.indexOf(this._currentOwnerId) !== -1
             ? this._currentOwnerId
-            : (ownerIds.length ? ownerIds[0] : ""));
-    const matches = allMatches.filter((model) => (model.ownerId || "") === selectedOwner);
+            : (ownerIds.length ? ownerIds[0] : null));
+    const matches = allMatches.filter((model) => model.ownerId === selectedOwner);
     SQL.dom.clear(this.dom.serverloadmodel);
     const modelNames = Array.from(new Set(this._serverModels.map((model) => model.keyword)));
     const placeholder = SQL.dom.create("option");
@@ -1153,10 +1159,13 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     this.dom.serverowner.appendChild(ownerPlaceholder);
     for (const ownerId of ownerIds) {
         const option = SQL.dom.create("option");
-        option.value = ownerId;
+        option.value = ownerId === null ? "" : ownerId;
+        if (ownerId === null) {
+            option.dataset.globalOwner = "true";
+        }
         option.textContent = ownerId === this._currentOwnerId
             ? this._currentOwnerLabel
-            : (ownerId || "Public models");
+            : (ownerId === null ? "Public models" : ownerId);
         option.selected = ownerId === selectedOwner;
         this.dom.serverowner.appendChild(option);
     }

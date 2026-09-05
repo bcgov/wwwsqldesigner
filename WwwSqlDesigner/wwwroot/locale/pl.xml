@@ -90,7 +90,9 @@
     <string name="serverimportprompt">Wpisz nazwę bazy danych do zaimportowania:</string>
     <string name="httpresponse">Odpowiedź serwera</string>
     <string name="http201">Zapisano</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Nie znaleziono</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Wewnętrzny błąd serwera</string>
     <string name="http501">Niezaimplementowane</string>
     <string name="http503">Serwer niedostępny</string>

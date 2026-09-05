@@ -88,7 +88,9 @@
     <string name="serverimportprompt">Digite o nome da base de dados à ser importada:</string>
     <string name="httpresponse"> Resposta do servidor</string>
     <string name="http201">Salvo</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Não Encontrado</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Erro Interno do Servidor</string>
     <string name="http501">Não Implementado</string>
     <string name="http503">Serviço Indisponível</string>

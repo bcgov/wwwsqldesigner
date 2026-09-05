@@ -93,7 +93,9 @@
     <string name="serverimportprompt">가져올 데이터베이스의 이름을 입력해 주세요:</string>
     <string name="httpresponse">서버 응답</string>
     <string name="http201">저장되었습니다</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">찾을 수 없습니다(Not Found)</string>
+    <string name="http409">Conflict</string>
     <string name="http500">내부 서버 에러(Internal Server Error)</string>
     <string name="http501">구현되지 않았습니다(Not Implemented)</string>
     <string name="http503">서비스를 사용할 수 없습니다(Service Unavailable)</string>

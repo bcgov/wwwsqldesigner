@@ -93,7 +93,9 @@
     <string name="serverimportprompt">Yüklenecek veritabanının adını girin:</string>
     <string name="httpresponse">Sunucu yanıtı</string>
     <string name="http201">Kaydedilmiş</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Bulunamadı</string>
+    <string name="http409">Conflict</string>
     <string name="http500">İç Sunucu Hatası</string>
     <string name="http501">Uygulanmadı</string>
     <string name="http503">Hizmet Kullanılamıyor</string>

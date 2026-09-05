@@ -91,7 +91,9 @@
     <string name="serverimportprompt">输入所要导入的数据库名称:</string>
     <string name="httpresponse">服务器反馈</string>
     <string name="http201">已存</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">找不到</string>
+    <string name="http409">Conflict</string>
     <string name="http500">网络服务错误</string>
     <string name="http501">未执行</string>
     <string name="http503">服务暂不可用</string>
