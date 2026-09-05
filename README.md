@@ -24,7 +24,14 @@ Note that the auto-creation of a database and schema only works with LocalDB in 
 1. Save models to a database and load the latest or a selected version by model and owner
 1. The DB connection is based on Entity Framework Core, so supports LocalDB (for development), MSSQL, PostgreSQL, etc.
 1. Data model versioning
- 
+
+## Server model authorization
+
+With Keycloak enabled, a model whose `OwnerId` is `NULL` is global and visible
+to every authenticated user. Non-null owner IDs and user/group grant target IDs
+are stored and matched exactly with case- and whitespace-sensitive SQL Server
+semantics; they are not trimmed or case-normalized.
+
 # Upcoming Features
 1. Expanding the SQL import feature to support more than an import from a local MySQL DB
 1. User roles and permissions

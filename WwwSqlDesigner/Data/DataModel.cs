@@ -6,7 +6,7 @@ namespace WwwSqlDesigner.Data
     [Description("Table to hold various data models")]
     public partial class DataModel
     {
-        public const string UnownedOwnerId = "unowned";
+        public int Id { get; set; }
 
         [MaxLength(30)]
         [Required]
@@ -22,9 +22,8 @@ namespace WwwSqlDesigner.Data
         public string Data { get; set; } = null!;
 
         [MaxLength(256)]
-        [Required]
-        [Description("The owner identifier for the model, or the unowned sentinel")]
-        public string OwnerId { get; set; } = UnownedOwnerId;
+        [Description("The exact owner identifier for the model; null makes the model global")]
+        public string? OwnerId { get; set; }
 
         [Required]
         [Description("The date and time when this model was created")]

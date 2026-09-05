@@ -4,6 +4,8 @@ namespace WwwSqlDesigner.Data
 {
     public partial class DataModelAccessGrant
     {
+        public int Id { get; set; }
+
         [MaxLength(256)]
         [Required]
         public string OwnerId { get; set; } = null!;

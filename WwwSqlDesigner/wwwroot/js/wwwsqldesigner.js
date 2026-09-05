@@ -155,10 +155,14 @@ SQL.Designer.prototype.init2 = function () {
     const regexKeyword = url.match(/keyword=([^&]+)/);
     const regexVersion = url.match(/version=([^&]+)/);
     const regexOwnerId = url.match(/ownerId=([^&]+)/);
+    const regexGlobalOwner = url.match(/globalOwner=([^&]+)/);
     this._serverDeepLink = regexKeyword ? {
         keyword: decodeURIComponent(regexKeyword[1]),
         version: regexVersion ? decodeURIComponent(regexVersion[1]) : null,
-        ownerId: regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null
+        ownerId: regexOwnerId ? decodeURIComponent(regexOwnerId[1]) : null,
+        globalOwner: regexGlobalOwner
+            ? decodeURIComponent(regexGlobalOwner[1]) === "true"
+            : false
     } : null;
     this._serverDeepLinkLoaded = false;
     this.io.updateServerUi();
@@ -172,7 +176,7 @@ SQL.Designer.prototype.loadServerDeepLink = function () {
     }
     this._serverDeepLinkLoaded = true;
     const link = this._serverDeepLink;
-    this.io.serverload(false, link.keyword, link.version, link.ownerId);
+    this.io.serverload(false, link.keyword, link.version, link.ownerId, link.globalOwner);
 };
 
 SQL.Designer.prototype.getMaxZ = function () {

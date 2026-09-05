@@ -134,6 +134,16 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
+        public async Task PublicModeAccessReturnsEmptyGrantCollection()
+        {
+            var result = await _controller.Access("Test1").ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(result, typeof(JsonResult));
+            var grants = (IEnumerable<AccessGrantResponse>)((JsonResult)result).Value!;
+            Assert.AreEqual(0, grants.Count());
+        }
+
+        [TestMethod]
         public async Task ListLabelsCurrentOwnerWithNameAndEmail()
         {
             var settings = ConfiguredKeycloak();
@@ -254,6 +264,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.IsInstanceOfType(result, typeof(ContentResult));
             var dbContent = _dbContext.DataModels.FirstOrDefault(x => x.Keyword == "Test3");
             Assert.IsNotNull(dbContent);
+            Assert.IsNull(dbContent.OwnerId);
         }
 
         [TestMethod()]
@@ -322,43 +333,54 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
-        public async Task ListIncludesDirectAndGroupSharesButNotPrivateModels()
+        public async Task ListDistinguishesGlobalOwnedSharedCaseDifferentAndUnrelatedModels()
         {
             var settings = ConfiguredKeycloak();
             _dbContext.DataModels.AddRange(
-                new DataModel { OwnerId = "alice", Keyword = "Owned", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
-                new DataModel { OwnerId = "bob", Keyword = "Private", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = null, Keyword = "Global", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "Alice", Keyword = "Owned", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
                 new DataModel { OwnerId = "bob", Keyword = "UserShared", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
-                new DataModel { OwnerId = "bob", Keyword = "GroupShared", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow });
+                new DataModel { OwnerId = "bob", Keyword = "GroupShared", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "alice", Keyword = "CaseOwner", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "bob", Keyword = "CaseUser", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "bob", Keyword = "CaseGroup", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = "bob", Keyword = "Unrelated", Version = 0, Data = FooBarModelXml, CreatedAt = DateTime.UtcNow });
             _dbContext.DataModelAccessGrants.AddRange(
-                new DataModelAccessGrant { OwnerId = "bob", Keyword = "UserShared", TargetType = "User", TargetId = "alice", Permission = "View" },
-                new DataModelAccessGrant { OwnerId = "bob", Keyword = "GroupShared", TargetType = "Group", TargetId = "team-a", Permission = "View" });
+                new DataModelAccessGrant { OwnerId = "bob", Keyword = "UserShared", TargetType = "User", TargetId = "Alice", Permission = "View" },
+                new DataModelAccessGrant { OwnerId = "bob", Keyword = "GroupShared", TargetType = "Group", TargetId = "Team-A", Permission = "View" },
+                new DataModelAccessGrant { OwnerId = "bob", Keyword = "CaseUser", TargetType = "User", TargetId = "alice", Permission = "View" },
+                new DataModelAccessGrant { OwnerId = "bob", Keyword = "CaseGroup", TargetType = "Group", TargetId = "team-a", Permission = "View" });
             _dbContext.SaveChanges();
 
-            var controller = InitializeController(settings, User("alice", "team-a"));
+            var controller = InitializeController(settings, User("Alice", "Team-A"));
             var result = (ModelListResponse)((JsonResult)await controller.List()).Value!;
             var keywords = result.Models.Select(x => x.Keyword).ToArray();
+            CollectionAssert.Contains(keywords, "Global");
             CollectionAssert.Contains(keywords, "Owned");
             CollectionAssert.Contains(keywords, "UserShared");
             CollectionAssert.Contains(keywords, "GroupShared");
-            CollectionAssert.DoesNotContain(keywords, "Private");
+            CollectionAssert.DoesNotContain(keywords, "CaseOwner");
+            CollectionAssert.DoesNotContain(keywords, "CaseUser");
+            CollectionAssert.DoesNotContain(keywords, "CaseGroup");
+            CollectionAssert.DoesNotContain(keywords, "Unrelated");
+            Assert.IsNull(result.Models.Single(x => x.Keyword == "Global").OwnerId);
         }
 
         [TestMethod]
-        public async Task AuthenticatedUsersCanLoadUnownedModels()
+        public async Task AuthenticatedUsersCanLoadGlobalModels()
         {
             var settings = ConfiguredKeycloak();
             _dbContext.DataModels.Add(new DataModel
             {
-                OwnerId = DataModel.UnownedOwnerId,
-                Keyword = "PublicLegacy",
+                OwnerId = null,
+                Keyword = "Global",
                 Version = 0,
                 Data = FooBarModelXml
             });
             _dbContext.SaveChanges();
 
             var controller = InitializeController(settings, User("viewer"));
-            var result = await controller.Load("PublicLegacy", null);
+            var result = await controller.Load("Global", null);
 
             Assert.IsInstanceOfType(result, typeof(ContentResult));
             Assert.AreEqual("true", controller.Response.Headers["X-MODEL-COPYABLE"].ToString());
@@ -454,7 +476,8 @@ namespace WwwSqlDesigner.Controllers.Tests
             var settings = ConfiguredKeycloak();
             _dbContext.DataModels.AddRange(
                 new DataModel { OwnerId = "owner-a", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"A\" /></sql>", CreatedAt = DateTime.UtcNow },
-                new DataModel { OwnerId = "owner-b", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"B\" /></sql>", CreatedAt = DateTime.UtcNow });
+                new DataModel { OwnerId = "owner-b", Keyword = "Shared", Version = 0, Data = "<sql><table name=\"B\" /></sql>", CreatedAt = DateTime.UtcNow },
+                new DataModel { OwnerId = null, Keyword = "Shared", Version = 0, Data = "<sql><table name=\"Global\" /></sql>", CreatedAt = DateTime.UtcNow });
             _dbContext.DataModelAccessGrants.Add(new DataModelAccessGrant
             {
                 OwnerId = "owner-b",
@@ -467,9 +490,11 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var viewer = InitializeController(settings, User("viewer"));
             var result = await viewer.Load("Shared", null, "owner-b");
+            var globalResult = await viewer.Load("Shared", null, "owner-b", globalOwner: true);
 
             var content = (ContentResult)result;
             StringAssert.Contains(content.Content, "name=\"B\"");
+            StringAssert.Contains(((ContentResult)globalResult).Content, "name=\"Global\"");
             Assert.AreEqual("true", viewer.Response.Headers["X-MODEL-COPYABLE"].ToString());
         }
 

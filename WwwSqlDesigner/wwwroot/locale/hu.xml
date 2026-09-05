@@ -88,7 +88,9 @@
     <string name="serverimportprompt">Írja be az importálandó adatbázis nevét:</string>
     <string name="httpresponse">A szerver válasza</string>
     <string name="http201">Elmentve</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Nem találom</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Belső szerver hiba</string>
     <string name="http501">Nem lett végrehajtva</string>
     <string name="http503">Szolgáltatás nem elérhető</string>

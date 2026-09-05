@@ -87,7 +87,9 @@
     <string name="serverimportprompt">أدخل إسم قاعدة البيانات التي تريد إستيرادها:</string>
     <string name="httpresponse">رد الخادم</string>
     <string name="http201">تم الحفظ بنجاح</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">لم يتم العثور عليه</string>
+    <string name="http409">Conflict</string>
     <string name="http500">خطأ داخلي في الخادم</string>
     <string name="http501">الخاصية غير موجودة</string>
     <string name="http503">الخدمة غير متوفرة</string>

@@ -92,7 +92,9 @@
     <string name="serverimportprompt">インポートするDB名を入力してください:</string>
     <string name="httpresponse">サーバレスポンス</string>
     <string name="http201">Saved</string>
+    <string name="http400">Bad Request</string>
     <string name="http404">Not Found</string>
+    <string name="http409">Conflict</string>
     <string name="http500">Internal Server Error</string>
     <string name="http501">Not Implemented</string>
     <string name="http503">Service Unavailable</string>

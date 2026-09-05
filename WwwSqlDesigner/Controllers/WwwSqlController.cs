@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text;
@@ -11,6 +12,9 @@ namespace WwwSqlDesigner.Controllers
     [ServiceFilter(typeof(RequireKeycloakAuthenticationFilter))]
     public class WwwSqlController : Controller
     {
+        private const string GrantIdentityIndexName =
+            "IX_DataModelAccessGrants_OwnerId_Keyword_TargetType_TargetId_OwnerIdByteLength_TargetIdByteLength";
+        private const string IdentityComparisonTerminator = "|";
         private readonly ILogger<WwwSqlController> _logger;
         private readonly ApplicationDbContext _context;
         private readonly KeycloakSettings _keycloakSettings;
@@ -41,7 +45,7 @@ namespace WwwSqlDesigner.Controllers
 
         [HttpGet]
         [Route("backend/netcore-ef/load")]
-        public async Task<IActionResult> Load(string? keyword, int? version, string? ownerId = null)
+        public async Task<IActionResult> Load(string? keyword, int? version, string? ownerId = null, bool globalOwner = false)
         {
             if (string.IsNullOrEmpty(keyword))
             {
@@ -49,8 +53,18 @@ namespace WwwSqlDesigner.Controllers
             }
 
             var currentOwnerId = GetEffectiveOwnerId();
-            IQueryable<DataModel> query = ApplyOwnerFilter(_context.DataModels)
-                .Where(x => string.IsNullOrWhiteSpace(ownerId) || x.OwnerId == ownerId!.Trim());
+            IQueryable<DataModel> query = ApplyOwnerFilter(_context.DataModels);
+            if (globalOwner)
+            {
+                query = query.Where(x => x.OwnerId == null);
+            }
+            else if (ownerId is not null)
+            {
+                var requestedOwnerIdentity = GetExactIdentityKey(ownerId);
+                query = query.Where(x =>
+                    x.OwnerId == ownerId
+                    && x.OwnerId + IdentityComparisonTerminator == requestedOwnerIdentity);
+            }
             DataModel? model;
             if (!version.HasValue)
             {
@@ -163,7 +177,15 @@ namespace WwwSqlDesigner.Controllers
             }
 
             var ownerId = GetEffectiveOwnerId();
-            var ownsModel = await _context.DataModels.AnyAsync(x => x.OwnerId == ownerId && x.Keyword == keyword);
+            if (ownerId is null)
+            {
+                return new JsonResult(Array.Empty<AccessGrantResponse>());
+            }
+            var ownerIdentity = GetExactIdentityKey(ownerId);
+            var ownsModel = await _context.DataModels.AnyAsync(x =>
+                x.OwnerId == ownerId
+                && x.OwnerId + IdentityComparisonTerminator == ownerIdentity
+                && x.Keyword == keyword);
             if (!ownsModel)
             {
                 return NotFound();
@@ -171,7 +193,10 @@ namespace WwwSqlDesigner.Controllers
 
             var grants = await _context.DataModelAccessGrants
                 .AsNoTracking()
-                .Where(x => x.OwnerId == ownerId && x.Keyword == keyword)
+                .Where(x =>
+                    x.OwnerId == ownerId
+                    && x.OwnerId + IdentityComparisonTerminator == ownerIdentity
+                    && x.Keyword == keyword)
                 .OrderBy(x => x.TargetType)
                 .ThenBy(x => x.TargetId)
                 .Select(x => new AccessGrantResponse(x.TargetType, x.TargetId, x.Permission))
@@ -190,29 +215,27 @@ namespace WwwSqlDesigner.Controllers
             }
 
             var ownerId = GetEffectiveOwnerId();
-            var ownsModel = await _context.DataModels.AnyAsync(x => x.OwnerId == ownerId && x.Keyword == keyword);
+            if (ownerId is null)
+            {
+                return NotFound();
+            }
+            var ownerIdentity = GetExactIdentityKey(ownerId);
+            var ownsModel = await _context.DataModels.AnyAsync(x =>
+                x.OwnerId == ownerId
+                && x.OwnerId + IdentityComparisonTerminator == ownerIdentity
+                && x.Keyword == keyword);
             if (!ownsModel)
             {
                 return NotFound();
             }
 
             var targetType = request.TargetType?.Trim();
-            var targetId = request.TargetId?.Trim();
+            var targetId = request.TargetId;
             var permission = request.Permission?.Trim();
             if (!IsValidTargetType(targetType) || string.IsNullOrWhiteSpace(targetId) || targetId.Length > 256
                 || !IsValidPermission(permission))
             {
                 return BadRequest("TargetType, TargetId, and Permission are invalid.");
-            }
-
-            var exists = await _context.DataModelAccessGrants.AnyAsync(x =>
-                x.OwnerId == ownerId
-                && x.Keyword == keyword
-                && x.TargetType == targetType
-                && x.TargetId == targetId);
-            if (exists)
-            {
-                return Conflict();
             }
 
             _context.DataModelAccessGrants.Add(new DataModelAccessGrant
@@ -223,7 +246,14 @@ namespace WwwSqlDesigner.Controllers
                 TargetId = targetId!,
                 Permission = permission!
             });
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException exception) when (IsDuplicateGrantIdentity(exception))
+            {
+                return Conflict();
+            }
             return NoContent();
         }
 
@@ -232,17 +262,26 @@ namespace WwwSqlDesigner.Controllers
         [Route("backend/netcore-ef/access/grant")]
         public async Task<IActionResult> RevokeAccess(string? keyword, string? targetType, string? targetId)
         {
-            if (string.IsNullOrWhiteSpace(keyword) || !IsValidTargetType(targetType) || string.IsNullOrWhiteSpace(targetId))
+            if (string.IsNullOrWhiteSpace(keyword) || !IsValidTargetType(targetType)
+                || string.IsNullOrWhiteSpace(targetId) || targetId.Length > 256)
             {
                 return BadRequest();
             }
 
             var ownerId = GetEffectiveOwnerId();
+            if (ownerId is null)
+            {
+                return NotFound();
+            }
+            var ownerIdentity = GetExactIdentityKey(ownerId);
+            var targetIdentity = GetExactIdentityKey(targetId);
             var grant = await _context.DataModelAccessGrants.FirstOrDefaultAsync(x =>
                 x.OwnerId == ownerId
+                && x.OwnerId + IdentityComparisonTerminator == ownerIdentity
                 && x.Keyword == keyword
                 && x.TargetType == targetType
-                && x.TargetId == targetId);
+                && x.TargetId == targetId
+                && x.TargetId + IdentityComparisonTerminator == targetIdentity);
             if (grant is null)
             {
                 return NotFound();
@@ -253,11 +292,11 @@ namespace WwwSqlDesigner.Controllers
             return NoContent();
         }
 
-        private string GetEffectiveOwnerId()
+        private string? GetEffectiveOwnerId()
         {
             if (!_keycloakSettings.IsConfigured)
             {
-                return DataModel.UnownedOwnerId;
+                return null;
             }
 
             return User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -284,32 +323,43 @@ namespace WwwSqlDesigner.Controllers
             {
                 return $"{name} ({email})";
             }
-            return name ?? email ?? username ?? GetEffectiveOwnerId();
+            return name ?? email ?? username ?? GetEffectiveOwnerId()!;
         }
 
         private IQueryable<DataModel> ApplyOwnerFilter(IQueryable<DataModel> query, bool includeGrants = true)
         {
             if (!_keycloakSettings.IsConfigured)
             {
-                return query.Where(x => x.OwnerId == DataModel.UnownedOwnerId);
+                return query.Where(x => x.OwnerId == null);
             }
 
-            var ownerId = GetEffectiveOwnerId();
+            var ownerId = GetEffectiveOwnerId()!;
+            var ownerIdentity = GetExactIdentityKey(ownerId);
             if (!includeGrants)
             {
-                return query.Where(x => x.OwnerId == ownerId);
+                return query.Where(x =>
+                    x.OwnerId == ownerId
+                    && x.OwnerId + IdentityComparisonTerminator == ownerIdentity);
             }
 
             var groupIds = GetCurrentGroupIds();
+            var groupIdentities = groupIds.Select(GetExactIdentityKey).ToArray();
             return query.Where(x =>
-                x.OwnerId == ownerId
-                || x.OwnerId == DataModel.UnownedOwnerId
+                (x.OwnerId == ownerId
+                    && x.OwnerId + IdentityComparisonTerminator == ownerIdentity)
+                || x.OwnerId == null
                 || _context.DataModelAccessGrants.Any(grant =>
                     grant.OwnerId == x.OwnerId
+                    && grant.OwnerId + IdentityComparisonTerminator
+                        == x.OwnerId + IdentityComparisonTerminator
                     && grant.Keyword == x.Keyword
                     && grant.Permission == "View"
-                    && ((grant.TargetType == "User" && grant.TargetId == ownerId)
-                        || (grant.TargetType == "Group" && groupIds.Contains(grant.TargetId)))));
+                    && ((grant.TargetType == "User"
+                            && grant.TargetId == ownerId
+                            && grant.TargetId + IdentityComparisonTerminator == ownerIdentity)
+                        || (grant.TargetType == "Group"
+                            && groupIds.Contains(grant.TargetId)
+                            && groupIdentities.Contains(grant.TargetId + IdentityComparisonTerminator)))));
         }
 
         private string[] GetCurrentGroupIds()
@@ -320,6 +370,21 @@ namespace WwwSqlDesigner.Controllers
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        private static string GetExactIdentityKey(string identity)
+        {
+            // SQL Server pads string operands with spaces for equality. A non-space
+            // terminator makes trailing spaces part of the comparison.
+            return identity + IdentityComparisonTerminator;
+        }
+
+        private static bool IsDuplicateGrantIdentity(DbUpdateException exception)
+        {
+            return exception.InnerException is SqlException sqlException
+                && sqlException.Errors.Cast<SqlError>().Any(error =>
+                    error.Number == 2601
+                    && error.Message.Contains(GrantIdentityIndexName, StringComparison.Ordinal));
         }
 
         private static bool IsValidTargetType(string? targetType)
@@ -337,6 +402,6 @@ namespace WwwSqlDesigner.Controllers
 
     public sealed record AccessGrantRequest(string? TargetType, string? TargetId, string? Permission);
     public sealed record AccessGrantResponse(string TargetType, string TargetId, string Permission);
-    public sealed record ModelListEntry(string Keyword, int Version, string OwnerId);
-    public sealed record ModelListResponse(ModelListEntry[] Models, string CurrentOwnerId, string CurrentOwnerLabel, string[] Groups);
+    public sealed record ModelListEntry(string Keyword, int Version, string? OwnerId);
+    public sealed record ModelListResponse(ModelListEntry[] Models, string? CurrentOwnerId, string CurrentOwnerLabel, string[] Groups);
 }
