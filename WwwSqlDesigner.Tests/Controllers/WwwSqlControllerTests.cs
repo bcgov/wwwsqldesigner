@@ -134,6 +134,16 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod]
+        public async Task PublicModeAccessReturnsEmptyGrantCollection()
+        {
+            var result = await _controller.Access("Test1").ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(result, typeof(JsonResult));
+            var grants = (IEnumerable<AccessGrantResponse>)((JsonResult)result).Value!;
+            Assert.AreEqual(0, grants.Count());
+        }
+
+        [TestMethod]
         public async Task ListLabelsCurrentOwnerWithNameAndEmail()
         {
             var settings = ConfiguredKeycloak();

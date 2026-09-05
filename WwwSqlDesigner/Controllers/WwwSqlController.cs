@@ -179,7 +179,7 @@ namespace WwwSqlDesigner.Controllers
             var ownerId = GetEffectiveOwnerId();
             if (ownerId is null)
             {
-                return NotFound();
+                return new JsonResult(Array.Empty<AccessGrantResponse>());
             }
             var ownerIdentity = GetExactIdentityKey(ownerId);
             var ownsModel = await _context.DataModels.AnyAsync(x =>
