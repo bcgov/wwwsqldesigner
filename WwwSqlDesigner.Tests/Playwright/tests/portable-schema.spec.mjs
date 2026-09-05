@@ -49,6 +49,30 @@ test("rejects duplicate and unresolved schema identities transactionally", async
     }
 });
 
+test("clears import diagnostics after rejected and malformed imports", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    page.on("dialog", (dialog) => dialog.dismiss());
+    await page.locator("#saveload").click();
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><datatypes db="mssql"/><table name="Location"><row name="Shape"><datatype>geography</datatype></row></table></sql>`)).toBe(true);
+    await expect(page.locator("#iostatus")).toBeVisible();
+    const original = await page.evaluate(() => d.toXML());
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name="Duplicate"/><table name="duplicate"/></sql>`)).toBe(false);
+    await expect(page.locator("#iostatus")).toBeHidden();
+    expect(await page.locator("#iostatus").textContent()).toBe("");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name="Malformed">`)).toBe(false);
+    await expect(page.locator("#iostatus")).toBeHidden();
+    expect(await page.locator("#iostatus").textContent()).toBe("");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
 test("validates table names transactionally while preserving valid whitespace identity", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);

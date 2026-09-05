@@ -376,6 +376,7 @@ SQL.IO.prototype.parseXml = function (xml) {
 };
 
 SQL.IO.prototype.fromXMLText = function (xml) {
+    this.showStatus();
     try {
         const xmlDoc = this.parseXml(xml);
         return this.fromXML(xmlDoc);
@@ -386,6 +387,7 @@ SQL.IO.prototype.fromXMLText = function (xml) {
 };
 
 SQL.IO.prototype.fromXML = function (xmlDoc) {
+    this.showStatus();
     if (!xmlDoc || !xmlDoc.documentElement) {
         alert(_("xmlerror") + ": Null document");
         return false;
