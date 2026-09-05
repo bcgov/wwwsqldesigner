@@ -196,8 +196,10 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Load("Tied", null).ConfigureAwait(true);
 
-            var content = (ContentResult)result;
-            Assert.AreEqual("<sql version=\"1\" />", content.Content);
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            string? content = ((ContentResult)result).Content;
+            Assert.IsNotNull(content);
+            Assert.AreEqual("<sql version=\"1\" />", content);
         }
 
         [TestMethod]
@@ -210,8 +212,10 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Load("Created", null).ConfigureAwait(true);
 
-            var content = (ContentResult)result;
-            Assert.AreEqual("<sql version=\"1\" />", content.Content);
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            string? content = ((ContentResult)result).Content;
+            Assert.IsNotNull(content);
+            Assert.AreEqual("<sql version=\"1\" />", content);
         }
 
         [TestMethod()]
