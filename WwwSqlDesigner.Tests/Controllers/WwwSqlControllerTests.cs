@@ -185,6 +185,39 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.AreEqual(content, FooBarModelXml);
         }
 
+        [TestMethod]
+        public async Task LoadLatestReturnsHighestVersionWhenCreatedAtTies()
+        {
+            var createdAt = new DateTime(2023, 06, 01, 12, 00, 00);
+            _dbContext.DataModels.AddRange(
+                new DataModel { Keyword = "Tied", Version = 0, Data = "<sql version=\"0\" />", CreatedAt = createdAt },
+                new DataModel { Keyword = "Tied", Version = 1, Data = "<sql version=\"1\" />", CreatedAt = createdAt });
+            _dbContext.SaveChanges();
+
+            var result = await _controller.Load("Tied", null).ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            string? content = ((ContentResult)result).Content;
+            Assert.IsNotNull(content);
+            Assert.AreEqual("<sql version=\"1\" />", content);
+        }
+
+        [TestMethod]
+        public async Task LoadLatestStillPrefersNewerCreatedAt()
+        {
+            _dbContext.DataModels.AddRange(
+                new DataModel { Keyword = "Created", Version = 2, Data = "<sql version=\"2\" />", CreatedAt = new DateTime(2023, 06, 01) },
+                new DataModel { Keyword = "Created", Version = 1, Data = "<sql version=\"1\" />", CreatedAt = new DateTime(2023, 06, 02) });
+            _dbContext.SaveChanges();
+
+            var result = await _controller.Load("Created", null).ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            string? content = ((ContentResult)result).Content;
+            Assert.IsNotNull(content);
+            Assert.AreEqual("<sql version=\"1\" />", content);
+        }
+
         [TestMethod()]
         public async Task LoadTestVersion()
         {
