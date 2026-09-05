@@ -49,6 +49,30 @@ test("rejects duplicate and unresolved schema identities transactionally", async
     }
 });
 
+test("clears import diagnostics after rejected and malformed imports", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    page.on("dialog", (dialog) => dialog.dismiss());
+    await page.locator("#saveload").click();
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><datatypes db="mssql"/><table name="Location"><row name="Shape"><datatype>geography</datatype></row></table></sql>`)).toBe(true);
+    await expect(page.locator("#iostatus")).toBeVisible();
+    const original = await page.evaluate(() => d.toXML());
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name="Duplicate"/><table name="duplicate"/></sql>`)).toBe(false);
+    await expect(page.locator("#iostatus")).toBeHidden();
+    expect(await page.locator("#iostatus").textContent()).toBe("");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+
+    expect(await page.evaluate((value) => d.io.fromXMLText(value),
+        `<sql><table name="Malformed">`)).toBe(false);
+    await expect(page.locator("#iostatus")).toBeHidden();
+    expect(await page.locator("#iostatus").textContent()).toBe("");
+    expect(await page.evaluate(() => d.toXML())).toBe(original);
+});
+
 test("validates table names transactionally while preserving valid whitespace identity", async ({ page }) => {
     await page.goto("/");
     await load(page, `<sql><table name="Keep"><row name="Id"><datatype>integer</datatype></row></table></sql>`);
@@ -442,13 +466,14 @@ test("valid replacement discards an invalid editor while rejected import preserv
     name = page.locator("tbody.expanded input[type=text]").first();
     await name.fill("");
     expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
-        `<sql><table name="Bad"/><table name="bad"/></sql>`)).toBe(false);
+        `<sql><datatypes db="mssql"/><table name="Bad"><row name="Shape"><datatype>geography</datatype></row></table><table name="bad"/></sql>`)).toBe(false);
     expect(await page.evaluate(() => ({
         tables: d.tables.map((table) => table.getTitle()),
         selected: d.rowManager.selected.getTitle(),
         expanded: d.rowManager.selected.expanded,
         input: d.rowManager.selected.dom.name.value,
     }))).toEqual({ tables: ["Replacement"], selected: "NewId", expanded: true, input: "" });
+    await expect(page.locator("#iostatus")).toBeHidden();
 });
 
 test("invalid row keeps new-table placement pending until one successful retry", async ({ page }) => {
@@ -785,15 +810,59 @@ test("round-trips every canonical portable token and facet", async ({ page }) =>
     expect(await page.evaluate(() => d.toXML())).toBe(saved);
 });
 
-test("imports specialized and unknown legacy types without a prompt", async ({ page }) => {
+test("keeps exact tagged imports quiet and independent from the export target", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await page.locator("#saveload").click();
+    await page.locator("#exporttarget").selectOption("mssql");
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><datatypes db="postgresql"/><table name="Files"><row name="Payload"><datatype>bytea</datatype></row></table></sql>`)).toBe(true);
+    await expect(page.locator("#iostatus")).toBeHidden();
+    expect(await page.evaluate(() => ({
+        datatype: d.tables[0].rows[0].getDataType().getAttribute("sql"),
+        exportTarget: d.io.dom.exporttarget.value,
+        windowState: d.window.state,
+    }))).toEqual({ datatype: "binary", exportTarget: "mssql", windowState: 0 });
+});
+
+test("applies lossy legacy imports and exposes an accessible contextual warning", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => typeof d !== "undefined" && d.io);
     await page.evaluate(() => { window.prompt = () => { throw new Error("Import must not prompt"); }; });
     await page.locator("#saveload").click();
-    const imported = await page.evaluate(() => d.io.fromXML(new DOMParser().parseFromString("<sql><datatypes db=\"mssql\" /><table name=\"Location\"><row name=\"Shape\" null=\"1\"><datatype>geography</datatype></row><row name=\"Mystery\" null=\"1\"><datatype>future_type</datatype></row><row name=\"Empty\" null=\"1\"><datatype></datatype></row></table></sql>", "text/xml")));
-    expect(imported).toBe(true);
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><datatypes db="mssql"/><table name="Location"><row name="Shape" null="1"><datatype>geography</datatype></row></table></sql>`)).toBe(true);
     expect(await page.evaluate(() => d.toXML())).toContain("<datatype>text</datatype>");
-    await page.evaluate(() => d.io.click());
+    const status = page.getByRole("status");
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toContainText("Import conversion warnings — review affected columns");
+    await expect(status).toContainText("Affected column [dbo].[Location].[Shape]: SQL Server geography is imported as text.");
+    await expect(status.locator("li")).toHaveCount(1);
+    expect(await page.evaluate(() => d.window.state)).toBe(1);
+});
+
+test("deduplicates repeated import diagnostics with every affected column", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => typeof d !== "undefined" && d.io);
+    await page.locator("#saveload").click();
+    expect(await page.evaluate((xml) => d.io.fromXMLText(xml),
+        `<sql><datatypes db="mssql"/><table schema="sales" name="Location">
+          <row name="Shape"><datatype>geography</datatype></row>
+          <row name="Boundary"><datatype>geography</datatype></row>
+          <row name="Mystery"><datatype>future_type</datatype></row>
+          <row name="OtherMystery"><datatype>future_type</datatype></row>
+        </table></sql>`)).toBe(true);
+
+    const items = page.getByRole("status").locator("li");
+    await expect(items).toHaveCount(2);
+    await expect(items.filter({ hasText: "SQL Server geography" })).toHaveText(
+        "Affected columns [sales].[Location].[Shape], [sales].[Location].[Boundary]: SQL Server geography is imported as text.");
+    await expect(items.filter({ hasText: "future_type from mssql" })).toHaveText(
+        "Affected columns [sales].[Location].[Mystery], [sales].[Location].[OtherMystery]: future_type from mssql is imported as text.");
+    const statusText = await page.getByRole("status").textContent();
+    expect(statusText.match(/SQL Server geography is imported as text\./g)).toHaveLength(1);
+    expect(statusText.match(/future_type from mssql is imported as text\./g)).toHaveLength(1);
 });
 
 test("uses the MSSQL fallback for metadata-free legacy XML", async ({ page }) => {

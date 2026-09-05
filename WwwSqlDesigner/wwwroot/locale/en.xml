@@ -94,6 +94,7 @@
     <string name="clientexport">Export</string>
     <string name="clientef">Generate EF</string>
     <string name="exporttarget">Format</string>
+    <string name="importwarning">Import conversion warnings — review affected columns</string>
     <string name="exportwarning">Export warnings</string>
     <string name="exportunsafe">Export unavailable; no download was created</string>
     <string name="efzipexportempty">Add at least one table before exporting an EF ZIP.</string>

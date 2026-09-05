@@ -376,6 +376,7 @@ SQL.IO.prototype.parseXml = function (xml) {
 };
 
 SQL.IO.prototype.fromXMLText = function (xml) {
+    this.showStatus();
     try {
         const xmlDoc = this.parseXml(xml);
         return this.fromXML(xmlDoc);
@@ -386,6 +387,7 @@ SQL.IO.prototype.fromXMLText = function (xml) {
 };
 
 SQL.IO.prototype.fromXML = function (xmlDoc) {
+    this.showStatus();
     if (!xmlDoc || !xmlDoc.documentElement) {
         alert(_("xmlerror") + ": Null document");
         return false;
@@ -397,7 +399,7 @@ SQL.IO.prototype.fromXML = function (xmlDoc) {
         return false;
     }
     /* Keep the pane open when conversion warnings need to be read. */
-    this.owner.window.close();
+    if (this.dom.status.hidden) { this.owner.window.close(); }
     return true;
 };
 
@@ -659,6 +661,26 @@ SQL.IO.nvarcharByteLength = function (value) {
 
 SQL.IO.hasXmlContent = SQL.hasXmlContent;
 
+SQL.IO.prototype.showStatus = function (diagnostics, heading, unsafe) {
+    const messages = Array.from(new Set(diagnostics || []));
+    SQL.dom.clear(this.dom.status);
+    this.dom.status.hidden = messages.length === 0;
+    this.dom.status.classList.toggle("unsafe", !!unsafe);
+    if (!messages.length) { return false; }
+
+    const title = SQL.dom.create("strong");
+    title.textContent = heading;
+    this.dom.status.appendChild(title);
+    const list = SQL.dom.create("ul");
+    messages.forEach((message) => {
+        const item = SQL.dom.create("li");
+        item.textContent = message;
+        list.appendChild(item);
+    });
+    this.dom.status.appendChild(list);
+    return true;
+};
+
 /* Maps a serialized copy only; target selection never rewrites the editor. */
 SQL.IO.prototype.getExportXml = function (target) {
     const doc = this.parseXml(this.owner.toXML());
@@ -767,22 +789,8 @@ SQL.IO.prototype.getExportXml = function (target) {
 
 SQL.IO.prototype.getSafeExportXml = function (target) {
     const mapped = this.getExportXml(target);
-    const diagnostics = Array.from(new Set(mapped.diagnostics || []));
-    SQL.dom.clear(this.dom.status);
-    this.dom.status.hidden = diagnostics.length === 0;
-    this.dom.status.classList.toggle("unsafe", !mapped.safe);
-    if (diagnostics.length) {
-        const heading = SQL.dom.create("strong");
-        heading.textContent = mapped.safe ? _("exportwarning") : _("exportunsafe");
-        this.dom.status.appendChild(heading);
-        const list = SQL.dom.create("ul");
-        diagnostics.forEach((message) => {
-            const item = SQL.dom.create("li");
-            item.textContent = message;
-            list.appendChild(item);
-        });
-        this.dom.status.appendChild(list);
-    }
+    this.showStatus(mapped.diagnostics,
+        mapped.safe ? _("exportwarning") : _("exportunsafe"), !mapped.safe);
     return mapped.safe ? mapped.xml : null;
 };
 

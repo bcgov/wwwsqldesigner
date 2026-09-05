@@ -392,7 +392,7 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
     const currentDb = window.DATATYPES.getAttribute("db");
     const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? CONFIG.DEFAULT_DB : currentDb);
     const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
-    const diagnostics = [];
+    const diagnostics = new Map();
     for (const table of SQL.Designer.directChildren(copy, "table")) {
       for (const row of SQL.Designer.directChildren(table, "row")) {
         const datatype = SQL.Designer.directChild(row, "datatype");
@@ -404,11 +404,26 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
             type = { kind: "text", facets: "", diagnostics: [label + " is not a portable type and is imported as text."] };
         }
         datatype.textContent = SQL.PortableTypes.formatToken(type);
-        if (type.diagnostics) { diagnostics.push.apply(diagnostics, type.diagnostics); }
+        if (type.diagnostics) {
+            const context = [
+                SQL.Designer.effectiveSchema(table.getAttribute("schema")),
+                table.getAttribute("name") || "(unnamed table)",
+                row.getAttribute("name") || "(unnamed column)"
+            ].map((name) => "[" + String(name).replace(/]/g, "]]") + "]").join(".");
+            for (const message of type.diagnostics) {
+                if (!diagnostics.has(message)) { diagnostics.set(message, new Set()); }
+                diagnostics.get(message).add(context);
+            }
+        }
       }
     }
     copy.setAttribute("format", SQL.PortableTypes.format);
-    return { node: copy, diagnostics: diagnostics };
+    return {
+        node: copy,
+        diagnostics: Array.from(diagnostics, ([message, contexts]) =>
+            "Affected column" + (contexts.size === 1 ? " " : "s ") +
+            Array.from(contexts).join(", ") + ": " + message)
+    };
 };
 SQL.Designer.prototype.validatePortableImport = function (prepared) {
     const portable = prepared.node;
@@ -557,6 +572,7 @@ SQL.Designer.prototype.fromXML = function (node) {
     }
     this.sync();
     this.legend.rememberSaved(this.toXML());
+    if (this.io) { this.io.showStatus(prepared.diagnostics, _("importwarning")); }
     return true;
 };
 SQL.Designer.prototype.setTitle = function (t) {
