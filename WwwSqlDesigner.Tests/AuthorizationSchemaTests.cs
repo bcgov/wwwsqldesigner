@@ -21,6 +21,10 @@ namespace WwwSqlDesigner.Tests
         private const string AuthorizationIdentityCollation = "Latin1_General_100_BIN2";
         private const string PreviousMigration = "20260821165042_AddOwnerScopedModelAccess";
         private const string CurrentMigration = "20260904011733_HardenAuthorizationIdentitySchema";
+        private const string TestConnectionStringEnvironmentVariable =
+            "WWWSQLDESIGNER_TEST_CONNECTION_STRING";
+        private const string DefaultLocalDbConnectionString =
+            "Server=(localdb)\\MSSQLLocalDB;Trusted_Connection=True;MultipleActiveResultSets=true";
 
         [TestMethod]
         public void ModelSnapshotMatchesCurrentModel()
@@ -204,7 +208,7 @@ namespace WwwSqlDesigner.Tests
         [TestMethod]
         public async Task MigrationGlobalizesOnlyExactLegacySentinelAndRemovesAllExactLegacyGrants()
         {
-            await RunWithLocalDbAsync(nameof(MigrationGlobalizesOnlyExactLegacySentinelAndRemovesAllExactLegacyGrants), async context =>
+            await RunWithSqlServerAsync(nameof(MigrationGlobalizesOnlyExactLegacySentinelAndRemovesAllExactLegacyGrants), async context =>
             {
                 var migrator = context.GetService<IMigrator>();
                 await migrator.MigrateAsync(PreviousMigration);
@@ -268,7 +272,7 @@ namespace WwwSqlDesigner.Tests
         [TestMethod]
         public async Task RelationalAuthorizationComparesOwnerUserAndGroupIdsExactly()
         {
-            await RunWithLocalDbAsync(nameof(RelationalAuthorizationComparesOwnerUserAndGroupIdsExactly), async context =>
+            await RunWithSqlServerAsync(nameof(RelationalAuthorizationComparesOwnerUserAndGroupIdsExactly), async context =>
             {
                 await context.Database.MigrateAsync();
                 var now = DateTime.UtcNow;
@@ -353,7 +357,7 @@ namespace WwwSqlDesigner.Tests
         [TestMethod]
         public async Task RelationalIdentityIndexesAllowWhitespaceVariantsAndEnforceExactDuplicatesAndLengths()
         {
-            await RunWithLocalDbAsync(
+            await RunWithSqlServerAsync(
                 nameof(RelationalIdentityIndexesAllowWhitespaceVariantsAndEnforceExactDuplicatesAndLengths),
                 async context =>
                 {
@@ -430,7 +434,7 @@ namespace WwwSqlDesigner.Tests
         [TestMethod]
         public async Task ConcurrentDuplicateGrantRequestsPersistOnceAndReturnConflict()
         {
-            await RunWithLocalDbAsync(
+            await RunWithSqlServerAsync(
                 nameof(ConcurrentDuplicateGrantRequestsPersistOnceAndReturnConflict),
                 async context =>
                 {
@@ -462,7 +466,7 @@ namespace WwwSqlDesigner.Tests
         [TestMethod]
         public async Task MigrationDownRejectsGrantIdentityBeyondPreviousClusteredKeyLimitAndRemainsApplied()
         {
-            await RunWithLocalDbAsync(
+            await RunWithSqlServerAsync(
                 nameof(MigrationDownRejectsGrantIdentityBeyondPreviousClusteredKeyLimitAndRemainsApplied),
                 async context =>
                 {
@@ -506,7 +510,7 @@ namespace WwwSqlDesigner.Tests
         [TestMethod]
         public async Task MigrationDownRejectsUnrepresentableAndCollidingIdentities()
         {
-            await RunWithLocalDbAsync(nameof(MigrationDownRejectsUnrepresentableAndCollidingIdentities), async context =>
+            await RunWithSqlServerAsync(nameof(MigrationDownRejectsUnrepresentableAndCollidingIdentities), async context =>
             {
                 var migrator = context.GetService<IMigrator>();
                 await migrator.MigrateAsync(CurrentMigration);
@@ -552,7 +556,7 @@ namespace WwwSqlDesigner.Tests
         private static ApplicationDbContext CreateContext()
         {
             return CreateContext(
-                "Server=(localdb)\\MSSQLLocalDB;Database=WwwSqlDesignerAuthorizationSchemaTests;Trusted_Connection=True;");
+                CreateDatabaseConnectionString("WwwSqlDesignerAuthorizationSchemaTests"));
         }
 
         private static ApplicationDbContext CreateContext(string connectionString)
@@ -563,16 +567,12 @@ namespace WwwSqlDesigner.Tests
             return new ApplicationDbContext(options);
         }
 
-        private static async Task RunWithLocalDbAsync(
+        private static async Task RunWithSqlServerAsync(
             string testName,
             Func<ApplicationDbContext, Task> test)
         {
             var databaseName = $"WwwSqlDesigner-{testName[..Math.Min(testName.Length, 40)]}-{Guid.NewGuid():N}";
-            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-                .UseSqlServer(
-                    $"Server=(localdb)\\MSSQLLocalDB;Database={databaseName};Trusted_Connection=True;MultipleActiveResultSets=true")
-                .Options;
-            await using var context = new ApplicationDbContext(options);
+            await using var context = CreateContext(CreateDatabaseConnectionString(databaseName));
             try
             {
                 await test(context);
@@ -581,6 +581,27 @@ namespace WwwSqlDesigner.Tests
             {
                 await context.Database.EnsureDeletedAsync();
             }
+        }
+
+        private static string CreateDatabaseConnectionString(string databaseName)
+        {
+            var connectionString = Environment.GetEnvironmentVariable(
+                TestConnectionStringEnvironmentVariable);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                connectionString = Environment.GetEnvironmentVariable(
+                    "ConnectionStrings__DefaultConnection");
+            }
+
+            var builder = new SqlConnectionStringBuilder(
+                string.IsNullOrWhiteSpace(connectionString)
+                    ? DefaultLocalDbConnectionString
+                    : connectionString)
+            {
+                InitialCatalog = databaseName
+            };
+
+            return builder.ConnectionString;
         }
 
         private static DataModel Model(

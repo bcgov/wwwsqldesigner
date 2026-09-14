@@ -13,6 +13,23 @@ This repository replaces the backend with a .NET 8 / EF Core version and expands
 
 Note that the auto-creation of a database and schema only works with LocalDB in a Development environment. When you're setting up a CI/CD pipeline for Test and Production environments, please include a [dotnet ef migrations bundle](https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/applying?tabs=dotnet-core-cli#bundles) step to handle DB migrations.
 
+## Running SQL Server integration tests
+
+The authorization schema integration tests create and delete isolated databases, so they require a real
+SQL Server instance. Local development uses `(localdb)\MSSQLLocalDB` by default. Build agents without the
+LocalDB runtime must provide a SQL Server connection string through the
+`WWWSQLDESIGNER_TEST_CONNECTION_STRING` environment variable:
+
+```powershell
+$env:WWWSQLDESIGNER_TEST_CONNECTION_STRING = "Server=localhost;Database=WwwSqlDesignerTests;Integrated Security=True;TrustServerCertificate=True"
+dotnet test
+```
+
+The test code replaces the database name in the supplied connection string with a unique name for each
+test, so the configured account must be allowed to create and drop databases. In Azure Pipelines, map a
+secret pipeline variable containing this connection string to
+`WWWSQLDESIGNER_TEST_CONNECTION_STRING` for the `dotnet test` task.
+
 # Current Features
 1. Full-feature ER diagrams
 1. Comments per table and column
