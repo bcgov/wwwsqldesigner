@@ -16,6 +16,7 @@ namespace WwwSqlDesigner.Controllers
     public class WwwSqlController : Controller
     {
         public const int MaxModelXmlBytes = 1_048_576;
+        private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
         private const string GrantIdentityIndexName =
             "IX_DataModelAccessGrants_OwnerId_Keyword_TargetType_TargetId_OwnerIdByteLength_TargetIdByteLength";
         private const string IdentityComparisonTerminator = "|";
@@ -136,7 +137,16 @@ namespace WwwSqlDesigner.Controllers
                 await xmlBuffer.WriteAsync(byteBuffer.AsMemory(0, read), Request.HttpContext.RequestAborted).ConfigureAwait(false);
             }
 
-            var xmlData = Encoding.UTF8.GetString(xmlBuffer.ToArray());
+            string xmlData;
+            try
+            {
+                xmlData = StrictUtf8.GetString(xmlBuffer.ToArray());
+            }
+            catch (DecoderFallbackException)
+            {
+                return BadRequest("Model XML is not valid UTF-8.");
+            }
+
             if (!IsValidModelXml(xmlData))
             {
                 return BadRequest("Model XML is invalid.");

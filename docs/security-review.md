@@ -33,7 +33,7 @@ This updated review covers the single ASP.NET Core application, its browser asse
 
 ## Executive Summary
 
-The review found one confirmed stored DOM XSS, vulnerable .NET and Vitest dependency lines, a deployment-mode configuration problem, missing browser hardening headers, and an unbounded XML model write path. The branch remediates these items by moving rendering to `textContent`, rejecting XML markup in portable facets before exporter-specific semantic validation, upgrading to .NET 10 and current declared dependencies, setting IIS deployment to Production, removing inline script requirements from CSP, validating and capping XML writes, and applying a per-client write rate limit.
+The review found one confirmed stored DOM XSS, vulnerable .NET and Vitest dependency lines, a deployment-mode configuration problem, missing browser hardening headers, and an unbounded XML model write path. The branch remediates these items by moving rendering to `textContent`, rejecting XML markup in portable facets before exporter-specific semantic validation, upgrading to .NET 10 and current declared dependencies, setting IIS deployment to Production, removing inline script requirements from CSP, requiring strict UTF-8 and safe XML parsing, capping XML writes, and applying the per-client write rate limit after routing and authentication.
 
 ## Findings and Remediation Status
 
@@ -43,7 +43,7 @@ The review found one confirmed stored DOM XSS, vulnerable .NET and Vitest depend
 | SEC-002 | Medium | `web.config` | Development mode and stdout logging in deployment configuration | Remediated: Production and stdout disabled |
 | SEC-003 | High | Project files and transitive graph | Vulnerable .NET 8 dependency graph | Remediated: .NET 10 and package line upgraded; `dotnet list package --vulnerable` reports none |
 | SEC-004 | Medium | Playwright package manifest/lock | Vulnerable Vitest graph | Remediated: Vitest 5 and refreshed lockfile; `npm audit --omit=optional` reports 0 vulnerabilities |
-| SEC-005 | Medium | `WwwSqlController.Save` | Unbounded XML body and storage input | Remediated: 1 MiB cap, well-formed XML/DTD rejection, rate limit |
+| SEC-005 | Medium | `WwwSqlController.Save` | Unbounded XML body and storage input | Remediated: strict UTF-8, 1 MiB cap with streaming fallback, well-formed XML/DTD rejection, rate limit |
 | SEC-006 | Low | `web.config` | Partial browser security headers and unsafe inline CSP | Remediated: external bootstrap script and explicit headers |
 | SEC-007 | Informational | Project target framework | .NET 8 support horizon | Remediated: target framework is .NET 10 |
 

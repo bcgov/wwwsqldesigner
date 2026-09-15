@@ -127,14 +127,13 @@ else
 }
 
 app.UseHttpsRedirection();
-app.UseRateLimiter();
-
-app.UseAuthentication();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseAuthentication();
+app.UseRateLimiter();
 
 app.Use(async (context, next) =>
 {

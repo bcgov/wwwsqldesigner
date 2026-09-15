@@ -100,7 +100,7 @@ Controller and browser tests exercise authorization, XML round trips, exports, a
 | :--- | :--- | :--- | :--- | :--- |
 | Keycloak OIDC | Unknown external owner | OIDC authorization-code flow with PKCE; package line follows .NET 10 | Callback failure redirects to authentication-error; no repository timeout policy | Authentication failure does not grant resource access |
 | SQL Server via EF Core | Application/platform owner unknown | EF Core 10 and SQL Server provider | Request cancellation is available on body reads; database retry policy is not configured | Database failure is surfaced through normal exception handling |
-| Browser XML model contract | Application owner unknown | Portable-v1 plus dialect adapters | Client parser rejects DTD/ENTITY and invalid XML; saved model body capped at 1 MiB | Invalid or oversized model is rejected with 400 |
+| Browser XML model contract | Application owner unknown | Portable-v1 plus dialect adapters | Client parser rejects DTD/ENTITY and invalid XML; server requires strict UTF-8, validates XML, and caps saved bodies at 1 MiB | Invalid, malformed, non-UTF-8, or oversized model is rejected with 400 |
 
 ## 5. Unicode, UTF-8 & Indigenous-Language Readiness
 
@@ -131,7 +131,7 @@ Controller and browser tests exercise authorization, XML round trips, exports, a
 | **Token Format** | OIDC tokens held by server-side authentication middleware |
 | **Token Storage** | HttpOnly secure cookie configuration through ASP.NET Core |
 
-State-changing routes use antiforgery validation. Model writes are explicitly capped at 1 MiB and rate-limited per authenticated identity or client address. Client-side type hints use `textContent`, and portable facets reject XML markup characters before exporter-specific semantic validation.
+State-changing routes use antiforgery validation. Model writes are explicitly capped at 1 MiB, require strict UTF-8 decoding, and are rate-limited per authenticated identity or client address after routing and authentication select the endpoint policy. Client-side type hints use `textContent`, and portable facets reject XML markup characters before exporter-specific semantic validation.
 
 ### 6.2 Cryptographic Controls
 
