@@ -947,8 +947,12 @@ SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
 };
 
 SQL.IO.prototype.getModelTableCount = function (xml) {
-    const xmlDoc = this.parseXml(xml);
-    return xmlDoc.querySelectorAll("sql > table").length;
+    try {
+        const xmlDoc = this.parseXml(xml);
+        return xmlDoc.querySelectorAll("sql > table").length;
+    } catch {
+        return 0;
+    }
 };
 
 SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
@@ -998,7 +1002,8 @@ SQL.IO.prototype.findGeneratedClassEnd = function (source, start) {
     let depth = 0;
     let state = "code";
     let escaped = false;
-    for (const [offset, current] of Array.from(source.slice(start)).entries()) {
+    for (let offset = 0; start + offset < source.length; offset++) {
+        const current = source[start + offset];
         const next = source[start + offset + 1];
         if (state !== "code") {
             const transition = this.advanceGeneratedClassState(current, next, state, escaped);
@@ -1329,7 +1334,7 @@ SQL.IO.prototype.copyCurrentOwnerId = function () {
 };
 
 SQL.IO.prototype.copyTextFallback = function () {
-    alert("Unable to copy the user ID.");
+    globalThis.prompt(_("servercopytitle"), this._currentOwnerId);
 };
 
 SQL.IO.prototype.servershare = function () {

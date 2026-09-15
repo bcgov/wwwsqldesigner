@@ -73,7 +73,7 @@ SQL.Options.prototype.build = function () {
 };
 
 SQL.Options.prototype.save = function () {
-    const identifier = /^\w+$/;
+    const identifier = /^[A-Za-z_]\w*$/;
     const namespace = this.dom.optionefnamespace.value.trim();
     const context = this.dom.optionefcontext.value.trim();
     const pattern = this.dom.optionpattern.value;

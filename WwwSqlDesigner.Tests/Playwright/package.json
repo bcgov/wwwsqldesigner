@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node run-local.mjs test",
+    "test": "npm run unit && node run-local.mjs test",
     "unit": "vitest run --coverage",
     "postunit": "node unit/normalize-coverage.mjs"
   },

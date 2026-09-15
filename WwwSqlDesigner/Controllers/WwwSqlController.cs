@@ -89,7 +89,7 @@ namespace WwwSqlDesigner.Controllers
             }
             if (null == model)
             {
-                _logger.LogWarning("Keyword not found: {Keyword:0}", keyword);
+                _logger.LogWarning("Keyword not found.");
                 return NotFound();
             }
             var ownsModel = string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal);
@@ -134,7 +134,7 @@ namespace WwwSqlDesigner.Controllers
                     Version = 0,
                 };
                 _context.DataModels.Add(newModel);
-                _logger.LogInformation("New data model created: {Keyword:0}", keyword);
+                _logger.LogInformation("New data model created.");
             }
             else
             {
@@ -147,7 +147,7 @@ namespace WwwSqlDesigner.Controllers
                     Version = save.Version + 1,  //This does not need to be thread-safe as a unique (key/version) key exists in the DB.
                 };
                 _context.DataModels.Add(newModel);
-                _logger.LogInformation("New Data model version: {Keyword:0}", keyword);
+                _logger.LogInformation("New data model version created.");
             }
             await _context.SaveChangesAsync();
             return Content(string.Empty);
