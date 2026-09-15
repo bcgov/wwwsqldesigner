@@ -23,8 +23,8 @@ namespace WwwSqlDesigner.Tests
         private const string CurrentMigration = "20260904011733_HardenAuthorizationIdentitySchema";
         private const string TestConnectionStringEnvironmentVariable =
             "WWWSQLDESIGNER_TEST_CONNECTION_STRING";
-        private const string DefaultLocalDbConnectionString =
-            "Server=(localdb)\\MSSQLLocalDB;Trusted_Connection=True;MultipleActiveResultSets=true";
+        private const string MetadataConnectionString =
+            "Server=(localdb)\\MSSQLLocalDB;Database=WwwSqlDesignerAuthorizationSchemaTests;Trusted_Connection=True;";
 
         [TestMethod]
         public void ModelSnapshotMatchesCurrentModel()
@@ -555,8 +555,7 @@ namespace WwwSqlDesigner.Tests
 
         private static ApplicationDbContext CreateContext()
         {
-            return CreateContext(
-                CreateDatabaseConnectionString("WwwSqlDesignerAuthorizationSchemaTests"));
+            return CreateContext(MetadataConnectionString);
         }
 
         private static ApplicationDbContext CreateContext(string connectionString)
@@ -571,8 +570,18 @@ namespace WwwSqlDesigner.Tests
             string testName,
             Func<ApplicationDbContext, Task> test)
         {
+            var configuredConnectionString = GetConfiguredConnectionString();
+            if (string.IsNullOrWhiteSpace(configuredConnectionString))
+            {
+                Assert.Inconclusive(
+                    "SQL Server integration tests require WWWSQLDESIGNER_TEST_CONNECTION_STRING "
+                    + "or ConnectionStrings__DefaultConnection.");
+                return;
+            }
+
             var databaseName = $"WwwSqlDesigner-{testName[..Math.Min(testName.Length, 40)]}-{Guid.NewGuid():N}";
-            await using var context = CreateContext(CreateDatabaseConnectionString(databaseName));
+            await using var context = CreateContext(
+                CreateDatabaseConnectionString(databaseName, configuredConnectionString));
             try
             {
                 await test(context);
@@ -583,7 +592,7 @@ namespace WwwSqlDesigner.Tests
             }
         }
 
-        private static string CreateDatabaseConnectionString(string databaseName)
+        private static string? GetConfiguredConnectionString()
         {
             var connectionString = Environment.GetEnvironmentVariable(
                 TestConnectionStringEnvironmentVariable);
@@ -593,10 +602,15 @@ namespace WwwSqlDesigner.Tests
                     "ConnectionStrings__DefaultConnection");
             }
 
+            return connectionString;
+        }
+
+        private static string CreateDatabaseConnectionString(
+            string databaseName,
+            string connectionString)
+        {
             var builder = new SqlConnectionStringBuilder(
-                string.IsNullOrWhiteSpace(connectionString)
-                    ? DefaultLocalDbConnectionString
-                    : connectionString)
+                connectionString)
             {
                 InitialCatalog = databaseName
             };
