@@ -15,20 +15,19 @@ Note that the auto-creation of a database and schema only works with LocalDB in 
 
 ## Running SQL Server integration tests
 
-The authorization schema integration tests create and delete isolated databases, so they require a real
-SQL Server instance. Local development uses `(localdb)\MSSQLLocalDB` by default. Build agents without the
-LocalDB runtime must provide a SQL Server connection string through the
+The default `dotnet test` run uses the in-memory provider for application and controller tests. The
+authorization schema integration tests create and delete isolated databases, so they are skipped unless a
+SQL Server connection string is configured. To run those tests, provide a connection string through the
 `WWWSQLDESIGNER_TEST_CONNECTION_STRING` environment variable:
 
 ```powershell
-$env:WWWSQLDESIGNER_TEST_CONNECTION_STRING = "Server=localhost;Database=WwwSqlDesignerTests;Integrated Security=True;TrustServerCertificate=True"
+$env:WWWSQLDESIGNER_TEST_CONNECTION_STRING = "Server=(localdb)\MSSQLLocalDB;Integrated Security=True;TrustServerCertificate=True"
 dotnet test
 ```
 
 The test code replaces the database name in the supplied connection string with a unique name for each
-test, so the configured account must be allowed to create and drop databases. In Azure Pipelines, map a
-secret pipeline variable containing this connection string to
-`WWWSQLDESIGNER_TEST_CONNECTION_STRING` for the `dotnet test` task.
+test, so the configured account must be allowed to create and drop databases. The
+`ConnectionStrings__DefaultConnection` environment variable is also supported for pipeline configuration.
 
 # Current Features
 1. Full-feature ER diagrams
