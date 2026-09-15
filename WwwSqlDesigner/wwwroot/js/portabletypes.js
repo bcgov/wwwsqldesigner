@@ -1,5 +1,5 @@
 /* Canonical, persisted column types. Dialect adapters are import/export only. */
-SQL.PortableTypes = {
+globalThis.SQL.PortableTypes = {
     format: "portable-v1",
     tokens: ["integer", "decimal", "float", "string", "text", "boolean", "date", "time", "datetime", "datetime-with-time-zone", "binary", "uuid", "json", "xml"],
     sourceAdapters: {
@@ -31,58 +31,77 @@ SQL.PortableTypes = {
         groups.forEach(function (group) { xml += '<group label="' + group[0] + '" color="#eeeeaa">'; group[1].split(" ").forEach(function (token) { xml += '<type label="' + token + '" length="' + (/^(decimal|string|binary)$/.test(token) ? "1" : "0") + '" sql="' + token + '" quote="' + (/^(string|text|json|xml|binary)$/.test(token) ? "&apos;" : "") + '" />'; }); xml += "</group>"; });
         return new DOMParser().parseFromString(xml + "</datatypes>", "text/xml").documentElement;
     },
-    split: function (value) { const match = (value || "").trim().match(/^([^()]+?)(?:\((.*)\))?$/); return { name: match ? match[1].trim() : "", facets: match && match[2] ? match[2].trim() : "" }; },
+    split: function (value) { const match = (value || "").trim().match(/^([^()]+?)(?:\((.*)\))?$/); return { name: match ? match[1].trim() : "", facets: match?.[2] ? match[2].trim() : "" }; },
     source: function (dialect, value) {
-        const parsed = this.split(value); const normalized = parsed.name.toLowerCase().replace(/\s+/g, " "); const entry = (this.sourceAdapters[(dialect || "").toLowerCase()] || {})[normalized];
+        const parsed = this.split(value); const normalized = parsed.name.toLowerCase().replaceAll(/\s+/g, " "); const entry = this.sourceAdapters[(dialect || "").toLowerCase()]?.[normalized];
         if (!entry) { return { kind: "text", facets: "", diagnostics: [(value || "(empty type)") + " from " + (dialect || "unknown source") + " is imported as text."] }; }
         const kind = typeof entry === "string" ? entry : entry.kind;
         if (kind === "string" && parsed.facets.toLowerCase() === "max") { return { kind: "text", facets: "", diagnostics: [value + " was imported as unlimited text."] }; }
         const diagnostics = typeof entry === "string" || !entry.lossy ? [] : [entry.lossy]; if (typeof entry !== "string" && parsed.facets) { diagnostics.push("Facets (" + parsed.facets + ") on " + (value || "(empty type)") + " are ignored."); } return { kind: kind, facets: typeof entry === "string" ? parsed.facets : "", diagnostics: diagnostics };
     },
-    canonical: function (value) { const parsed = this.split(value); const kind = parsed.name.toLowerCase(); return this.tokens.indexOf(kind) !== -1 ? { kind: kind, facets: parsed.facets } : null; },
+    canonical: function (value) { const parsed = this.split(value); const kind = parsed.name.toLowerCase(); return this.tokens.includes(kind) ? { kind: kind, facets: parsed.facets } : null; },
     formatToken: function (type) { return type.kind + (type.facets ? "(" + type.facets + ")" : ""); },
     map: function (type, target) {
         const dialect = (target || "").toLowerCase(); const adapter = this.targetAdapters[dialect] || {}; const direct = adapter[type.kind]; const fallback = !direct && (adapter.text || adapter.string); const result = { type: direct || fallback || "", diagnostics: [], safe: !!(direct || fallback) };
         if (!result.safe) { result.diagnostics.push(this.formatToken(type) + " cannot be represented by " + dialect + "."); return result; }
         if (fallback) { result.diagnostics.push(this.formatToken(type) + " is exported as " + fallback + " in " + dialect + "."); return result; }
         if (dialect === "ef" && /^(decimal|string|binary)$/.test(type.kind)) {
-            if (!type.facets) { return result; }
-            if (type.kind === "decimal") {
-                const match = type.facets.match(/^\s*([0-9]+)\s*,\s*([0-9]+)\s*$/);
-                const precision = match ? Number(match[1]) : 0;
-                const scale = match ? Number(match[2]) : 0;
-                if (!match || precision < 1 || precision > 2147483647 || scale > precision || scale > 2147483647) {
-                    result.safe = false;
-                    result.diagnostics.push(this.formatToken(type) + " is invalid for EF; decimal facets must be ASCII integers p,s with 1 <= p <= 2147483647 and 0 <= s <= p.");
-                    return result;
-                }
-                result.type += "(" + precision + "," + scale + ")";
-                return result;
-            }
-            if (/^max$/i.test(type.facets)) {
-                result.type += "(max)";
-                return result;
-            }
-            const match = type.facets.match(/^\s*([0-9]+)\s*$/);
-            const length = match ? Number(match[1]) : 0;
-            if (!match || length < 1 || length > 2147483647) {
+            return this.mapEfType(type, result);
+        }
+        this.appendMapDiagnostics(type, dialect, result);
+        return result;
+    },
+    mapEfType: function (type, result) {
+        if (!type.facets) { return result; }
+        if (type.kind === "decimal") {
+            const match = type.facets.match(/^\s*(\d+)\s*,\s*(\d+)\s*$/);
+            const precision = match ? Number(match[1]) : 0;
+            const scale = match ? Number(match[2]) : 0;
+            if (!match || precision < 1 || precision > 2147483647 || scale > precision || scale > 2147483647) {
                 result.safe = false;
-                result.diagnostics.push(this.formatToken(type) + " is invalid for EF; length must be max or an ASCII integer n with 1 <= n <= 2147483647.");
+                result.diagnostics.push(this.formatToken(type) + " is invalid for EF; decimal facets must be ASCII integers p,s with 1 <= p <= 2147483647 and 0 <= s <= p.");
                 return result;
             }
-            result.type += "(" + length + ")";
+            result.type += "(" + precision + "," + scale + ")";
             return result;
         }
-        if (type.facets && /^(decimal|string)$/.test(type.kind) && !/\(/.test(result.type)) { result.type += "(" + type.facets + ")";
+        if (/^max$/i.test(type.facets)) {
+            result.type += "(max)";
+            return result;
+        }
+        const match = type.facets.match(/^\s*(\d+)\s*$/);
+        const length = match ? Number(match[1]) : 0;
+        if (!match || length < 1 || length > 2147483647) {
+            result.safe = false;
+            result.diagnostics.push(this.formatToken(type) + " is invalid for EF; length must be max or an ASCII integer n with 1 <= n <= 2147483647.");
+            return result;
+        }
+        result.type += "(" + length + ")";
+        return result;
+    },
+    appendMapDiagnostics: function (type, dialect, result) {
+        if (type.facets && /^(decimal|string)$/.test(type.kind) && !/\(/.test(result.type)) {
+            result.type += "(" + type.facets + ")";
         }
         if (type.kind === "binary" && type.facets) {
-            if (["mssql", "sqlalchemy"].indexOf(dialect) !== -1 && !/\(/.test(result.type)) { result.type += "(" + type.facets + ")"; }
-            else if (["mssql", "sqlalchemy"].indexOf(dialect) === -1) { result.diagnostics.push("Binary length " + type.facets + " is not enforced by " + dialect + "."); }
+            const supportsLength = ["mssql", "sqlalchemy"].includes(dialect);
+            if (supportsLength && !/\(/.test(result.type)) {
+                result.type += "(" + type.facets + ")";
+            } else if (!supportsLength) {
+                result.diagnostics.push("Binary length " + type.facets + " is not enforced by " + dialect + ".");
+            }
         }
-        if (type.kind === "decimal" && type.facets && ["sqlite", "vfp9"].indexOf(dialect) !== -1) { result.diagnostics.push("Precision and scale are not enforced by " + dialect + "."); }
-        if (type.kind === "datetime-with-time-zone" && ["mssql", "postgresql", "oracle", "sqlalchemy", "ef"].indexOf(dialect) === -1) { result.diagnostics.push("Time-zone semantics are not preserved by " + dialect + "."); }
-        if (type.kind === "uuid" && ["mssql", "postgresql", "sqlalchemy", "ef"].indexOf(dialect) === -1) { result.diagnostics.push("UUID semantics are represented as text by " + dialect + "."); }
-        if (["json", "xml"].indexOf(type.kind) !== -1 && ["mssql", "postgresql", "mysql", "sqlalchemy", "web2py", "ef"].indexOf(dialect) === -1) { result.diagnostics.push(this.formatToken(type) + " is represented as text by " + dialect + "."); }
-        return result;
+        if (type.kind === "decimal" && type.facets && ["sqlite", "vfp9"].includes(dialect)) {
+            result.diagnostics.push("Precision and scale are not enforced by " + dialect + ".");
+        }
+        if (type.kind === "datetime-with-time-zone" && !["mssql", "postgresql", "oracle", "sqlalchemy", "ef"].includes(dialect)) {
+            result.diagnostics.push("Time-zone semantics are not preserved by " + dialect + ".");
+        }
+        if (type.kind === "uuid" && !["mssql", "postgresql", "sqlalchemy", "ef"].includes(dialect)) {
+            result.diagnostics.push("UUID semantics are represented as text by " + dialect + ".");
+        }
+        if (["json", "xml"].includes(type.kind) && !["mssql", "postgresql", "mysql", "sqlalchemy", "web2py", "ef"].includes(dialect)) {
+            result.diagnostics.push(this.formatToken(type) + " is represented as text by " + dialect + ".");
+        }
     }
 };

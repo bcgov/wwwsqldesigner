@@ -322,9 +322,8 @@ namespace WwwSqlDesigner.Controllers.Tests
             public TestAuthenticationHandler(
                 Microsoft.Extensions.Options.IOptionsMonitor<AuthenticationSchemeOptions> options,
                 Microsoft.Extensions.Logging.ILoggerFactory logger,
-                System.Text.Encodings.Web.UrlEncoder encoder,
-                ISystemClock clock)
-                : base(options, logger, encoder, clock)
+                System.Text.Encodings.Web.UrlEncoder encoder)
+                : base(options, logger, encoder)
             {
             }
 

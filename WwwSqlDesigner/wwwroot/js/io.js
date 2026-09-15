@@ -2,8 +2,8 @@ SQL.IO = function (owner) {
     this.owner = owner;
     this._name = ""; /* last used name with server load/save */
     this._csrfToken = "";
-    this._authenticated = window.__wwwSqlAuthenticated === true;
-    this._serverAvailable = window.__wwwSqlServerAvailable === true;
+    this._authenticated = globalThis.__wwwSqlAuthenticated === true;
+    this._serverAvailable = globalThis.__wwwSqlServerAvailable === true;
     this._serverModelState = "none";
     this._serverModels = [];
     this._currentOwnerId = "";
@@ -46,7 +46,7 @@ SQL.IO = function (owner) {
     this.dom.iosourcebuttons = Array.from(document.querySelectorAll("#iosourcebuttons .io-source-button"));
     const sourceLabels = { browser: "client", xml: "clientfile", server: "server" };
     this.dom.iosourcebuttons.forEach((button) => {
-        const source = button.getAttribute("data-source");
+        const source = button.dataset.source;
         button.textContent = _(sourceLabels[source] || source);
     });
     SQL.dom.get("iosourcebuttons").setAttribute("aria-label", _("iosourcelabel"));
@@ -84,7 +84,7 @@ SQL.IO = function (owner) {
     this.updateServerModelControls();
     this.updateServerUi();
 
-    this.dom.container.parentNode.removeChild(this.dom.container);
+    this.dom.container.remove();
     this.dom.container.style.visibility = "";
 
     this.saveresponse = this.saveresponse.bind(this);
@@ -107,7 +107,7 @@ SQL.IO = function (owner) {
     SQL.events.add(this.dom.iotype, "change", this.updateIoType.bind(this));
     this.dom.iosourcebuttons.forEach((button) => {
         SQL.events.add(button, "click", () => {
-            this.dom.iotype.value = button.getAttribute("data-source");
+            this.dom.iotype.value = button.dataset.source;
             this.updateIoType();
         });
     });
@@ -171,7 +171,7 @@ SQL.IO.prototype.setAuthenticated = function (authenticated) {
 SQL.IO.prototype.updateServerUi = function () {
     const enabled = this._serverAvailable;
     this.dom.iosourcebuttons
-        .filter((button) => button.getAttribute("data-source") === "server")
+        .filter((button) => button.dataset.source === "server")
         .forEach((button) => {
             button.hidden = false;
             button.disabled = !enabled;
@@ -247,10 +247,10 @@ SQL.IO.prototype.build = function () {
 
     const bs = CONFIG.AVAILABLE_BACKENDS;
     let be = CONFIG.DEFAULT_BACKEND;
-    const r = window.location.search.substring(1).match(/backend=([^&]*)/);
+    const r = /backend=([^&]*)/.exec(globalThis.location.search.substring(1));
     if (r) {
         const req = r[1];
-        if (bs.indexOf(req) != -1) {
+        if (bs.includes(req)) {
             be = req;
         }
     }
@@ -328,11 +328,10 @@ SQL.IO.prototype.updateIoType = function () {
         this.updateServerModelChoices();
     }
     this.dom.iosave.disabled = !this.dom.serverloadname.value.trim();
-    this.dom.ioload.disabled = type === "server"
-        ? !this.dom.serverloadmodel.value
-        : type === "browser" ? !this.dom.serverloadmodel.value : false;
+    this.dom.ioload.disabled = (type === "server" || type === "browser")
+        && !this.dom.serverloadmodel.value;
     this.dom.iosourcebuttons.forEach((button) => {
-        const selected = button.getAttribute("data-source") === type;
+        const selected = button.dataset.source === type;
         button.classList.toggle("selected", selected);
         button.setAttribute("aria-pressed", selected ? "true" : "false");
     });
@@ -354,7 +353,7 @@ SQL.IO.prototype.updateExportButtons = function () {
 
 SQL.IO.prototype.parseXml = function (xml) {
     if (typeof xml !== "string") {
-        throw new Error("Invalid XML input.");
+        throw new TypeError("Invalid XML input.");
     }
 
     /* The designer model and bundled XSLT do not use DTDs. Reject them before
@@ -363,7 +362,7 @@ SQL.IO.prototype.parseXml = function (xml) {
         throw new Error("DTD and entity declarations are not allowed.");
     }
 
-    if (!window.DOMParser) {
+    if (!globalThis.DOMParser) {
         throw new Error("No XML parser available.");
     }
 
@@ -388,7 +387,7 @@ SQL.IO.prototype.fromXMLText = function (xml) {
 
 SQL.IO.prototype.fromXML = function (xmlDoc) {
     this.showStatus();
-    if (!xmlDoc || !xmlDoc.documentElement) {
+    if (!xmlDoc?.documentElement) {
         alert(_("xmlerror") + ": Null document");
         return false;
     }
@@ -423,27 +422,24 @@ SQL.IO.prototype.clientload = function () {
     input.type = "file";
     input.accept = ".xml,application/xml,text/xml";
     input.addEventListener("change", () => {
-        const file = input.files && input.files[0];
+        const file = input.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.addEventListener("load", () => {
-            if (typeof reader.result !== "string") {
-                throw new Error("Unable to read XML file.");
-            }
-            if (this.fromXMLText(reader.result)) {
+        file.text().then((xml) => {
+            if (this.fromXMLText(xml)) {
                 this._serverModelState = "none";
                 this._name = "";
                 this.dom.serverloadname.value = "";
                 this.updateServerModelControls();
             }
+        }).catch(() => {
+            alert(_("xmlerror") + ": Unable to read XML file.");
         });
-        reader.readAsText(file);
     });
     input.click();
 };
 
 SQL.IO.prototype.clientlocalsave = function () {
-    if (!window.localStorage) {
+    if (!globalThis.localStorage) {
         alert("Sorry, your browser does not seem to support localStorage.");
         return;
     }
@@ -485,7 +481,7 @@ SQL.IO.prototype.clientlocalsave = function () {
 };
 
 SQL.IO.prototype.clientlocalload = function () {
-    if (!window.localStorage) {
+    if (!globalThis.localStorage) {
         alert("Sorry, your browser does not seem to support localStorage.");
         return;
     }
@@ -526,7 +522,7 @@ SQL.IO.prototype.refreshClientStorageModels = function () {
     const names = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith(prefix)) {
+        if (key?.startsWith(prefix)) {
             names.push(key.substring(prefix.length));
         }
     }
@@ -556,7 +552,7 @@ SQL.IO.prototype.updateClientStorageControls = function () {
 };
 
 SQL.IO.prototype.clientlocallist = function () {
-    if (!window.localStorage) {
+    if (!globalThis.localStorage) {
         alert("Sorry, your browser does not seem to support localStorage.");
         return;
     }
@@ -639,7 +635,7 @@ SQL.IO.prototype.clientef = function () {
             }
         } catch (e) {
             this.owner.window.hideThrobber();
-            alert(_("efzipexporterror"));
+            alert(_("efzipexporterror") + (e?.message ? ": " + e.message : ""));
         }
     });
 };
@@ -685,6 +681,30 @@ SQL.IO.prototype.showStatus = function (diagnostics, heading, unsafe) {
 SQL.IO.prototype.getExportXml = function (target) {
     const doc = this.parseXml(this.owner.toXML());
     const diagnostics = [];
+    let safe = this.mapExportRows(doc, target, diagnostics);
+    const supportsSchema = target === "mssql" || target === "ef";
+    const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
+    const supportsClassification = target === "mssql" || target === "ef";
+    const supportsRecordsSchedule = target === "mssql" || target === "ef";
+    safe = this.addExportCapabilityDiagnostics(
+        doc,
+        target,
+        supportsSchema,
+        supportsDescriptions,
+        supportsClassification,
+        supportsRecordsSchedule,
+        diagnostics) && safe;
+    if (supportsSchema) {
+        safe = this.addSchemaLengthDiagnostics(doc, target, diagnostics) && safe;
+    }
+    if (target === "mssql" && doc.querySelector("sql > table > key[type='FULLTEXT']")) {
+        diagnostics.push("Microsoft SQL Server export omits portable FULLTEXT keys.");
+    }
+    const datatypes = doc.querySelector("sql > datatypes");
+    if (datatypes) { datatypes.setAttribute("db", target); }
+    return { xml: new XMLSerializer().serializeToString(doc), diagnostics: diagnostics, safe: safe };
+};
+SQL.IO.prototype.mapExportRows = function (doc, target, diagnostics) {
     let safe = true;
     for (const row of doc.querySelectorAll("sql > table > row")) {
         const datatype = SQL.Designer.directChild(row, "datatype");
@@ -694,41 +714,58 @@ SQL.IO.prototype.getExportXml = function (target) {
             const table = row.parentElement;
             const columnName = SQL.Designer.effectiveSchema(table.getAttribute("schema")) + "." +
                 table.getAttribute("name") + "." + row.getAttribute("name");
-            diagnostics.push.apply(diagnostics, mapped.diagnostics.map((message) => columnName + ": " + message));
+            diagnostics.push(...mapped.diagnostics.map((message) => columnName + ": " + message));
         } else {
-            diagnostics.push.apply(diagnostics, mapped.diagnostics);
+            diagnostics.push(...mapped.diagnostics);
         }
         safe = safe && mapped.safe;
         if (mapped.safe && datatype) { datatype.textContent = mapped.type; }
     }
-    const datatypes = doc.querySelector("sql > datatypes");
-    if (datatypes) { datatypes.setAttribute("db", target); }
-    const supportsSchema = target === "mssql" || target === "ef";
-    const supportsDescriptions = supportsSchema || target === "postgresql" || target === "oracle";
-    const supportsClassification = target === "mssql" || target === "ef";
-    const supportsRecordsSchedule = target === "mssql" || target === "ef";
+    return safe;
+};
+SQL.IO.prototype.addExportCapabilityDiagnostics = function (
+    doc, target, supportsSchema, supportsDescriptions, supportsClassification, supportsRecordsSchedule, diagnostics) {
+    let safe = true;
     if (!supportsSchema) {
-        const tables = Array.from(doc.querySelectorAll("sql > table"));
-        if (tables.some((table) =>
-            SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
-            diagnostics.push(target + " export omits non-default schema metadata.");
-        }
-        const projected = new Map();
-        for (const table of tables) {
-            const identity = SQL.Designer.tableIdentity("", table.getAttribute("name"));
-            const sources = projected.get(identity) || [];
-            sources.push(SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
-                "." + table.getAttribute("name"));
-            projected.set(identity, sources);
-        }
-        for (const sources of projected.values()) {
-            if (sources.length < 2) { continue; }
-            diagnostics.push(target + " export maps qualified tables " +
-                sources.slice().sort().join(", ") +
-                " to the same unqualified table name.");
-            safe = false;
-        }
+        safe = this.addNonSchemaDiagnostics(doc, target, diagnostics);
     }
+    this.addUnsupportedFeatureDiagnostics(
+        doc, target, supportsDescriptions, supportsClassification, supportsRecordsSchedule, diagnostics);
+    return safe;
+};
+SQL.IO.prototype.addNonSchemaDiagnostics = function (doc, target, diagnostics) {
+    const tables = Array.from(doc.querySelectorAll("sql > table"));
+    if (tables.some((table) =>
+        SQL.Designer.effectiveSchema(table.getAttribute("schema")).toLowerCase() !== "dbo")) {
+        diagnostics.push(target + " export omits non-default schema metadata.");
+    }
+    const projected = this.projectExportedTables(tables);
+    return this.reportProjectedCollisions(projected, target, diagnostics);
+};
+SQL.IO.prototype.projectExportedTables = function (tables) {
+    const projected = new Map();
+    for (const table of tables) {
+        const identity = SQL.Designer.tableIdentity("", table.getAttribute("name"));
+        const sources = projected.get(identity) || [];
+        sources.push(SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
+            "." + table.getAttribute("name"));
+        projected.set(identity, sources);
+    }
+    return projected;
+};
+SQL.IO.prototype.reportProjectedCollisions = function (projected, target, diagnostics) {
+    let safe = true;
+    for (const sources of projected.values()) {
+        if (sources.length < 2) { continue; }
+        diagnostics.push(target + " export maps qualified tables " +
+            sources.slice().sort().join(", ") +
+            " to the same unqualified table name.");
+        safe = false;
+    }
+    return safe;
+};
+SQL.IO.prototype.addUnsupportedFeatureDiagnostics = function (
+    doc, target, supportsDescriptions, supportsClassification, supportsRecordsSchedule, diagnostics) {
     if (!supportsDescriptions && Array.from(doc.querySelectorAll("sql > table > comment, sql > table > row > comment")).some((comment) =>
         SQL.hasXmlContent(comment.textContent))) {
         diagnostics.push(target + " export omits table and column descriptions.");
@@ -740,51 +777,56 @@ SQL.IO.prototype.getExportXml = function (target) {
         SQL.hasXmlContent(recordsSchedule.textContent))) {
         diagnostics.push(target + " export omits table records schedules.");
     }
-    if (supportsSchema) {
+};
+SQL.IO.prototype.addSchemaLengthDiagnostics = function (doc, target, diagnostics) {
+    let safe = true;
+    for (const table of doc.querySelectorAll("sql > table")) {
+        safe = this.addTableLengthDiagnostics(table, diagnostics) && safe;
+    }
+    if (target === "mssql") {
         for (const table of doc.querySelectorAll("sql > table")) {
-            const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
-            const tableName = schema + "." + table.getAttribute("name");
-            const descriptions = [{
-                comment: SQL.Designer.directChild(table, "comment"),
-                name: tableName,
-            }];
-            for (const row of table.querySelectorAll(":scope > row")) {
-                descriptions.push({
-                    comment: SQL.Designer.directChild(row, "comment"),
-                    name: tableName + "." + row.getAttribute("name"),
-                });
-            }
-            for (const description of descriptions) {
-                const text = description.comment ? description.comment.textContent : "";
-                if (!SQL.hasXmlContent(text)) { continue; }
-                const bytes = SQL.IO.nvarcharByteLength(text);
-                if (bytes > 7500) {
-                    diagnostics.push(description.name + " description is " + bytes
-                        + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
-                    safe = false;
-                }
-            }
-        }
-        if (target === "mssql") {
-            for (const table of doc.querySelectorAll("sql > table")) {
-                const recordsSchedule = SQL.Designer.directChild(table, "records-schedule");
-                const text = recordsSchedule ? recordsSchedule.textContent : "";
-                if (!SQL.hasXmlContent(text)) { continue; }
-                const bytes = SQL.IO.nvarcharByteLength(text);
-                if (bytes > 7500) {
-                    const name = SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
-                        "." + table.getAttribute("name");
-                    diagnostics.push(name + " records schedule is " + bytes
-                        + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the records schedule.");
-                    safe = false;
-                }
-            }
+            safe = this.addRecordsScheduleLengthDiagnostics(table, diagnostics) && safe;
         }
     }
-    if (target === "mssql" && doc.querySelector("sql > table > key[type='FULLTEXT']")) {
-        diagnostics.push("Microsoft SQL Server export omits portable FULLTEXT keys.");
+    return safe;
+};
+SQL.IO.prototype.addTableLengthDiagnostics = function (table, diagnostics) {
+    const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
+    const tableName = schema + "." + table.getAttribute("name");
+    const descriptions = [{
+        comment: SQL.Designer.directChild(table, "comment"),
+        name: tableName,
+    }];
+    for (const row of table.querySelectorAll(":scope > row")) {
+        descriptions.push({
+            comment: SQL.Designer.directChild(row, "comment"),
+            name: tableName + "." + row.getAttribute("name"),
+        });
     }
-    return { xml: new XMLSerializer().serializeToString(doc), diagnostics: diagnostics, safe: safe };
+    let safe = true;
+    for (const description of descriptions) {
+        const text = description.comment ? description.comment.textContent : "";
+        if (!SQL.hasXmlContent(text)) { continue; }
+        const bytes = SQL.IO.nvarcharByteLength(text);
+        if (bytes > 7500) {
+            diagnostics.push(description.name + " description is " + bytes
+                + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the description.");
+            safe = false;
+        }
+    }
+    return safe;
+};
+SQL.IO.prototype.addRecordsScheduleLengthDiagnostics = function (table, diagnostics) {
+    const recordsSchedule = SQL.Designer.directChild(table, "records-schedule");
+    const text = recordsSchedule ? recordsSchedule.textContent : "";
+    if (!SQL.hasXmlContent(text)) { return true; }
+    const bytes = SQL.IO.nvarcharByteLength(text);
+    if (bytes <= 7500) { return true; }
+    const name = SQL.Designer.effectiveSchema(table.getAttribute("schema")) +
+        "." + table.getAttribute("name");
+    diagnostics.push(name + " records schedule is " + bytes
+        + " bytes; the SQL Server limit is 7,500 bytes. No download was created; shorten the records schedule.");
+    return false;
 };
 
 SQL.IO.prototype.getSafeExportXml = function (target) {
@@ -801,7 +843,7 @@ SQL.IO.prototype.downloadTextFile = function (contents, name) {
     link.download = name;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     setTimeout(() => URL.revokeObjectURL(link.href), 0);
 };
 
@@ -833,7 +875,7 @@ SQL.IO.prototype.getXSL = function (xslPath, cb) {
 };
 
 SQL.IO.prototype.getEfSettings = function () {
-    const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    const identifier = /^[A-Za-z_]\w*$/;
     const namespace = (this.owner.getOption("efnamespace") || "").trim();
     const context = (this.owner.getOption("efcontext") || "").trim();
     const namespaceParts = namespace.split(".");
@@ -882,7 +924,7 @@ SQL.IO.prototype.performTransformation = function (xslDoc, xml) {
 };
 
 SQL.IO.prototype.transformEf = function (xslDoc, xml, applyEfSettings = true) {
-    if (!window.XSLTProcessor || !window.DOMParser) {
+    if (!globalThis.XSLTProcessor || !globalThis.DOMParser) {
         throw new Error("No XSLT processor available");
     }
 
@@ -908,50 +950,13 @@ SQL.IO.prototype.getModelTableCount = function (xml) {
     try {
         const xmlDoc = this.parseXml(xml);
         return xmlDoc.querySelectorAll("sql > table").length;
-    } catch (e) {
+    } catch {
         return 0;
     }
 };
 
 SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
-    const classes = [];
-    const classPattern = /public class\s+(@?[A-Za-z_][A-Za-z0-9_]*)\b[^\{]*\{/g;
-    let match;
-    while ((match = classPattern.exec(source))) {
-        let depth = 0;
-        let end = match.index + match[0].length - 1;
-        let state = "code";
-        let escaped = false;
-        for (; end < source.length; end++) {
-            const current = source[end];
-            const next = source[end + 1];
-            if (state === "line") {
-                if (current === "\n") { state = "code"; }
-                continue;
-            }
-            if (state === "block") {
-                if (current === "*" && next === "/") { state = "code"; end++; }
-                continue;
-            }
-            if (state === "string" || state === "char") {
-                if (escaped) { escaped = false; continue; }
-                if (current === "\\") { escaped = true; continue; }
-                if ((state === "string" && current === '"') || (state === "char" && current === "'")) { state = "code"; }
-                continue;
-            }
-            if (current === "/" && next === "/") { state = "line"; end++; continue; }
-            if (current === "/" && next === "*") { state = "block"; end++; continue; }
-            if (current === '"') { state = "string"; continue; }
-            if (current === "'") { state = "char"; continue; }
-            if (current === "{") { depth++; }
-            if (current === "}" && --depth === 0) { break; }
-        }
-        if (depth !== 0) {
-            throw new Error("Unable to separate generated classes.");
-        }
-        classes.push({ name: match[1], source: source.slice(match.index, end + 1) });
-        classPattern.lastIndex = end + 1;
-    }
+    const classes = this.extractGeneratedClasses(source);
     if (classes.length !== tableCount + 1) {
         throw new Error("The model does not contain an exportable table.");
     }
@@ -965,7 +970,7 @@ SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
     const files = [];
     const createFile = (classInfo) => {
         const filename = this.createUniqueCsFilename(classInfo.name, usedNames);
-        const body = classInfo.source.split("\n").map((line) => line.replace(/^    /, "")).join("\n");
+        const body = classInfo.source.split("\n").map((line) => line.replace(/^ {4}/, "")).join("\n");
         files.push({
             name: filename,
             contents: "using System;\nusing Microsoft.EntityFrameworkCore;\n\nnamespace " + namespaceMatch[1].trim() + "\n{\n" +
@@ -981,8 +986,60 @@ SQL.IO.prototype.createEfZipFiles = function (source, contextName, tableCount) {
     return files;
 };
 
+SQL.IO.prototype.extractGeneratedClasses = function (source) {
+    const classes = [];
+    const classPattern = /public class\s+(@?[A-Za-z_]\w*)\b[^{}]*{/g;
+    let match;
+    while ((match = classPattern.exec(source))) {
+        const end = this.findGeneratedClassEnd(source, match.index + match[0].length - 1);
+        classes.push({ name: match[1], source: source.slice(match.index, end + 1) });
+        classPattern.lastIndex = end + 1;
+    }
+    return classes;
+};
+
+SQL.IO.prototype.findGeneratedClassEnd = function (source, start) {
+    let depth = 0;
+    let state = "code";
+    let escaped = false;
+    for (let offset = 0; start + offset < source.length; offset++) {
+        const current = source[start + offset];
+        const next = source[start + offset + 1];
+        if (state !== "code") {
+            const transition = this.advanceGeneratedClassState(current, next, state, escaped);
+            state = transition.state;
+            escaped = transition.escaped;
+            continue;
+        }
+        if (current === "/" && next === "/") { state = "line"; continue; }
+        if (current === "/" && next === "*") { state = "block"; continue; }
+        if (current === '"') { state = "string"; continue; }
+        if (current === "'") { state = "char"; continue; }
+        if (current === "{") { depth++; }
+        if (current === "}" && --depth === 0) { return start + offset; }
+    }
+    throw new Error("Unable to separate generated classes.");
+};
+SQL.IO.prototype.advanceGeneratedClassState = function (current, next, state, escaped) {
+    if (state === "line") {
+        return { state: current === "\n" ? "code" : state, escaped: false };
+    }
+    if (state === "block") {
+        const closed = current === "*" && next === "/";
+        return { state: closed ? "code" : state, escaped: false };
+    }
+    if (escaped) {
+        return { state: state, escaped: false };
+    }
+    if (current === "\\") {
+        return { state: state, escaped: true };
+    }
+    const quote = state === "string" ? '"' : "'";
+    return { state: current === quote ? "code" : state, escaped: false };
+};
+
 SQL.IO.prototype.createUniqueCsFilename = function (className, usedNames) {
-    let baseName = className.replace(/^@/, "").replace(/[^A-Za-z0-9_-]/g, "_") || "Entity";
+    let baseName = className.replace(/^@/, "").replaceAll(/[^\w-]/g, "_") || "Entity";
     if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(baseName)) {
         baseName = "_" + baseName;
     }
@@ -1002,7 +1059,7 @@ SQL.IO.prototype.downloadEfZip = function (archive, contextName) {
     link.download = name;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     setTimeout(() => URL.revokeObjectURL(link.href), 0);
 };
 
@@ -1047,7 +1104,7 @@ SQL.IO.prototype.quicksave = function (e) {
 
 SQL.IO.prototype.serverload = function (e, keyword, version, ownerId, globalOwner) {
     if (!this._serverAvailable) return;
-    if (typeof keyword === "undefined") {
+    if (keyword === undefined) {
         keyword = this.dom.serverloadmodel.value || this.dom.serverloadname.value.trim();
         if (keyword) {
             version = this.dom.serverloadversion.value === "" ? null : Number(this.dom.serverloadversion.value);
@@ -1128,16 +1185,17 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
     const allMatches = this._serverModels.filter((model) => model.keyword === name);
     const ownerIds = Array.from(new Set(allMatches.map((model) => model.ownerId)));
     const selectedOption = this.dom.serverowner.options[this.dom.serverowner.selectedIndex];
-    const selectedOptionOwner = selectedOption && selectedOption.dataset.globalOwner === "true"
+    const selectedOptionOwner = selectedOption?.dataset.globalOwner === "true"
         ? null
         : this.dom.serverowner.value;
-    const selectedOwner = preferSelectedOwner
-        && this.dom.serverowner.selectedIndex > 0
-        && ownerIds.indexOf(selectedOptionOwner) !== -1
-        ? selectedOptionOwner
-        : (ownerIds.indexOf(this._currentOwnerId) !== -1
-            ? this._currentOwnerId
-            : (ownerIds.length ? ownerIds[0] : null));
+    let selectedOwner = ownerIds.length ? ownerIds[0] : null;
+    if (ownerIds.includes(this._currentOwnerId)) {
+        selectedOwner = this._currentOwnerId;
+    }
+    if (preferSelectedOwner && this.dom.serverowner.selectedIndex > 0 &&
+        ownerIds.includes(selectedOptionOwner)) {
+        selectedOwner = selectedOptionOwner;
+    }
     const matches = allMatches.filter((model) => model.ownerId === selectedOwner);
     SQL.dom.clear(this.dom.serverloadmodel);
     const modelNames = Array.from(new Set(this._serverModels.map((model) => model.keyword)));
@@ -1171,9 +1229,12 @@ SQL.IO.prototype.updateServerModelChoices = function (preferSelectedOwner) {
         if (ownerId === null) {
             option.dataset.globalOwner = "true";
         }
-        option.textContent = ownerId === this._currentOwnerId
-            ? this._currentOwnerLabel
-            : (ownerId === null ? "Public models" : ownerId);
+        option.textContent = ownerId;
+        if (ownerId === this._currentOwnerId) {
+            option.textContent = this._currentOwnerLabel;
+        } else if (ownerId === null) {
+            option.textContent = "Public models";
+        }
         option.selected = ownerId === selectedOwner;
         this.dom.serverowner.appendChild(option);
     }
@@ -1221,6 +1282,9 @@ SQL.IO.prototype.refreshShareState = function () {
             this._serverGrants = JSON.parse(data || "[]");
         } catch (e) {
             this._serverGrants = [];
+            if (!(e instanceof SyntaxError)) {
+                throw e;
+            }
         }
         this.refreshGrantChoices();
         this.updateServerModelControls();
@@ -1260,31 +1324,17 @@ SQL.IO.prototype.copyCurrentOwnerId = function () {
         });
         return;
     }
-    const copied = () => this.setActionLabel("servercopy", _("servercopied"));
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(this._currentOwnerId).then(copied).catch(() => {
-            this.copyTextFallback(this._currentOwnerId, copied);
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(this._currentOwnerId).then(() => this.setActionLabel("servercopy", _("servercopied"))).catch(() => {
+            this.copyTextFallback();
         });
         return;
     }
-    this.copyTextFallback(this._currentOwnerId, copied);
+    this.copyTextFallback();
 };
 
-SQL.IO.prototype.copyTextFallback = function (value, callback) {
-    const input = document.createElement("textarea");
-    input.value = value;
-    input.style.position = "fixed";
-    input.style.opacity = "0";
-    document.body.appendChild(input);
-    input.focus();
-    input.select();
-    const copied = document.execCommand("copy");
-    input.remove();
-    if (copied) {
-        callback();
-    } else {
-        alert("Unable to copy the user ID.");
-    }
+SQL.IO.prototype.copyTextFallback = function () {
+    globalThis.prompt(_("servercopytitle"), this._currentOwnerId);
 };
 
 SQL.IO.prototype.servershare = function () {
@@ -1385,8 +1435,8 @@ SQL.IO.prototype.serverimport = function (e) {
 SQL.IO.prototype.check = function (code) {
     switch (code) {
         case 401:
-            if (window.__wwwSqlSetAuthenticationState) {
-                window.__wwwSqlSetAuthenticationState(true, false);
+            if (globalThis.__wwwSqlSetAuthenticationState) {
+                globalThis.__wwwSqlSetAuthenticationState(true, false);
             } else {
                 this.setAuthenticationState(false, false);
             }
@@ -1402,9 +1452,11 @@ SQL.IO.prototype.check = function (code) {
         case 500:
         case 501:
         case 503:
-            const lang = "http" + code;
-            alert(_("httpresponse") + ": " + _(lang));
-            return false;
+            {
+                const lang = "http" + code;
+                alert(_("httpresponse") + ": " + _(lang));
+                return false;
+            }
         default:
             return true;
     }

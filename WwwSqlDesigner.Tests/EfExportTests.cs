@@ -154,7 +154,7 @@ public class EfExportTests
             """);
 
         StringAssert.Contains(generated, "public class Item_2");
-        StringAssert.Contains(generated, "ToTable(\"Item\", \"sales\").HasComment(\"表\\r\\n");
+        StringAssert.Contains(generated, "ToTable(\"Item\", \"sales\").HasComment(\"表\\n");
         StringAssert.Contains(generated, "Property(e => e.Id).HasComment(\"id \\\"quoted\\\" \\\\ path { public class Fake { } }\")");
         StringAssert.Contains(generated, "HasOne<Item_2>()");
     }
@@ -302,7 +302,7 @@ public class EfExportTests
         StringAssert.Contains(options, "setCustomValidity");
         StringAssert.Contains(options, "return false;");
         StringAssert.Contains(options, "CONFIG.CSHARP_KEYWORDS.includes");
-        StringAssert.Contains(window, "this.callback() !== false");
+        StringAssert.Contains(window, "this.callback?.() !== false");
     }
 
     [TestMethod]
@@ -401,8 +401,8 @@ public class EfExportTests
         var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
 
         StringAssert.Contains(io, "DTD and entity declarations are not allowed.");
-        StringAssert.Contains(io, "if (!window.DOMParser)");
-        StringAssert.Contains(io, "if (!window.XSLTProcessor || !window.DOMParser)");
+        StringAssert.Contains(io, "if (!globalThis.DOMParser)");
+        StringAssert.Contains(io, "if (!globalThis.XSLTProcessor || !globalThis.DOMParser)");
         Assert.IsTrue(io.IndexOf("SQL.IO.prototype.parseXml", StringComparison.Ordinal) < io.IndexOf("SQL.IO.prototype.transformEf", StringComparison.Ordinal));
         Assert.IsFalse(io.Contains("ActiveXObject", StringComparison.Ordinal));
         Assert.IsFalse(io.Contains("Msxml2.DOMDocument", StringComparison.Ordinal));
@@ -416,7 +416,7 @@ public class EfExportTests
 
         StringAssert.Contains(io, "let completed = false;");
         StringAssert.Contains(io, "const complete = (err, xslDoc) => {");
-        StringAssert.Contains(io, "this.owner.window.hideThrobber();" + Environment.NewLine + "            return;");
+        StringAssert.Contains(io, "this.owner.window.hideThrobber();\n            return;");
     }
 
     [TestMethod]

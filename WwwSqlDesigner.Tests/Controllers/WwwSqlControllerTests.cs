@@ -56,27 +56,33 @@ namespace WwwSqlDesigner.Controllers.Tests
 
         private sealed class TestAntiforgery : IAntiforgery
         {
+            private readonly AntiforgeryTokenSet _defaultTokens =
+                new("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
+
             public AntiforgeryTokenSet GetAndStoreTokens(HttpContext httpContext)
-                => new("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
+                => _defaultTokens;
 
             public AntiforgeryTokenSet? GetAndStoreTokens(HttpContext httpContext, AntiforgeryTokenSet? tokenSet)
-                => tokenSet ?? new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
+                => tokenSet ?? _defaultTokens;
 
             public Task<AntiforgeryTokenSet> GetAndStoreTokensAsync(HttpContext httpContext, AntiforgeryTokenSet? tokenSet, CancellationToken cancellationToken = default)
-                => Task.FromResult(tokenSet ?? new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN"));
+                => Task.FromResult(tokenSet ?? _defaultTokens);
 
             public AntiforgeryTokenSet GetTokens(HttpContext httpContext)
-                => new("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN");
+                => _defaultTokens;
 
             public Task<AntiforgeryTokenSet> GetTokensAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
-                => Task.FromResult(new AntiforgeryTokenSet("request-token", "cookie-token", "__RequestVerificationToken", "X-CSRF-TOKEN"));
+                => Task.FromResult(_defaultTokens);
 
             public void SetCookieTokenAndHeader(HttpContext httpContext)
             {
             }
 
             public Task SetCookieTokenAndHeaderAsync(HttpContext httpContext)
-                => Task.CompletedTask;
+            {
+                _ = _defaultTokens;
+                return Task.CompletedTask;
+            }
 
             public Task<bool> IsRequestValidAsync(HttpContext httpContext)
                 => Task.FromResult(string.Equals(httpContext.Request.Headers["X-CSRF-TOKEN"], "request-token", StringComparison.Ordinal));
@@ -192,7 +198,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.IsInstanceOfType(result, typeof(ContentResult));
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
-            Assert.AreEqual(content, FooBarModelXml);
+            Assert.AreEqual(FooBarModelXml, content);
         }
 
         [TestMethod]
@@ -235,7 +241,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             Assert.IsInstanceOfType(result, typeof(ContentResult));
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
-            Assert.AreEqual(content, FooBarModelXml);
+            Assert.AreEqual(FooBarModelXml, content);
         }
 
         [TestMethod()]

@@ -10,7 +10,7 @@ SQL.Rubberband.prototype = Object.create(SQL.Visual.prototype);
 
 SQL.Rubberband.prototype.down = function (e) {
     const target = SQL.events.target(e);
-    if (target && ((target.closest && target.closest(".diagram-legend")) || target.matches("input.relation-name-input"))) {
+    if (target?.closest?.(".diagram-legend") || target?.matches("input.relation-name-input")) {
         return;
     }
     SQL.events.prevent(e);

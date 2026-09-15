@@ -4,6 +4,8 @@ namespace WwwSqlDesigner.Data
 {
     public class ApplicationDbContext : DbContext
     {
+        private const string OwnerIdByteLengthColumn = "OwnerIdByteLength";
+
         public ApplicationDbContext() { }
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
@@ -19,14 +21,14 @@ namespace WwwSqlDesigner.Data
             {
                 entity.HasKey(e => e.Id).IsClustered();
                 entity.Property(e => e.OwnerId).UseCollation("Latin1_General_100_BIN2");
-                entity.Property<int?>("OwnerIdByteLength")
+                entity.Property<int?>(OwnerIdByteLengthColumn)
                     .HasComputedColumnSql("DATALENGTH([OwnerId])", stored: true);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
                 entity.HasIndex(
                         nameof(DataModel.OwnerId),
                         nameof(DataModel.Keyword),
                         nameof(DataModel.Version),
-                        "OwnerIdByteLength")
+                        OwnerIdByteLengthColumn)
                     .IsUnique()
                     .HasFilter(null)
                     .IsClustered(false);
@@ -37,7 +39,7 @@ namespace WwwSqlDesigner.Data
                 entity.HasKey(e => e.Id).IsClustered();
                 entity.Property(e => e.OwnerId).UseCollation("Latin1_General_100_BIN2");
                 entity.Property(e => e.TargetId).UseCollation("Latin1_General_100_BIN2");
-                entity.Property<int>("OwnerIdByteLength")
+                entity.Property<int>(OwnerIdByteLengthColumn)
                     .HasComputedColumnSql("DATALENGTH([OwnerId])", stored: true);
                 entity.Property<int>("TargetIdByteLength")
                     .HasComputedColumnSql("DATALENGTH([TargetId])", stored: true);
@@ -47,7 +49,7 @@ namespace WwwSqlDesigner.Data
                         nameof(DataModelAccessGrant.Keyword),
                         nameof(DataModelAccessGrant.TargetType),
                         nameof(DataModelAccessGrant.TargetId),
-                        "OwnerIdByteLength",
+                        OwnerIdByteLengthColumn,
                         "TargetIdByteLength")
                     .IsUnique()
                     .IsClustered(false);

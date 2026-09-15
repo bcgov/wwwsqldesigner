@@ -81,7 +81,7 @@ SQL.Row.prototype.setTitle = function (t) {
         if (relation.row1 != this) {
             continue;
         }
-        const tt = relation.row2.getTitle().replace(new RegExp(old, "g"), t);
+        const tt = relation.row2.getTitle().replaceAll(new RegExp(old, "g"), t);
         if (tt != relation.row2.getTitle()) {
             relation.row2.setTitle(tt);
         }
@@ -118,7 +118,7 @@ SQL.Row.prototype.update = function (data) {
     if ("comment" in data && !SQL.hasXmlContent(data.comment)) {
         data.comment = "";
     }
-    if (data.nll && data.def && data.def.match(/^null$/i)) {
+    if (data.nll && data.def && /^null$/i.test(data.def)) {
         data.def = null;
     }
 
@@ -276,9 +276,10 @@ SQL.Row.prototype.collapse = function () {
     const duplicate = this.owner.rows.some((row) =>
         row !== this && row.getTitle() === title);
     if (!title || duplicate) {
-        this.dom.name.setCustomValidity(
-            !title ? "Field name cannot be empty." : "A field with this name already exists."
-        );
+        const message = title
+            ? "A field with this name already exists."
+            : "Field name cannot be empty.";
+        this.dom.name.setCustomValidity(message);
         this.dom.name.reportValidity();
         this.dom.name.focus();
         return false;
@@ -425,7 +426,7 @@ SQL.Row.prototype.destroy = function () {
 
 SQL.Row.prototype.toXML = function () {
     let xml = '';
-    const name = this.getTitle().replace(/"/g, "&quot;");
+    const name = this.getTitle().replaceAll('"', "&quot;");
     xml += '<row name="' + name + '" null="' + (this.data.nll ? "1" : "0") + '" autoincrement="' + (this.data.ai ? "1" : "0") + '">\n';
     const elm = this.getDataType();
     const type = elm.getAttribute("sql");
@@ -439,10 +440,10 @@ SQL.Row.prototype.toXML = function () {
     for (let relation of this.relations) {
         if (relation.row2 !== this) { continue; }
         const target = relation.row1.owner;
-        xml += '<relation table="' + SQL.escape(target.getTitle()).replace(/"/g, "&quot;") +
-            '" schema="' + SQL.escape(target.getSchema()).replace(/"/g, "&quot;") +
-            '" row="' + SQL.escape(relation.row1.getTitle()).replace(/"/g, "&quot;") +
-            (relation.name ? '" name="' + SQL.escape(relation.name).replace(/"/g, "&quot;") : "") + '" />\n';
+        xml += '<relation table="' + SQL.escape(target.getTitle()).replaceAll('"', "&quot;") +
+            '" schema="' + SQL.escape(target.getSchema()).replaceAll('"', "&quot;") +
+            '" row="' + SQL.escape(relation.row1.getTitle()).replaceAll('"', "&quot;") +
+            (relation.name ? '" name="' + SQL.escape(relation.name).replaceAll('"', "&quot;") : "") + '" />\n';
     }
     if (SQL.hasXmlContent(this.data.comment)) { xml += "<comment>" + SQL.escapeXmlText(this.data.comment) + "</comment>\n"; }
     if (this.data.classification) { xml += "<classification>" + SQL.escape(this.data.classification) + "</classification>\n"; }
@@ -460,14 +461,14 @@ SQL.Row.prototype.fromXML = function (node) {
         const portable = SQL.PortableTypes.canonical(datatype.textContent);
         if (portable) {
             obj.size = portable.facets;
-            const types = window.DATATYPES.getElementsByTagName("type");
+            const types = globalThis.DATATYPES.getElementsByTagName("type");
             for (let i = 0; i < types.length; i++) { if (types[i].getAttribute("sql") === portable.kind) { obj.type = i; break; } }
         }
     }
     const defaultValue = SQL.Designer.directChild(node, "default");
-    if (defaultValue && defaultValue.firstChild) {
+    if (defaultValue?.firstChild) {
         obj.def = defaultValue.firstChild.nodeValue;
-        const quote = window.DATATYPES.getElementsByTagName("type")[obj.type].getAttribute("quote");
+        const quote = globalThis.DATATYPES.getElementsByTagName("type")[obj.type].getAttribute("quote");
         if (quote && obj.def.length >= quote.length * 2 && obj.def.indexOf(quote) === 0 && obj.def.lastIndexOf(quote) === obj.def.length - quote.length) { obj.def = obj.def.slice(quote.length, -quote.length); }
     }
     this.update(obj);

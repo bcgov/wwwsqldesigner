@@ -70,10 +70,9 @@ if (keycloakSettings.IsConfigured)
             RoleClaimType = "groups"
         };
         options.Scope.Clear();
-        foreach (var scope in new[] { "openid", "profile", "email" })
-        {
-            options.Scope.Add(scope);
-        }
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
         options.Events = new OpenIdConnectEvents
         {
             OnRemoteFailure = context =>
@@ -141,11 +140,14 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     using var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    context.Database.Migrate();
+    await context.Database.MigrateAsync();
 }
 
-app.Run();
+await app.RunAsync();
 
 public partial class Program
 {
+    protected Program()
+    {
+    }
 }

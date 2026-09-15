@@ -556,14 +556,6 @@ label, input, select {
     max-width: 100%;
 }
 
-#loadsavepanel .io-form-group,
-#ioshare .io-form-group {
-    display: flex;
-    flex-direction: row;
-    gap: 0.35em;
-    margin: 0 0 1em;
-}
-
 #loadsavepanel .io-form-group > input[type=text],
 #loadsavepanel .io-form-group > select,
 #ioshare .io-form-group > input[type=text],
@@ -718,24 +710,24 @@ label, input, select {
 #keyadd {
     margin: 15px;
     color: #FFF;
-    background-color: #2196F3;
+    background-color: #1565c0;
 }
 
 #keyadd:hover {
     transition: all .2s ease-in-out;
-    background-color: #39a1f4;
+    background-color: #0d47a1;
     box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 2px 2px rgba(0, 0, 0, .2);
 }
 
 #keyremove {
     margin: 15px;
     color: #FFF;
-    background-color: #F44336;
+    background-color: #b71c1c;
 }
 
 #keyremove:hover {
     transition: all .2s ease-in-out;
-    background-color: #f55a4e;
+    background-color: #8e0000;
     box-shadow: 0 0 2px rgba(0, 0, 0, .12), 0 2px 2px rgba(0, 0, 0, .2);
 }
 
@@ -786,15 +778,15 @@ label, input, select {
     opacity: .7;
     background-position: center;
     background-repeat: no-repeat;
+    background-image: url(../images/up_2_black.png);
 }
 
 #maptoggle:hover {
     background-color: #de2665;
+    background-image: url(../images/up_2_white.png);
 }
 
 #maptoggle::-webkit-details-marker { display: none; }
-#maptoggle { background-image: url(../images/up_2_black.png); }
-#maptoggle:hover { background-image: url(../images/up_2_white.png); }
 #legendtools[open] #maptoggle { background-image: url(../images/down_2_black.png); }
 #legendtools[open] #maptoggle:hover { background-image: url(../images/down_2_white.png); }
 
@@ -849,7 +841,6 @@ label, input, select {
     padding: 0;
     border: 0;
     border-bottom: 1px solid rgba(0, 0, 0, .26);
-    font-family: inherit;
     font: inherit;
     background: transparent;
     box-sizing: border-box;

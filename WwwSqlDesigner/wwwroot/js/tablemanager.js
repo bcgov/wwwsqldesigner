@@ -59,7 +59,7 @@ SQL.TableManager = function (owner) {
         this.dom.schema.setCustomValidity("");
     });
 
-    this.dom.container.parentNode.removeChild(this.dom.container);
+    this.dom.container.remove();
 };
 
 SQL.TableManager.prototype.addRow = function (e) {
@@ -225,9 +225,9 @@ SQL.TableManager.prototype.remove = function (e) {
 SQL.TableManager.prototype.edit = function (e, transientTable) {
     this.transientTable = transientTable || null;
     this.owner.window.open(_("edittable"), this.dom.container, this.save, () => {
-        if (transientTable && this.owner.tables.indexOf(transientTable) !== -1) {
+        if (transientTable && this.owner.tables.includes(transientTable)) {
             this.owner.rowManager.discardSelection(transientTable);
-            if (this.selection.indexOf(transientTable) !== -1) {
+            if (this.selection.includes(transientTable)) {
                 this.select(false);
             }
             this.owner.removeTable(transientTable);
@@ -241,15 +241,12 @@ SQL.TableManager.prototype.edit = function (e, transientTable) {
     this.dom.schema.value = this.selection[0].getSchema();
     this.dom.name.setCustomValidity("");
     this.dom.schema.setCustomValidity("");
-    try {
-        /* throws in ie6 */
-        this.originalScalarValues = {
-            comment: this.selection[0].getComment(),
-            recordsSchedule: this.selection[0].getRecordsSchedule()
-        };
-        this.dom.comment.value = this.originalScalarValues.comment;
-        this.dom.recordsSchedule.value = this.originalScalarValues.recordsSchedule;
-    } catch (e) { }
+    this.originalScalarValues = {
+        comment: this.selection[0].getComment(),
+        recordsSchedule: this.selection[0].getRecordsSchedule()
+    };
+    this.dom.comment.value = this.originalScalarValues.comment;
+    this.dom.recordsSchedule.value = this.originalScalarValues.recordsSchedule;
 
     /* pre-select table name */
     this.dom.name.focus();
@@ -283,8 +280,8 @@ SQL.TableManager.prototype.save = function () {
     selected.setSchema(schema);
     selected.setTitle(this.dom.name.value);
     const original = this.originalScalarValues || { comment: "", recordsSchedule: "" };
-    const normalizedComment = original.comment.replace(/\r\n?/g, "\n");
-    const normalizedRecordsSchedule = original.recordsSchedule.replace(/\r\n?/g, "\n");
+    const normalizedComment = original.comment.replaceAll(/\r\n?/g, "\n");
+    const normalizedRecordsSchedule = original.recordsSchedule.replaceAll(/\r\n?/g, "\n");
     selected.setComment(this.dom.comment.value === normalizedComment ? original.comment : this.dom.comment.value);
     selected.setRecordsSchedule(this.dom.recordsSchedule.value === normalizedRecordsSchedule ?
         original.recordsSchedule : this.dom.recordsSchedule.value);

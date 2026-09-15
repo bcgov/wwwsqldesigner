@@ -71,13 +71,13 @@ SQL.Legend.prototype.formatDate = function (value) {
         return _("legendnotsaved");
     }
     const date = new Date(value);
-    return isNaN(date.getTime()) ? _("legendnotsaved") : date.toLocaleString();
+    return Number.isNaN(date.getTime()) ? _("legendnotsaved") : date.toLocaleString();
 };
 
 SQL.Legend.prototype.toXML = function () {
     const attrs = [];
     for (let name in this.data) {
-        attrs.push(name + '="' + SQL.escape(this.data[name]).replace(/"/g, "&quot;") + '"');
+        attrs.push(name + '="' + SQL.escape(this.data[name]).replaceAll('"', "&quot;") + '"');
     }
     return "<legend " + attrs.join(" ") + " />\n";
 };

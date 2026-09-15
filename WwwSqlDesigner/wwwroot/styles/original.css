@@ -67,7 +67,7 @@ body {
 }
 
 #loadsavepanel input[type=button]:disabled {
-    color: #888;
+    color: #595959;
     background-color: #eee;
     cursor: not-allowed;
     opacity: .6;
@@ -361,11 +361,11 @@ label, input, select {
     cursor: pointer;
     background-position: 50% 5px;
     background-repeat: no-repeat;
+    background-image: url(../images/up.gif);
 }
 
 #maptoggle:hover { background-color: #bbb; }
 #maptoggle::-webkit-details-marker { display: none; }
-#maptoggle { background-image: url(../images/up.gif); }
 #legendtools[open] #maptoggle { background-image: url(../images/down.gif); }
 
 #maptools #minimap {

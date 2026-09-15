@@ -94,7 +94,7 @@ SQL.Designer.prototype.loadLanguage = function (xmlDoc) {
         for (let string of strings) {
             const n = string.getAttribute("name");
             const v = string.firstChild.nodeValue;
-            window.LOCALE[n] = v;
+            globalThis.LOCALE[n] = v;
         }
     }
 };
@@ -113,7 +113,7 @@ SQL.Designer.prototype.requestDB = function () {
 };
 
 SQL.Designer.prototype.dbResponse = function (xmlDoc) {
-    window.DATATYPES = SQL.PortableTypes.registry();
+    globalThis.DATATYPES = SQL.PortableTypes.registry();
     this.flag--;
     if (!this.flag) { this.init2(); }
 };
@@ -125,7 +125,7 @@ SQL.Designer.prototype.applyStyle = function () {
         link_elms = document.querySelectorAll("link");
     for (i = 0; i < link_elms.length; i++) {
         if (
-            link_elms[i].getAttribute("rel").indexOf("style") != -1 &&
+            link_elms[i].getAttribute("rel").includes("style") &&
             link_elms[i].getAttribute("title")
         ) {
             link_elms[i].disabled = true;
@@ -151,11 +151,11 @@ SQL.Designer.prototype.init2 = function () {
 
     this.sync();
 
-    const url = window.location.href;
-    const regexKeyword = url.match(/keyword=([^&]+)/);
-    const regexVersion = url.match(/version=([^&]+)/);
-    const regexOwnerId = url.match(/ownerId=([^&]+)/);
-    const regexGlobalOwner = url.match(/globalOwner=([^&]+)/);
+    const url = globalThis.location.href;
+    const regexKeyword = /keyword=([^&]+)/.exec(url);
+    const regexVersion = /version=([^&]+)/.exec(url);
+    const regexOwnerId = /ownerId=([^&]+)/.exec(url);
+    const regexGlobalOwner = /globalOwner=([^&]+)/.exec(url);
     this._serverDeepLink = regexKeyword ? {
         keyword: decodeURIComponent(regexKeyword[1]),
         version: regexVersion ? decodeURIComponent(regexVersion[1]) : null,
@@ -171,7 +171,7 @@ SQL.Designer.prototype.init2 = function () {
 };
 
 SQL.Designer.prototype.loadServerDeepLink = function () {
-    if (!this.io || !this.io._serverAvailable || !this._serverDeepLink || this._serverDeepLinkLoaded) {
+    if (!this.io?._serverAvailable || !this._serverDeepLink || this._serverDeepLinkLoaded) {
         return;
     }
     this._serverDeepLinkLoaded = true;
@@ -229,11 +229,11 @@ SQL.Designer.prototype.getCookie = function () {
     let obj = {};
     const parts = c.split(";");
     for (let part of parts) {
-        const r = part.match(/wwwsqldesigner={(.*?)}/);
+        const r = /wwwsqldesigner={(.*?)}/.exec(part);
         if (r) {
             const options = r[1].split(",");
             for (let option of options) {
-                const opt = option.match(/(.*):'(.*)'/);
+                const opt = /(.*):'(.*)'/.exec(option);
                 if (opt) {
                     obj[opt[1]] = opt[2];
                 }
@@ -389,32 +389,18 @@ SQL.Designer.prototype.directChild = function (node, name) {
 SQL.Designer.prototype.preparePortableImport = function (node) {
     const copy = node.cloneNode(true);
     const types = SQL.Designer.directChildren(copy, "datatypes");
-    const currentDb = window.DATATYPES.getAttribute("db");
-    const sourceDb = types.length ? types[0].getAttribute("db") : (currentDb === "portable" ? CONFIG.DEFAULT_DB : currentDb);
+    const currentDb = globalThis.DATATYPES.getAttribute("db");
+    let sourceDb = currentDb;
+    if (types.length) {
+        sourceDb = types[0].getAttribute("db");
+    } else if (currentDb === "portable") {
+        sourceDb = CONFIG.DEFAULT_DB;
+    }
     const isPortable = copy.getAttribute("format") === SQL.PortableTypes.format || (sourceDb || "").toLowerCase() === "portable";
     const diagnostics = new Map();
     for (const table of SQL.Designer.directChildren(copy, "table")) {
       for (const row of SQL.Designer.directChildren(table, "row")) {
-        const datatype = SQL.Designer.directChild(row, "datatype");
-        if (!datatype) { continue; }
-        const original = datatype.textContent.trim();
-        let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
-        if (!type) {
-            const label = original || "(empty type)";
-            type = { kind: "text", facets: "", diagnostics: [label + " is not a portable type and is imported as text."] };
-        }
-        datatype.textContent = SQL.PortableTypes.formatToken(type);
-        if (type.diagnostics) {
-            const context = [
-                SQL.Designer.effectiveSchema(table.getAttribute("schema")),
-                table.getAttribute("name") || "(unnamed table)",
-                row.getAttribute("name") || "(unnamed column)"
-            ].map((name) => "[" + String(name).replace(/]/g, "]]") + "]").join(".");
-            for (const message of type.diagnostics) {
-                if (!diagnostics.has(message)) { diagnostics.set(message, new Set()); }
-                diagnostics.get(message).add(context);
-            }
-        }
+        this.processPortableImportRow(table, row, isPortable, sourceDb, diagnostics);
       }
     }
     copy.setAttribute("format", SQL.PortableTypes.format);
@@ -425,9 +411,34 @@ SQL.Designer.prototype.preparePortableImport = function (node) {
             Array.from(contexts).join(", ") + ": " + message)
     };
 };
+SQL.Designer.prototype.processPortableImportRow = function (table, row, isPortable, sourceDb, diagnostics) {
+    const datatype = SQL.Designer.directChild(row, "datatype");
+    if (!datatype) { return; }
+    const original = datatype.textContent.trim();
+    let type = isPortable ? SQL.PortableTypes.canonical(original) : SQL.PortableTypes.source(sourceDb, original);
+    if (!type) {
+        const label = original || "(empty type)";
+        type = { kind: "text", facets: "", diagnostics: [label + " is not a portable type and is imported as text."] };
+    }
+    datatype.textContent = SQL.PortableTypes.formatToken(type);
+    if (type.diagnostics) {
+        this.addPortableImportDiagnostics(table, row, type.diagnostics, diagnostics);
+    }
+};
+SQL.Designer.prototype.addPortableImportDiagnostics = function (table, row, messages, diagnostics) {
+    const context = [
+        SQL.Designer.effectiveSchema(table.getAttribute("schema")),
+        table.getAttribute("name") || "(unnamed table)",
+        row.getAttribute("name") || "(unnamed column)"
+    ].map((name) => "[" + String(name).replaceAll("]", "]]") + "]").join(".");
+    for (const message of messages) {
+        if (!diagnostics.has(message)) { diagnostics.set(message, new Set()); }
+        diagnostics.get(message).add(context);
+    }
+};
 SQL.Designer.prototype.validatePortableImport = function (prepared) {
     const portable = prepared.node;
-    if (!portable.tagName || portable.tagName.toLowerCase() !== "sql") {
+    if (portable?.tagName?.toLowerCase() !== "sql") {
         throw new Error("Invalid model root: expected sql.");
     }
     const allowedParents = {
@@ -437,115 +448,114 @@ SQL.Designer.prototype.validatePortableImport = function (prepared) {
     };
     const singletons = { sql: ["datatypes", "legend"], table: ["comment", "records-schedule"], row: ["datatype", "default", "comment", "classification"] };
     for (const element of [portable].concat(Array.from(portable.querySelectorAll("*")))) {
-        const name = element.tagName.toLowerCase();
-        if ((name === "comment" || name === "records-schedule") && element.tagName !== name) {
-            throw new Error("Invalid model element case: " + name + ".");
-        }
-        if (name === "classification" && element.tagName !== "classification") {
-            throw new Error("Invalid model element case: classification.");
-        }
-        if (name === "sql" && element !== portable) {
-            throw new Error("Misplaced model element: sql.");
-        }
-        if (allowedParents[name]) {
-            const parentName = element.parentElement && element.parentElement.tagName.toLowerCase();
-            if (allowedParents[name].indexOf(parentName) === -1) {
-                throw new Error("Misplaced model element: " + name + ".");
-            }
-        }
-        for (const childName of singletons[name] || []) {
-            if (SQL.Designer.directChildren(element, childName).length > 1) {
-                throw new Error("Duplicate model element: " + childName + ".");
-            }
-        }
-        if (name === "default" && element.childNodes.length &&
-            (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
-            throw new Error("Default must contain exactly one text node.");
-        }
-        if ((name === "comment" || name === "records-schedule") && element.childNodes.length &&
-            (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
-            throw new Error(name + " must contain exactly one text node.");
-        }
-        if (name === "classification") {
-            if (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE) {
-                throw new Error("Classification must contain exactly one text node.");
-            }
-            const value = element.firstChild.nodeValue;
-            if (["Public", "Protected A", "Protected B", "Protected C"].indexOf(value) === -1) {
-                throw new Error("Invalid column classification.");
-            }
-        }
+        this.validatePortableElement(element, portable, allowedParents, singletons);
     }
     const tables = SQL.Designer.directChildren(portable, "table");
     const identities = new Map();
     const rowMaps = new Map();
     for (const table of tables) {
-        const tableName = table.getAttribute("name");
-        if (tableName === null || !String(tableName).trim().length) {
-            throw new Error("Table name cannot be empty.");
-        }
-        const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
-        table.setAttribute("schema", schema);
-        const identity = SQL.Designer.tableIdentity(schema, tableName);
-        if (identities.has(identity)) {
-            throw new Error("Duplicate table identity: [" + schema + "].[" + table.getAttribute("name") + "].");
-        }
-        identities.set(identity, table);
-        const rows = new Map();
-        for (const row of SQL.Designer.directChildren(table, "row")) {
-            const name = row.getAttribute("name") || "";
-            if (!name.length) {
-                throw new Error("Row name cannot be empty.");
-            }
-            if (rows.has(name)) {
-                throw new Error("Duplicate row name: " + name + ".");
-            }
-            rows.set(name, row);
-        }
-        rowMaps.set(table, rows);
-        for (const key of SQL.Designer.directChildren(table, "key")) {
-            const parts = SQL.Designer.directChildren(key, "part");
-            if (!parts.length) {
-                throw new Error("Key must contain at least one part.");
-            }
-            const partNames = new Set();
-            for (const part of parts) {
-                if (part.childNodes.length !== 1 || part.firstChild.nodeType !== Node.TEXT_NODE) {
-                    throw new Error("Key part must contain exactly one text node.");
-                }
-                const name = part.firstChild.nodeValue;
-                if (!name.length) {
-                    throw new Error("Key part cannot be empty.");
-                }
-                if (partNames.has(name)) {
-                    throw new Error("Duplicate key part: " + name + ".");
-                }
-                partNames.add(name);
-                if (!rows.has(name)) {
-                    throw new Error("Key part row not found: " + name + ".");
-                }
-            }
-        }
+        this.validatePortableTable(table, identities, rowMaps);
     }
-    for (const sourceTable of tables) {
-        const rows = SQL.Designer.directChildren(sourceTable, "row");
-        for (const sourceRow of rows) {
-            const relations = SQL.Designer.directChildren(sourceRow, "relation");
-            for (const relation of relations) {
-                const schema = SQL.Designer.effectiveSchema(relation.getAttribute("schema"));
-                relation.setAttribute("schema", schema);
-                const target = identities.get(SQL.Designer.tableIdentity(schema, relation.getAttribute("table")));
-                if (!target) {
-                    throw new Error("Relationship target table not found: [" + schema + "].[" + relation.getAttribute("table") + "].");
-                }
-                if (!rowMaps.get(target).has(relation.getAttribute("row"))) {
-                    throw new Error("Relationship target row not found: [" + schema + "].[" +
-                        target.getAttribute("name") + "].[" + relation.getAttribute("row") + "].");
-                }
-            }
-        }
-    }
+    this.validatePortableRelations(tables, identities, rowMaps);
     return prepared;
+};
+SQL.Designer.prototype.validatePortableElement = function (element, portable, allowedParents, singletons) {
+    const name = element.tagName.toLowerCase();
+    if ((name === "comment" || name === "records-schedule") && element.tagName !== name) {
+        throw new Error("Invalid model element case: " + name + ".");
+    }
+    if (name === "classification" && element.tagName !== "classification") {
+        throw new Error("Invalid model element case: classification.");
+    }
+    if (name === "sql" && element !== portable) {
+        throw new Error("Misplaced model element: sql.");
+    }
+    const parentName = element.parentElement?.tagName.toLowerCase();
+    if (allowedParents[name] && !allowedParents[name].includes(parentName)) {
+        throw new Error("Misplaced model element: " + name + ".");
+    }
+    for (const childName of singletons[name] || []) {
+        if (SQL.Designer.directChildren(element, childName).length > 1) {
+            throw new Error("Duplicate model element: " + childName + ".");
+        }
+    }
+    if (name === "default" && element.childNodes.length &&
+        (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
+        throw new Error("Default must contain exactly one text node.");
+    }
+    if ((name === "comment" || name === "records-schedule") && element.childNodes.length &&
+        (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE)) {
+        throw new Error(name + " must contain exactly one text node.");
+    }
+    if (name === "classification") {
+        if (element.childNodes.length !== 1 || element.firstChild.nodeType !== Node.TEXT_NODE) {
+            throw new Error("Classification must contain exactly one text node.");
+        }
+        const value = element.firstChild.nodeValue;
+        if (!["Public", "Protected A", "Protected B", "Protected C"].includes(value)) {
+            throw new Error("Invalid column classification.");
+        }
+    }
+};
+SQL.Designer.prototype.validatePortableTable = function (table, identities, rowMaps) {
+    const tableName = table.getAttribute("name");
+    if (tableName === null || !String(tableName).trim().length) {
+        throw new Error("Table name cannot be empty.");
+    }
+    const schema = SQL.Designer.effectiveSchema(table.getAttribute("schema"));
+    table.setAttribute("schema", schema);
+    const identity = SQL.Designer.tableIdentity(schema, tableName);
+    if (identities.has(identity)) {
+        throw new Error("Duplicate table identity: [" + schema + "].[" + table.getAttribute("name") + "].");
+    }
+    identities.set(identity, table);
+    const rows = new Map();
+    for (const row of SQL.Designer.directChildren(table, "row")) {
+        const name = row.getAttribute("name") || "";
+        if (!name.length) { throw new Error("Row name cannot be empty."); }
+        if (rows.has(name)) { throw new Error("Duplicate row name: " + name + "."); }
+        rows.set(name, row);
+    }
+    rowMaps.set(table, rows);
+    for (const key of SQL.Designer.directChildren(table, "key")) {
+        this.validatePortableKey(key, rows);
+    }
+};
+SQL.Designer.prototype.validatePortableKey = function (key, rows) {
+    const parts = SQL.Designer.directChildren(key, "part");
+    if (!parts.length) { throw new Error("Key must contain at least one part."); }
+    const partNames = new Set();
+    for (const part of parts) {
+        if (part.childNodes.length !== 1 || part.firstChild.nodeType !== Node.TEXT_NODE) {
+            throw new Error("Key part must contain exactly one text node.");
+        }
+        const name = part.firstChild.nodeValue;
+        if (!name.length) { throw new Error("Key part cannot be empty."); }
+        if (partNames.has(name)) { throw new Error("Duplicate key part: " + name + "."); }
+        partNames.add(name);
+        if (!rows.has(name)) { throw new Error("Key part row not found: " + name + "."); }
+    }
+};
+SQL.Designer.prototype.validatePortableRelations = function (tables, identities, rowMaps) {
+    for (const sourceTable of tables) {
+        for (const sourceRow of SQL.Designer.directChildren(sourceTable, "row")) {
+            for (const relation of SQL.Designer.directChildren(sourceRow, "relation")) {
+                this.validatePortableRelation(relation, identities, rowMaps);
+            }
+        }
+    }
+};
+SQL.Designer.prototype.validatePortableRelation = function (relation, identities, rowMaps) {
+    const schema = SQL.Designer.effectiveSchema(relation.getAttribute("schema"));
+    relation.setAttribute("schema", schema);
+    const target = identities.get(SQL.Designer.tableIdentity(schema, relation.getAttribute("table")));
+    if (!target) {
+        throw new Error("Relationship target table not found: [" + schema + "].[" + relation.getAttribute("table") + "].");
+    }
+    if (!rowMaps.get(target).has(relation.getAttribute("row"))) {
+        throw new Error("Relationship target row not found: [" + schema + "].[" +
+            target.getAttribute("name") + "].[" + relation.getAttribute("row") + "].");
+    }
 };
 SQL.Designer.prototype.fromXML = function (node) {
     const prepared = this.validatePortableImport(this.preparePortableImport(node));
@@ -553,7 +563,7 @@ SQL.Designer.prototype.fromXML = function (node) {
     this.rowManager.discardSelection();
     this.tableManager.select(false);
     this.clearTables();
-    window.DATATYPES = SQL.PortableTypes.registry();
+    globalThis.DATATYPES = SQL.PortableTypes.registry();
     this.typeIndex = false;
     this.fkTypeFor = false;
     const legends = SQL.Designer.directChildren(portable, "legend");
@@ -565,9 +575,9 @@ SQL.Designer.prototype.fromXML = function (node) {
         .flatMap((row) => SQL.Designer.directChildren(row, "relation")));
     for (let rel of rs) {
         let t1 = this.findTable(rel.getAttribute("schema"), rel.getAttribute("table"));
-        let r1 = t1 && t1.findNamedRow(rel.getAttribute("row"));
+        let r1 = t1?.findNamedRow(rel.getAttribute("row"));
         let t2 = this.findTable(rel.parentNode.parentNode.getAttribute("schema"), rel.parentNode.parentNode.getAttribute("name"));
-        let r2 = t2 && t2.findNamedRow(rel.parentNode.getAttribute("name"));
+        let r2 = t2?.findNamedRow(rel.parentNode.getAttribute("name"));
         if (r1 && r2) { const relation = this.addRelation(r1, r2); relation.name = rel.getAttribute("name") || ""; relation.redraw(); }
     }
     this.sync();
@@ -580,7 +590,7 @@ SQL.Designer.prototype.setTitle = function (t) {
 };
 
 SQL.Designer.prototype.removeSelection = function () {
-    const sel = window.getSelection ? window.getSelection() : document.selection;
+    const sel = globalThis.getSelection ? globalThis.getSelection() : document.selection;
     if (!sel) {
         return;
     }
@@ -595,7 +605,7 @@ SQL.Designer.prototype.removeSelection = function () {
 SQL.Designer.prototype.getTypeIndex = function (label) {
     if (!this.typeIndex) {
         this.typeIndex = {};
-        const types = window.DATATYPES.getElementsByTagName("type");
+        const types = globalThis.DATATYPES.getElementsByTagName("type");
         for (let i = 0; i < types.length; i++) {
             const l = types[i].getAttribute("label");
             if (l) {
@@ -609,7 +619,7 @@ SQL.Designer.prototype.getTypeIndex = function (label) {
 SQL.Designer.prototype.getFKTypeFor = function (typeIndex) {
     if (!this.fkTypeFor) {
         this.fkTypeFor = {};
-        const types = window.DATATYPES.getElementsByTagName("type");
+        const types = globalThis.DATATYPES.getElementsByTagName("type");
         for (let i = 0; i < types.length; i++) {
             this.fkTypeFor[i] = i;
             const fk = types[i].getAttribute("fk");
