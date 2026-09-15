@@ -146,8 +146,7 @@ public class EfExportTests
     {
         var generated = Transform("""
             <sql><datatypes db="mssql"/>
-              <table name="Item" schema="sales"><row name="Id" null="0"><datatype>int</datatype><comment>id "quoted" \ path { public class Fake { } }</comment></row><comment>表
-            comment</comment></table>
+              <table name="Item" schema="sales"><row name="Id" null="0"><datatype>int</datatype><comment>id "quoted" \ path { public class Fake { } }</comment></row><comment>表&#10;comment</comment></table>
               <table name="Item" schema="archive"><row name="Id" null="0"><datatype>int</datatype></row></table>
               <table name="Link" schema="dbo"><row name="ArchiveId" null="0"><datatype>int</datatype><relation table="Item" schema="archive" row="Id"/></row></table>
             </sql>
@@ -412,7 +411,8 @@ public class EfExportTests
     public void StylesheetLoadCompletesOnceAndClearsTheThrobberOnFailure()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
-        var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
+        var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"))
+            .ReplaceLineEndings("\n");
 
         StringAssert.Contains(io, "let completed = false;");
         StringAssert.Contains(io, "const complete = (err, xslDoc) => {");
