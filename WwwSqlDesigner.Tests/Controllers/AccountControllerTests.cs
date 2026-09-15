@@ -17,7 +17,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         {
             var settings = new KeycloakSettings();
 
-            var exception = Assert.ThrowsException<InvalidOperationException>(
+            var exception = Assert.Throws<InvalidOperationException>(
                 () => settings.Validate(isDevelopment: false));
 
             StringAssert.Contains(exception.Message, "outside the Development environment");
@@ -33,7 +33,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 ClientId = "client"
             };
 
-            var exception = Assert.ThrowsException<InvalidOperationException>(
+            var exception = Assert.Throws<InvalidOperationException>(
                 () => settings.Validate(isDevelopment: true));
 
             StringAssert.Contains(exception.Message, "ClientSecret");

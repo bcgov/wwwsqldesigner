@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using System.Text;
+using System.Xml;
 using WwwSqlDesigner.Authentication;
 using WwwSqlDesigner.Data;
 
@@ -13,6 +15,8 @@ namespace WwwSqlDesigner.Controllers
     [Route("backend/netcore-ef")]
     public class WwwSqlController : Controller
     {
+        public const int MaxModelXmlBytes = 1_048_576;
+        private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
         private const string GrantIdentityIndexName =
             "IX_DataModelAccessGrants_OwnerId_Keyword_TargetType_TargetId_OwnerIdByteLength_TargetIdByteLength";
         private const string IdentityComparisonTerminator = "|";
@@ -102,6 +106,7 @@ namespace WwwSqlDesigner.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [EnableRateLimiting("model-write")]
         [Route("save")]
         public async Task<IActionResult> Save(string? keyword)
         {
@@ -112,14 +117,41 @@ namespace WwwSqlDesigner.Controllers
 
             var ownerId = GetEffectiveOwnerId();
 
-            //Read XML data from request body
-            Request.EnableBuffering();
-            Request.Body.Position = 0;
-            string xmlData;
-            using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+            if (Request.ContentLength > MaxModelXmlBytes)
             {
-                xmlData = await reader.ReadToEndAsync().ConfigureAwait(false);
+                return BadRequest("Model XML exceeds the maximum size.");
             }
+
+            var xmlBuffer = new MemoryStream();
+            var byteBuffer = new byte[81920];
+            var bytesRead = 0;
+            int read;
+            while ((read = await Request.Body.ReadAsync(byteBuffer.AsMemory(), Request.HttpContext.RequestAborted).ConfigureAwait(false)) > 0)
+            {
+                bytesRead += read;
+                if (bytesRead > MaxModelXmlBytes)
+                {
+                    return BadRequest("Model XML exceeds the maximum size.");
+                }
+
+                await xmlBuffer.WriteAsync(byteBuffer.AsMemory(0, read), Request.HttpContext.RequestAborted).ConfigureAwait(false);
+            }
+
+            string xmlData;
+            try
+            {
+                xmlData = StrictUtf8.GetString(xmlBuffer.ToArray());
+            }
+            catch (DecoderFallbackException)
+            {
+                return BadRequest("Model XML is not valid UTF-8.");
+            }
+
+            if (!IsValidModelXml(xmlData))
+            {
+                return BadRequest("Model XML is invalid.");
+            }
+
             var save = await ApplyOwnerFilter(_context.DataModels, includeGrants: false)
                 .OrderByDescending(x => x.CreatedAt)
                 .FirstOrDefaultAsync(x => x.Keyword == keyword);
@@ -151,6 +183,28 @@ namespace WwwSqlDesigner.Controllers
             }
             await _context.SaveChangesAsync();
             return Content(string.Empty);
+        }
+
+        private static bool IsValidModelXml(string xmlData)
+        {
+            try
+            {
+                var settings = new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    MaxCharactersInDocument = MaxModelXmlBytes,
+                    XmlResolver = null
+                };
+                using var reader = XmlReader.Create(new StringReader(xmlData), settings);
+                while (reader.Read())
+                {
+                }
+                return true;
+            }
+            catch (XmlException)
+            {
+                return false;
+            }
         }
 
         [HttpGet]

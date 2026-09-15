@@ -1393,6 +1393,7 @@ test("preserves the current diagram after failed or malformed server loads", asy
     await page.locator("#serverloadmodel").selectOption("Broken");
     await page.locator("#ioload").click();
     await expect.poll(() => loadRequests).toBe(2);
+    await expect.poll(() => page.evaluate(() => d.window.dom.throbber.style.visibility)).toBe("hidden");
     expect(await page.evaluate(() => d.toXML())).toBe(original);
 });
 
