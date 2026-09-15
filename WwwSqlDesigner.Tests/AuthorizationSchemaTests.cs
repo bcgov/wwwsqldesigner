@@ -408,20 +408,20 @@ namespace WwwSqlDesigner.Tests
                             .SingleAsync());
 
                     context.DataModels.Add(Model("alice", "Same", "duplicate"));
-                    await Assert.ThrowsExceptionAsync<DbUpdateException>(() => context.SaveChangesAsync());
+                    await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
                     context.ChangeTracker.Clear();
 
                     context.DataModelAccessGrants.Add(Grant("grant-owner", "Same", "User", "alice"));
-                    await Assert.ThrowsExceptionAsync<DbUpdateException>(() => context.SaveChangesAsync());
+                    await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
                     context.ChangeTracker.Clear();
 
                     context.DataModels.Add(Model(new string('x', 257), "TooLongOwner", "too-long"));
-                    await Assert.ThrowsExceptionAsync<DbUpdateException>(() => context.SaveChangesAsync());
+                    await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
                     context.ChangeTracker.Clear();
 
                     context.DataModelAccessGrants.Add(
                         Grant("grant-owner", "TooLongTarget", "User", new string('x', 257)));
-                    await Assert.ThrowsExceptionAsync<DbUpdateException>(() => context.SaveChangesAsync());
+                    await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
                     context.ChangeTracker.Clear();
 
                     Assert.IsInstanceOfType<BadRequestObjectResult>(
@@ -489,7 +489,7 @@ namespace WwwSqlDesigner.Tests
                         """).SingleAsync();
                     Assert.IsTrue(keyBytes > 900);
 
-                    var exception = await Assert.ThrowsExceptionAsync<SqlException>(
+                    var exception = await Assert.ThrowsAsync<SqlException>(
                         () => migrator.MigrateAsync(PreviousMigration));
                     StringAssert.Contains(
                         exception.Message,
@@ -518,7 +518,7 @@ namespace WwwSqlDesigner.Tests
                 context.DataModels.Add(unrepresentable);
                 await context.SaveChangesAsync();
 
-                var sentinelException = await Assert.ThrowsExceptionAsync<SqlException>(
+                var sentinelException = await Assert.ThrowsAsync<SqlException>(
                     () => migrator.MigrateAsync(PreviousMigration));
                 StringAssert.Contains(
                     sentinelException.Message,
@@ -531,7 +531,7 @@ namespace WwwSqlDesigner.Tests
                     Model("alice ", "Same", "trailing"));
                 await context.SaveChangesAsync();
 
-                var modelException = await Assert.ThrowsExceptionAsync<SqlException>(
+                var modelException = await Assert.ThrowsAsync<SqlException>(
                     () => migrator.MigrateAsync(PreviousMigration));
                 StringAssert.Contains(
                     modelException.Message,
@@ -545,7 +545,7 @@ namespace WwwSqlDesigner.Tests
                     Grant("owner", "Same", "User", "alice "));
                 await context.SaveChangesAsync();
 
-                var grantException = await Assert.ThrowsExceptionAsync<SqlException>(
+                var grantException = await Assert.ThrowsAsync<SqlException>(
                     () => migrator.MigrateAsync(PreviousMigration));
                 StringAssert.Contains(
                     grantException.Message,

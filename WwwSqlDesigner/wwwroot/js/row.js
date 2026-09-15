@@ -345,7 +345,7 @@ SQL.Row.prototype.redraw = function () {
         typehint.push("(" + this.data.size + ")");
     }
 
-    this.dom.typehint.innerHTML = typehint.join(" ");
+    this.dom.typehint.textContent = typehint.join(" ");
     this.owner.redraw();
     this.owner.owner.rowManager.redraw();
 };

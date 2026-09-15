@@ -256,6 +256,21 @@ namespace WwwSqlDesigner.Controllers.Tests
         }
 
         [TestMethod()]
+        public async Task SaveRejectsOversizedModel()
+        {
+            var httpContext = CreateHttpContextWithAntiforgery();
+            httpContext.Request.ContentLength = WwwSqlController.MaxModelXmlBytes + 1;
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            };
+
+            var result = await _controller.Save("TooLarge").ConfigureAwait(true);
+
+            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+        }
+
+        [TestMethod()]
         public async Task SaveTestNew()
         {
             var httpContext = CreateHttpContextWithAntiforgery();
@@ -544,7 +559,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var settings = ConfiguredKeycloak();
             var user = new ClaimsPrincipal(new ClaimsIdentity("Test"));
 
-            await Assert.ThrowsExceptionAsync<InvalidOperationException>(
+            await Assert.ThrowsAsync<InvalidOperationException>(
                 () => InitializeController(settings, user).Load("Missing", null));
         }
 

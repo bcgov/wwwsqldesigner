@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+﻿import { beforeEach, describe, expect, it } from "vitest";
 import "@wwwsql/globals.js";
 import "@wwwsql/portabletypes.js";
 
@@ -42,6 +42,8 @@ describe("portable type conversion", () => {
     it("normalizes and validates canonical types", () => {
         expect(portable.split(" decimal ( 12, 2 ) ")).toEqual({ name: "decimal", facets: "12, 2" });
         expect(portable.canonical("STRING(40)")).toEqual({ kind: "string", facets: "40" });
+        expect(portable.canonical("string(<img src=x onerror=\"alert(1)\">)")).toBeNull();
+        expect(portable.canonical("decimal(18,2)")).toEqual({ kind: "decimal", facets: "18,2" });
         expect(portable.canonical("unknown")).toBeNull();
         expect(portable.formatToken({ kind: "binary", facets: "16" })).toBe("binary(16)");
     });
