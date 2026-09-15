@@ -14,8 +14,8 @@ SQL.Map = function (owner) {
     this.flag = false;
     this.sync();
 
-    SQL.events.add(window, "resize", this.sync);
-    SQL.events.add(window, "scroll", this.sync);
+    SQL.events.add(globalThis, "resize", this.sync);
+    SQL.events.add(globalThis, "scroll", this.sync);
     SQL.events.add(this.dom.container, "mousedown", this.down.bind(this));
     SQL.events.add(this.dom.container, "touchstart", this.down.bind(this));
     SQL.events.add(this.dom.container, "touchmove", SQL.events.prevent);

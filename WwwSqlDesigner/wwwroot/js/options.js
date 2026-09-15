@@ -69,11 +69,11 @@ SQL.Options.prototype.build = function () {
 
     SQL.events.add(this.dom.btn, "click", this.click.bind(this));
 
-    this.dom.container.parentNode.removeChild(this.dom.container);
+    this.dom.container.remove();
 };
 
 SQL.Options.prototype.save = function () {
-    const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    const identifier = /^\w+$/;
     const namespace = this.dom.optionefnamespace.value.trim();
     const context = this.dom.optionefcontext.value.trim();
     const pattern = this.dom.optionpattern.value;

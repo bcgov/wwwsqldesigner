@@ -22,9 +22,8 @@ SQL.Visual.prototype.fromXML = function (node) {};
 
 SQL.Visual.prototype.destroy = function () {
     /* "destructor" */
-    const p = this.dom.container.parentNode;
-    if (p && p.nodeType == 1) {
-        p.removeChild(this.dom.container);
+    if (this.dom.container.parentNode?.nodeType === 1) {
+        this.dom.container.remove();
     }
 };
 

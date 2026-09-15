@@ -35,7 +35,7 @@ SQL.Window.prototype.open = function (title, content, callback, cancelCallback) 
     this.callback = callback;
     this.cancelCallback = cancelCallback;
     while (this.dom.title.childNodes.length > 1) {
-        this.dom.title.removeChild(this.dom.title.childNodes[1]);
+        this.dom.title.childNodes[1].remove();
     }
 
     if (title) {
@@ -50,10 +50,10 @@ SQL.Window.prototype.open = function (title, content, callback, cancelCallback) 
     this.dom.cancel.style.visibility = this.callback ? "" : "hidden";
     this.dom.container.style.visibility = "visible";
 
-    const formElements = ["input", "select", "textarea"];
+    const formElements = new Set(["input", "select", "textarea"]);
     const all = this.dom.container.getElementsByTagName("*");
     for (let elm of all) {
-        if (formElements.indexOf(elm.tagName.toLowerCase()) != -1) {
+        if (formElements.has(elm.tagName.toLowerCase())) {
             elm.focus();
             break;
         }
@@ -66,7 +66,7 @@ SQL.Window.prototype.key = function (e) {
     }
     if (e.keyCode == 13) {
         const target = SQL.events.target(e);
-        if (target && target.nodeName.toLowerCase() === "textarea") {
+        if (target?.nodeName.toLowerCase() === "textarea") {
             return;
         }
         this.ok(e);
@@ -77,7 +77,7 @@ SQL.Window.prototype.key = function (e) {
 };
 
 SQL.Window.prototype.ok = function (e) {
-    if (!this.callback || this.callback() !== false) {
+    if (this.callback?.() !== false) {
         this.close();
     }
 };

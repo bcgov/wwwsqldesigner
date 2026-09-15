@@ -6,7 +6,7 @@ SQL.Toggle = function (elm) {
     SQL.events.add(elm, "click", this._click.bind(this));
 
     let defaultState = true;
-    if (document.location.href.match(/toolbar=hidden/)) {
+    if (/toolbar=hidden/.exec(document.location.href)) {
         defaultState = false;
     }
     this._switch(defaultState);

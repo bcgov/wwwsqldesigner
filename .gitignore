@@ -10,6 +10,7 @@ TestResults/
 WwwSqlDesigner.Tests/Playwright/node_modules/
 WwwSqlDesigner.Tests/Playwright/test-results/
 WwwSqlDesigner.Tests/Playwright/playwright-report/
+WwwSqlDesigner.Tests/Playwright/coverage/
 
 # Local, untracked planning and follow-up notes
 .working/

@@ -1,9 +1,9 @@
 function _(str) {
     /* getText */
-    if (!(str in window.LOCALE)) {
+    if (!(str in globalThis.LOCALE)) {
         return str;
     }
-    return window.LOCALE[str];
+    return globalThis.LOCALE[str];
 }
 
 var DATATYPES = false;
@@ -41,13 +41,13 @@ const SQL = {
 
     escape: function (str) {
         return str
-            .replace(/&/g, "&amp;")
-            .replace(/>/g, "&gt;")
-            .replace(/</g, "&lt;");
+            .replaceAll("&", "&amp;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("<", "&lt;");
     },
 
     escapeXmlText: function (str) {
-        return this.escape(str).replace(/\r/g, "&#13;");
+        return this.escape(str).replaceAll("\r", "&#13;");
     },
 
     hasXmlContent: function (value) {
@@ -80,7 +80,7 @@ const SQL = {
 
         clear: function (element) {
             while (element.firstChild) {
-                element.removeChild(element.firstChild);
+                element.firstChild.remove();
             }
         },
 
@@ -163,9 +163,13 @@ const SQL = {
             const rawHeaders = request.getAllResponseHeaders();
             if (rawHeaders) {
                 rawHeaders.split(/[\r\n]/).forEach(function (line) {
-                    const match = line.match(/^([^:]+): *(.*)$/);
-                    if (match) {
-                        headers[match[1]] = match[2];
+                    const separator = line.indexOf(":");
+                    if (separator > 0) {
+                        let valueStart = separator + 1;
+                        while (line[valueStart] === " ") {
+                            valueStart++;
+                        }
+                        headers[line.slice(0, separator)] = line.slice(valueStart);
                     }
                 });
             }
@@ -181,3 +185,7 @@ const SQL = {
 window.onbeforeunload = function (e) {
     return ""; /* some browsers will show this text, some won't. */
 };
+
+globalThis.SQL = SQL;
+globalThis.LOCALE = LOCALE;
+globalThis._ = _;

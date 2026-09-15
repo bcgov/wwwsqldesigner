@@ -4,9 +4,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node run-local.mjs test"
+    "test": "node run-local.mjs test",
+    "unit": "vitest run --coverage",
+    "postunit": "node unit/normalize-coverage.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.0"
+    "@playwright/test": "1.62.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "vitest": "^3.2.4"
   }
 }

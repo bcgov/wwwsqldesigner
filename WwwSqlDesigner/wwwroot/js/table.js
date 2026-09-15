@@ -39,18 +39,10 @@ SQL.Table.prototype._build = function () {
     this.owner.map.dom.container.appendChild(this.dom.mini);
 
     this._ec.push(
-        SQL.events.add(this.dom.container, "click", this.click.bind(this))
-    );
-    this._ec.push(
-        SQL.events.add(this.dom.container, "dblclick", this.dblclick.bind(this))
-    );
-    this._ec.push(
-        SQL.events.add(this.dom.container, "mousedown", this.down.bind(this))
-    );
-    this._ec.push(
-        SQL.events.add(this.dom.container, "touchstart", this.down.bind(this))
-    );
-    this._ec.push(
+        SQL.events.add(this.dom.container, "click", this.click.bind(this)),
+        SQL.events.add(this.dom.container, "dblclick", this.dblclick.bind(this)),
+        SQL.events.add(this.dom.container, "mousedown", this.down.bind(this)),
+        SQL.events.add(this.dom.container, "touchstart", this.down.bind(this)),
         SQL.events.add(this.dom.container, "touchmove", SQL.events.prevent)
     );
 };
@@ -62,7 +54,7 @@ SQL.Table.prototype.setTitle = function (t) {
             if (relation.row1 != row) {
                 continue;
             }
-            const tt = row.getTitle().replace(new RegExp(old, "g"), t);
+            const tt = row.getTitle().replaceAll(new RegExp(old, "g"), t);
             if (tt != row.getTitle()) {
                 row.setTitle(tt);
             }
@@ -75,7 +67,7 @@ SQL.Table.prototype.getRelations = function () {
     const arr = [];
     for (let row of this.rows) {
         for (let relation of row.relations) {
-            if (arr.indexOf(relation) == -1) {
+            if (!arr.includes(relation)) {
                 arr.push(relation);
             }
         }
@@ -227,7 +219,7 @@ SQL.Table.prototype.moveTo = function (x, y) {
 };
 
 SQL.Table.prototype.snap = function () {
-    const snap = parseInt(SQL.Designer.getOption("snap"));
+    const snap = Number.parseInt(SQL.Designer.getOption("snap"));
     if (snap) {
         this.x = Math.round(this.x / snap) * snap;
         this.y = Math.round(this.y / snap) * snap;
@@ -292,8 +284,8 @@ SQL.Table.prototype.down = function (e) {
 };
 
 SQL.Table.prototype.toXML = function () {
-    const t = SQL.escape(this.getTitle()).replace(/"/g, "&quot;");
-    const schema = SQL.escape(this.getSchema()).replace(/"/g, "&quot;");
+    const t = SQL.escape(this.getTitle()).replaceAll('"', "&quot;");
+    const schema = SQL.escape(this.getSchema()).replaceAll('"', "&quot;");
     let xml = "";
     xml += '<table x="' + this.x + '" y="' + this.y + '" name="' + t + '" schema="' + schema + '">\n';
     for (let row of this.rows) {
@@ -318,8 +310,8 @@ SQL.Table.prototype.fromXML = function (node) {
     this.setSchema(node.getAttribute("schema"));
     const name = node.getAttribute("name");
     this.setTitle(name);
-    const x = parseInt(node.getAttribute("x")) || 0;
-    const y = parseInt(node.getAttribute("y")) || 0;
+    const x = Number.parseInt(node.getAttribute("x")) || 0;
+    const y = Number.parseInt(node.getAttribute("y")) || 0;
     this.moveTo(x, y);
     const rows = SQL.Designer.directChildren(node, "row");
     for (let row of rows) {
@@ -421,7 +413,7 @@ SQL.Table.prototype.up = function (e) {
 
 SQL.Table.prototype.destroy = function () {
     SQL.Visual.prototype.destroy.apply(this);
-    this.dom.mini.parentNode.removeChild(this.dom.mini);
+    this.dom.mini.remove();
     while (this.rows.length) {
         this.removeRow(this.rows[0]);
     }

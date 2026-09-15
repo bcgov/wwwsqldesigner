@@ -261,12 +261,20 @@ SQL.Relation.prototype.redrawControl = function (x, y) {
     const hasName = !!this.name;
     const editing = this.editing;
     const compact = !hasName && !editing && !this.controlHovered;
-    const handleSize = hasName || editing ? 24 : (compact ? 10 : 16);
+    let handleSize = 16;
+    if (hasName || editing) {
+        handleSize = 24;
+    } else if (compact) {
+        handleSize = 10;
+    }
     const pointX = x;
     const pointY = y;
-    const controlWidth = editing
-        ? this.editingWidth
-        : (hasName ? this.measureNameWidth(this.name) + 16 : handleSize);
+    let controlWidth = handleSize;
+    if (editing) {
+        controlWidth = this.editingWidth;
+    } else if (hasName) {
+        controlWidth = this.measureNameWidth(this.name) + 16;
+    }
     const inputWidth = editing ? controlWidth : Math.max(24, controlWidth);
     const inputHeight = Math.max(24, handleSize);
     if (this.owner.vector) {
@@ -416,9 +424,9 @@ SQL.Relation.prototype.destroy = function () {
     document.removeEventListener("pointerdown", this.outsideClick, true);
     this.row1.removeRelation(this);
     this.row2.removeRelation(this);
-    for (let elm of this.dom) {
-        elm.parentNode.removeChild(elm);
+    for (const elm of this.dom) {
+        elm.remove();
     }
-    this.dom.handle.parentNode.removeChild(this.dom.handle);
-    this.dom.input.parentNode.removeChild(this.dom.input);
+    this.dom.handle.remove();
+    this.dom.input.remove();
 };

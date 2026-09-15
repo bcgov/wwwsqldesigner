@@ -97,9 +97,9 @@ SQL.RowManager.prototype.tableClick = function (e) {
     const t2 = e.target;
 
     let p = this.owner.getOption("pattern");
-    p = p.replace(/%T/g, r1.owner.getTitle());
-    p = p.replace(/%t/g, t2.getTitle());
-    p = p.replace(/%R/g, r1.getTitle());
+    p = p.replaceAll("%T", r1.owner.getTitle());
+    p = p.replaceAll("%t", t2.getTitle());
+    p = p.replaceAll("%R", r1.getTitle());
 
     if (!p.trim()) {
         alert(_("relationrowempty"));

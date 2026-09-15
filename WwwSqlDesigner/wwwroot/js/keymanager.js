@@ -56,7 +56,7 @@ SQL.KeyManager.prototype.build = function () {
     SQL.events.add(this.dom.left, "click", this.left.bind(this));
     SQL.events.add(this.dom.right, "click", this.right.bind(this));
 
-    this.dom.container.parentNode.removeChild(this.dom.container);
+    this.dom.container.remove();
 };
 
 SQL.KeyManager.prototype.listchange = function (e) {
@@ -155,7 +155,7 @@ SQL.KeyManager.prototype.switchTo = function (index) {
 
     SQL.dom.clear(this.dom.avail);
     for (let row of this.table.rows) {
-        if (k.rows.indexOf(row) != -1) {
+        if (k.rows.includes(row)) {
             continue;
         }
         const o = SQL.dom.create("option");

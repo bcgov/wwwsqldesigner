@@ -10,6 +10,7 @@ using WwwSqlDesigner.Data;
 namespace WwwSqlDesigner.Controllers
 {
     [ServiceFilter(typeof(RequireKeycloakAuthenticationFilter))]
+    [Route("backend/netcore-ef")]
     public class WwwSqlController : Controller
     {
         private const string GrantIdentityIndexName =
@@ -29,7 +30,7 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [HttpGet]
-        [Route("backend/netcore-ef/list")]
+        [Route("list")]
         public async Task<IActionResult> List()
         {
             var models = await ApplyOwnerFilter(_context.DataModels.AsNoTracking())
@@ -44,9 +45,14 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [HttpGet]
-        [Route("backend/netcore-ef/load")]
+        [Route("load")]
         public async Task<IActionResult> Load(string? keyword, int? version, string? ownerId = null, bool globalOwner = false)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             if (string.IsNullOrEmpty(keyword))
             {
                 return NotFound();
@@ -83,7 +89,7 @@ namespace WwwSqlDesigner.Controllers
             }
             if (null == model)
             {
-                _logger.LogWarning("Keyword not found: {keyword:0}", keyword);
+                _logger.LogWarning("Keyword not found: {Keyword:0}", keyword);
                 return NotFound();
             }
             var ownsModel = string.Equals(model.OwnerId, currentOwnerId, StringComparison.Ordinal);
@@ -96,7 +102,7 @@ namespace WwwSqlDesigner.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Route("backend/netcore-ef/save")]
+        [Route("save")]
         public async Task<IActionResult> Save(string? keyword)
         {
             if (string.IsNullOrEmpty(keyword))
@@ -128,7 +134,7 @@ namespace WwwSqlDesigner.Controllers
                     Version = 0,
                 };
                 _context.DataModels.Add(newModel);
-                _logger.LogInformation("New data model created: {keyword:0}", keyword);
+                _logger.LogInformation("New data model created: {Keyword:0}", keyword);
             }
             else
             {
@@ -141,14 +147,14 @@ namespace WwwSqlDesigner.Controllers
                     Version = save.Version + 1,  //This does not need to be thread-safe as a unique (key/version) key exists in the DB.
                 };
                 _context.DataModels.Add(newModel);
-                _logger.LogInformation("New Data model version: {keyword:0}", keyword);
+                _logger.LogInformation("New Data model version: {Keyword:0}", keyword);
             }
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
             return Content(string.Empty);
         }
 
         [HttpGet]
-        [Route("backend/netcore-ef/csrf")]
+        [Route("csrf")]
         public IActionResult CsrfToken()
         {
             if (_antiforgery is null)
@@ -161,14 +167,14 @@ namespace WwwSqlDesigner.Controllers
         }
 
         [HttpGet]
-        [Route("backend/netcore-ef/import")]
+        [Route("import")]
         public IActionResult Import()
         {
             return NotFound();
         }
 
         [HttpGet]
-        [Route("backend/netcore-ef/access")]
+        [Route("access")]
         public async Task<IActionResult> Access(string? keyword)
         {
             if (string.IsNullOrEmpty(keyword))
@@ -206,9 +212,14 @@ namespace WwwSqlDesigner.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Route("backend/netcore-ef/access/grant")]
+        [Route("access/grant")]
         public async Task<IActionResult> GrantAccess(string? keyword, [FromBody] AccessGrantRequest? request)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             if (string.IsNullOrWhiteSpace(keyword) || request is null)
             {
                 return BadRequest();
@@ -259,7 +270,7 @@ namespace WwwSqlDesigner.Controllers
 
         [HttpDelete]
         [ValidateAntiForgeryToken]
-        [Route("backend/netcore-ef/access/grant")]
+        [Route("access/grant")]
         public async Task<IActionResult> RevokeAccess(string? keyword, string? targetType, string? targetId)
         {
             if (string.IsNullOrWhiteSpace(keyword) || !IsValidTargetType(targetType)
