@@ -6,8 +6,8 @@ function _(str) {
     return globalThis.LOCALE[str];
 }
 
-var DATATYPES = false;
-var LOCALE = {};
+globalThis.DATATYPES = false;
+globalThis.LOCALE = {};
 const SQL = {
     _subscribers: {},
 
@@ -187,5 +187,4 @@ window.onbeforeunload = function (e) {
 };
 
 globalThis.SQL = SQL;
-globalThis.LOCALE = LOCALE;
 globalThis._ = _;

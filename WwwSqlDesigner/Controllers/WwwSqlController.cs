@@ -198,6 +198,7 @@ namespace WwwSqlDesigner.Controllers
                 using var reader = XmlReader.Create(new StringReader(xmlData), settings);
                 while (reader.Read())
                 {
+                    _ = reader.NodeType;
                 }
                 return true;
             }
