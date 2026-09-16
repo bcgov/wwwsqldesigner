@@ -378,7 +378,7 @@ SQL.Row.prototype.removeKey = function (k) {
 
 SQL.Row.prototype.getDataType = function () {
     const type = this.data.type;
-    const elm = DATATYPES.getElementsByTagName("type")[type];
+    const elm = globalThis.DATATYPES.getElementsByTagName("type")[type];
     return elm;
 };
 
@@ -391,7 +391,7 @@ SQL.Row.prototype.getColor = function () {
 SQL.Row.prototype.buildTypeSelect = function (id) {
     /* build selectbox with avail datatypes */
     const s = SQL.dom.create("select");
-    const gs = DATATYPES.getElementsByTagName("group");
+    const gs = globalThis.DATATYPES.getElementsByTagName("group");
     for (let g of gs) {
         const og = SQL.dom.create("optgroup");
         og.style.backgroundColor = g.getAttribute("color") || "#fff";

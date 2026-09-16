@@ -28,10 +28,10 @@ namespace WwwSqlDesigner.Controllers.Tests
                 AllowAutoRedirect = false
             });
 
-            var response = await client.GetAsync("/account/status");
+            var response = await client.GetAsync("/account/status", TestContext.CancellationToken);
 
             response.EnsureSuccessStatusCode();
-            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>();
+            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>(TestContext.CancellationToken);
             Assert.IsNotNull(status);
             Assert.IsTrue(status.Enabled);
             Assert.IsTrue(status.Authenticated);
@@ -50,10 +50,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             using var request = new HttpRequestMessage(HttpMethod.Get, "/account/status");
             request.Headers.Add("X-Test-Anonymous", "true");
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, TestContext.CancellationToken);
 
             response.EnsureSuccessStatusCode();
-            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>();
+            var status = await response.Content.ReadFromJsonAsync<AuthStatusResponse>(TestContext.CancellationToken);
             Assert.IsNotNull(status);
             Assert.IsTrue(status.Enabled);
             Assert.IsFalse(status.Authenticated);
@@ -70,10 +70,10 @@ namespace WwwSqlDesigner.Controllers.Tests
             using var request = new HttpRequestMessage(HttpMethod.Get, "/");
             request.Headers.Add("X-Test-Anonymous", "true");
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
-            StringAssert.Contains(await response.Content.ReadAsStringAsync(), "id=\"saveload\"");
+            Assert.Contains("id=\"saveload\"", await response.Content.ReadAsStringAsync(TestContext.CancellationToken));
         }
 
         [TestMethod]
@@ -87,7 +87,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             using var request = new HttpRequestMessage(HttpMethod.Get, "/index.html");
             request.Headers.Add("X-Test-Anonymous", "true");
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         }
@@ -105,8 +105,8 @@ namespace WwwSqlDesigner.Controllers.Tests
             using var loadRequest = new HttpRequestMessage(HttpMethod.Get, "/backend/netcore-ef/load?keyword=protected");
             loadRequest.Headers.Add("X-Test-Anonymous", "true");
 
-            var listResponse = await client.SendAsync(listRequest);
-            var loadResponse = await client.SendAsync(loadRequest);
+            var listResponse = await client.SendAsync(listRequest, TestContext.CancellationToken);
+            var loadResponse = await client.SendAsync(loadRequest, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.Unauthorized, listResponse.StatusCode);
             Assert.AreEqual(HttpStatusCode.Unauthorized, loadResponse.StatusCode);
@@ -125,7 +125,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             {
                 ["returnUrl"] = "/"
             });
-            var response = await client.PostAsync("/account/logout", content);
+            var response = await client.PostAsync("/account/logout", content, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         }
@@ -143,7 +143,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             content.Headers.ContentType = new MediaTypeHeaderValue("application/xml");
             var response = await client.PostAsync(
                 "/backend/netcore-ef/save?keyword=pipeline-test",
-                content);
+                content, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         }
@@ -167,7 +167,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             };
             request.Headers.Add("X-CSRF-TOKEN", "invalid-token");
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         }
@@ -181,7 +181,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 AllowAutoRedirect = false
             });
 
-            var tokenResponse = await client.GetAsync("/backend/netcore-ef/csrf");
+            var tokenResponse = await client.GetAsync("/backend/netcore-ef/csrf", TestContext.CancellationToken);
             tokenResponse.EnsureSuccessStatusCode();
             var token = tokenResponse.Headers.GetValues("X-CSRF-TOKEN").Single();
 
@@ -195,7 +195,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             };
             request.Headers.Add("X-CSRF-TOKEN", token);
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         }
@@ -216,7 +216,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 Content = JsonContent.Create(new { targetType = "User", targetId = "target", permission = "View" })
             };
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         }
@@ -231,7 +231,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             });
 
             var response = await client.DeleteAsync(
-                "/backend/netcore-ef/access/grant?keyword=pipeline-test&targetType=User&targetId=target");
+                "/backend/netcore-ef/access/grant?keyword=pipeline-test&targetType=User&targetId=target", TestContext.CancellationToken);
 
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         }
@@ -244,7 +244,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             {
                 AllowAutoRedirect = false
             });
-            var tokenResponse = await client.GetAsync("/backend/netcore-ef/csrf");
+            var tokenResponse = await client.GetAsync("/backend/netcore-ef/csrf", TestContext.CancellationToken);
             tokenResponse.EnsureSuccessStatusCode();
             var token = tokenResponse.Headers.GetValues("X-CSRF-TOKEN").Single();
 
@@ -257,7 +257,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 Content = saveContent
             };
             saveRequest.Headers.Add("X-CSRF-TOKEN", token);
-            var saveResponse = await client.SendAsync(saveRequest);
+            var saveResponse = await client.SendAsync(saveRequest, TestContext.CancellationToken);
             Assert.AreEqual(HttpStatusCode.OK, saveResponse.StatusCode);
 
             using var grantRequest = new HttpRequestMessage(
@@ -267,14 +267,14 @@ namespace WwwSqlDesigner.Controllers.Tests
                 Content = JsonContent.Create(new { targetType = "User", targetId = "target", permission = "View" })
             };
             grantRequest.Headers.Add("X-CSRF-TOKEN", token);
-            var grantResponse = await client.SendAsync(grantRequest);
+            var grantResponse = await client.SendAsync(grantRequest, TestContext.CancellationToken);
             Assert.AreEqual(HttpStatusCode.NoContent, grantResponse.StatusCode);
 
             using var revokeRequest = new HttpRequestMessage(
                 HttpMethod.Delete,
                 "/backend/netcore-ef/access/grant?keyword=pipeline-test&targetType=User&targetId=target");
             revokeRequest.Headers.Add("X-CSRF-TOKEN", token);
-            var revokeResponse = await client.SendAsync(revokeRequest);
+            var revokeResponse = await client.SendAsync(revokeRequest, TestContext.CancellationToken);
             Assert.AreEqual(HttpStatusCode.NoContent, revokeResponse.StatusCode);
         }
 
@@ -350,5 +350,6 @@ namespace WwwSqlDesigner.Controllers.Tests
             }
         }
 
+        public TestContext TestContext { get; set; }
     }
 }

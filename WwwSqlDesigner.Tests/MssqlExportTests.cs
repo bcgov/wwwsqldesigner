@@ -37,12 +37,12 @@ public class MssqlExportTests
         transform.Transform(model, null, output);
         var sql = output.ToString();
 
-        StringAssert.Contains(sql, "CREATE TABLE [Sal]]es].[Ord]]er's]");
-        StringAssert.Contains(sql, "CONSTRAINT [PK]]Orders] PRIMARY KEY ([I]]d])");
-        StringAssert.Contains(sql, "REFERENCES [Archive].[Ord]]er's] ([I]]d])");
-        StringAssert.Contains(sql, "@value=N'表''s description'");
-        StringAssert.Contains(sql, "@value=N'O''Brien");
-        StringAssert.Contains(sql, "@level2name=N'I]d'");
+        Assert.Contains("CREATE TABLE [Sal]]es].[Ord]]er's]", sql);
+        Assert.Contains("CONSTRAINT [PK]]Orders] PRIMARY KEY ([I]]d])", sql);
+        Assert.Contains("REFERENCES [Archive].[Ord]]er's] ([I]]d])", sql);
+        Assert.Contains("@value=N'表''s description'", sql);
+        Assert.Contains("@value=N'O''Brien", sql);
+        Assert.Contains("@level2name=N'I]d'", sql);
         Assert.IsFalse(sql.Contains(" -- O'Brien", StringComparison.Ordinal));
     }
 
@@ -68,20 +68,19 @@ public class MssqlExportTests
         Assert.AreEqual(2, sql.Split("WHERE class = 1").Length - 1);
         Assert.AreEqual(2, sql.Split("AND name = N'MS_Description'").Length - 1);
         Assert.AreEqual(2, sql.Split("ELSE").Length - 1);
-        StringAssert.Contains(sql, $"AND major_id = {objectId}");
-        StringAssert.Contains(sql, "AND minor_id = 0");
-        StringAssert.Contains(sql, $"AND minor_id = COLUMNPROPERTY({objectId}, N'C]ol''umn', 'ColumnId')");
-        StringAssert.Contains(sql, $"EXEC sys.sp_updateextendedproperty {tableArguments};");
-        StringAssert.Contains(sql, $"EXEC sys.sp_addextendedproperty {tableArguments};");
-        StringAssert.Contains(sql, $"EXEC sys.sp_updateextendedproperty {columnArguments};");
-        StringAssert.Contains(sql, $"EXEC sys.sp_addextendedproperty {columnArguments};");
+        Assert.Contains($"AND major_id = {objectId}", sql);
+        Assert.Contains("AND minor_id = 0", sql);
+        Assert.Contains($"AND minor_id = COLUMNPROPERTY({objectId}, N'C]ol''umn', 'ColumnId')", sql);
+        Assert.Contains($"EXEC sys.sp_updateextendedproperty {tableArguments};", sql);
+        Assert.Contains($"EXEC sys.sp_addextendedproperty {tableArguments};", sql);
+        Assert.Contains($"EXEC sys.sp_updateextendedproperty {columnArguments};", sql);
+        Assert.Contains($"EXEC sys.sp_addextendedproperty {columnArguments};", sql);
         Assert.AreEqual(2, sql.Split("EXEC sys.sp_updateextendedproperty").Length - 1);
-        StringAssert.Contains(sql, "EXEC sys.sp_addextendedproperty @name=N'DataClassification'");
-        StringAssert.Contains(sql, "EXEC sys.sp_addextendedproperty @name=N'RecordsSchedule'");
+        Assert.Contains("EXEC sys.sp_addextendedproperty @name=N'DataClassification'", sql);
+        Assert.Contains("EXEC sys.sp_addextendedproperty @name=N'RecordsSchedule'", sql);
         Assert.IsFalse(sql.Contains("sp_updateextendedproperty @name=N'DataClassification'", StringComparison.Ordinal));
         Assert.IsFalse(sql.Contains("sp_updateextendedproperty @name=N'RecordsSchedule'", StringComparison.Ordinal));
-        Assert.IsTrue(sql.LastIndexOf("CREATE TABLE", StringComparison.Ordinal) <
-            sql.IndexOf("FROM sys.extended_properties", StringComparison.Ordinal));
+        Assert.IsLessThan(sql.IndexOf("FROM sys.extended_properties", StringComparison.Ordinal), sql.LastIndexOf("CREATE TABLE", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -102,8 +101,7 @@ public class MssqlExportTests
         Assert.AreEqual(1, sql.Split(schema).Length - 1);
         Assert.AreEqual(1, sql.Split("IF SCHEMA_ID(N'a|b') IS NULL").Length - 1);
         Assert.AreEqual(1, sql.Split("IF SCHEMA_ID(N'b') IS NULL").Length - 1);
-        Assert.IsTrue(sql.IndexOf(schema, StringComparison.Ordinal) <
-            sql.IndexOf("CREATE TABLE", StringComparison.Ordinal));
+        Assert.IsLessThan(sql.IndexOf("CREATE TABLE", StringComparison.Ordinal), sql.IndexOf(schema, StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -119,8 +117,8 @@ public class MssqlExportTests
 
         Assert.AreEqual(1, sql.Split("IF SCHEMA_ID(N'Sales  Region') IS NULL").Length - 1);
         Assert.AreEqual(1, sql.Split("IF SCHEMA_ID(N'Sales Region') IS NULL").Length - 1);
-        StringAssert.Contains(sql, "CREATE TABLE [Sales  Region].[One]");
-        StringAssert.Contains(sql, "CREATE TABLE [sales  region].[Two]");
+        Assert.Contains("CREATE TABLE [Sales  Region].[One]", sql);
+        Assert.Contains("CREATE TABLE [sales  region].[Two]", sql);
     }
 
     [TestMethod]
@@ -137,7 +135,7 @@ public class MssqlExportTests
             </table></sql>
             """);
 
-        StringAssert.Contains(sql, "CONSTRAINT [UQ] UNIQUE ([Id])");
+        Assert.Contains("CONSTRAINT [UQ] UNIQUE ([Id])", sql);
         Assert.IsFalse(sql.Contains("UNIQUE KEY", StringComparison.Ordinal));
         Assert.IsFalse(sql.Contains("FULLTEXT", StringComparison.Ordinal));
         Assert.IsFalse(sql.Contains("[Text] nvarchar(max) ,", StringComparison.Ordinal));
@@ -154,11 +152,11 @@ public class MssqlExportTests
             </table></sql>
             """);
 
-        StringAssert.Contains(sql, "@name=N'MS_Description', @value=N'Sensitive date'");
-        StringAssert.Contains(sql, "@name=N'DataClassification', @value=N'Protected C'");
-        StringAssert.Contains(sql, "@level0name=N'Sec]ure'");
-        StringAssert.Contains(sql, "@level1name=N'People''s'");
-        StringAssert.Contains(sql, "@level2name=N'Birth]Date'");
+        Assert.Contains("@name=N'MS_Description', @value=N'Sensitive date'", sql);
+        Assert.Contains("@name=N'DataClassification', @value=N'Protected C'", sql);
+        Assert.Contains("@level0name=N'Sec]ure'", sql);
+        Assert.Contains("@level1name=N'People''s'", sql);
+        Assert.Contains("@level2name=N'Birth]Date'", sql);
     }
 
     [TestMethod]
@@ -171,9 +169,9 @@ public class MssqlExportTests
             </table></sql>
             """);
 
-        StringAssert.Contains(sql, "@name=N'RecordsSchedule', @value=N' Retain O''Brien\r\n表 '");
-        StringAssert.Contains(sql, "@level0type=N'SCHEMA', @level0name=N'Sec]ure'");
-        StringAssert.Contains(sql, "@level1type=N'TABLE', @level1name=N'People''s'");
+        Assert.Contains("@name=N'RecordsSchedule', @value=N' Retain O''Brien\r\n表 '", sql);
+        Assert.Contains("@level0type=N'SCHEMA', @level0name=N'Sec]ure'", sql);
+        Assert.Contains("@level1type=N'TABLE', @level1name=N'People''s'", sql);
         Assert.AreEqual(1, sql.Split("@name=N'RecordsSchedule'").Length - 1);
         Assert.IsFalse(sql.Contains("@level2type", StringComparison.Ordinal));
     }

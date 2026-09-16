@@ -133,10 +133,10 @@ namespace WwwSqlDesigner.Controllers.Tests
         public async Task ListTest()
         {
             var result = await _controller.List().ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(JsonResult));
+            Assert.IsInstanceOfType<JsonResult>(result);
             var content = (ModelListResponse)((JsonResult)result).Value!;
-            CollectionAssert.Contains(content.Models.Select(x => x.Keyword).ToArray(), "Test1");
-            CollectionAssert.Contains(content.Models.Select(x => x.Keyword).ToArray(), "Test2");
+            Assert.Contains("Test1", content.Models.Select(x => x.Keyword).ToArray());
+            Assert.Contains("Test2", content.Models.Select(x => x.Keyword).ToArray());
         }
 
         [TestMethod]
@@ -144,9 +144,9 @@ namespace WwwSqlDesigner.Controllers.Tests
         {
             var result = await _controller.Access("Test1").ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(JsonResult));
+            Assert.IsInstanceOfType<JsonResult>(result);
             var grants = (IEnumerable<AccessGrantResponse>)((JsonResult)result).Value!;
-            Assert.AreEqual(0, grants.Count());
+            Assert.IsEmpty(grants);
         }
 
         [TestMethod]
@@ -174,28 +174,28 @@ namespace WwwSqlDesigner.Controllers.Tests
         public async Task LoadTestNoKeyword()
         {
             var result = await _controller.Load(null, null).ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+            Assert.IsInstanceOfType<NotFoundResult>(result);
         }
 
         [TestMethod()]
         public async Task LoadTestInvalidKeyword()
         {
             var result = await _controller.Load("DoesNotExist", null).ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+            Assert.IsInstanceOfType<NotFoundResult>(result);
         }
 
         [TestMethod()]
         public async Task LoadTestInvalidVersion()
         {
             var result = await _controller.Load("Test1", 99).ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+            Assert.IsInstanceOfType<NotFoundResult>(result);
         }
 
         [TestMethod()]
         public async Task LoadTestLatest()
         {
             var result = await _controller.Load("Test1", null).ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
             Assert.AreEqual(FooBarModelXml, content);
@@ -212,7 +212,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Load("Tied", null).ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
             Assert.AreEqual("<sql version=\"1\" />", content);
@@ -228,7 +228,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Load("Created", null).ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
             Assert.AreEqual("<sql version=\"1\" />", content);
@@ -238,7 +238,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         public async Task LoadTestVersion()
         {
             var result = await _controller.Load("Test1", 1).ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             string? content = ((ContentResult)result).Content;
             Assert.IsNotNull(content);
             Assert.AreEqual(FooBarModelXml, content);
@@ -252,7 +252,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 HttpContext = CreateHttpContextWithAntiforgery()
             };
             var result = await _controller.Save(null).ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+            Assert.IsInstanceOfType<NotFoundResult>(result);
         }
 
         [TestMethod()]
@@ -267,7 +267,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Save("TooLarge").ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
         }
 
         [TestMethod()]
@@ -283,7 +283,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Save("TooLargeWithoutLength").ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
         }
 
         [TestMethod()]
@@ -298,7 +298,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Save("Malformed").ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
         }
 
         [TestMethod()]
@@ -314,7 +314,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Save("Dtd").ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
         }
 
         [TestMethod()]
@@ -329,7 +329,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await _controller.Save("MalformedUtf8").ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
         }
 
         [TestMethod()]
@@ -344,7 +344,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 HttpContext = httpContext
             };
             var result = await _controller.Save("Test3").ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             var dbContent = _dbContext.DataModels.FirstOrDefault(x => x.Keyword == "Test3");
             Assert.IsNotNull(dbContent);
             Assert.IsNull(dbContent.OwnerId);
@@ -363,7 +363,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 HttpContext = httpContext
             };
             var result = await _controller.Save("Test1").ConfigureAwait(true);
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             var dbContent = _dbContext.DataModels.OrderByDescending(x => x.CreatedAt).FirstOrDefault(x => x.Keyword == "Test1");
             Assert.IsNotNull(dbContent);
             Assert.AreNotEqual(oldVersion, dbContent.Version);
@@ -405,14 +405,14 @@ namespace WwwSqlDesigner.Controllers.Tests
             var missingForOtherOwner = await ownerB.Load("OwnerOnlyKeyword", null).ConfigureAwait(true);
             var ownerBList = await ownerB.List().ConfigureAwait(true);
 
-            Assert.IsInstanceOfType(ownerAResult, typeof(ContentResult));
-            Assert.IsInstanceOfType(ownerBResult, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(ownerAResult);
+            Assert.IsInstanceOfType<ContentResult>(ownerBResult);
             Assert.AreEqual(2, _dbContext.DataModels.Count(x => x.Keyword == "SharedKeyword"));
             var ownerOnlyModels = ((ModelListResponse)((JsonResult)ownerOnlyList).Value!).Models;
-            CollectionAssert.Contains(ownerOnlyModels.Select(x => x.Keyword).ToArray(), "OwnerOnlyKeyword");
-            Assert.IsInstanceOfType(missingForOtherOwner, typeof(NotFoundResult));
+            Assert.Contains("OwnerOnlyKeyword", ownerOnlyModels.Select(x => x.Keyword).ToArray());
+            Assert.IsInstanceOfType<NotFoundResult>(missingForOtherOwner);
             var ownerBModels = ((ModelListResponse)((JsonResult)ownerBList).Value!).Models;
-            Assert.IsFalse(ownerBModels.Any(x => x.Keyword == "OwnerOnlyKeyword"));
+            Assert.DoesNotContain(x => x.Keyword == "OwnerOnlyKeyword", ownerBModels);
         }
 
         [TestMethod]
@@ -438,14 +438,14 @@ namespace WwwSqlDesigner.Controllers.Tests
             var controller = InitializeController(settings, User("Alice", "Team-A"));
             var result = (ModelListResponse)((JsonResult)await controller.List()).Value!;
             var keywords = result.Models.Select(x => x.Keyword).ToArray();
-            CollectionAssert.Contains(keywords, "Global");
-            CollectionAssert.Contains(keywords, "Owned");
-            CollectionAssert.Contains(keywords, "UserShared");
-            CollectionAssert.Contains(keywords, "GroupShared");
-            CollectionAssert.DoesNotContain(keywords, "CaseOwner");
-            CollectionAssert.DoesNotContain(keywords, "CaseUser");
-            CollectionAssert.DoesNotContain(keywords, "CaseGroup");
-            CollectionAssert.DoesNotContain(keywords, "Unrelated");
+            Assert.Contains("Global", keywords);
+            Assert.Contains("Owned", keywords);
+            Assert.Contains("UserShared", keywords);
+            Assert.Contains("GroupShared", keywords);
+            Assert.DoesNotContain("CaseOwner", keywords);
+            Assert.DoesNotContain("CaseUser", keywords);
+            Assert.DoesNotContain("CaseGroup", keywords);
+            Assert.DoesNotContain("Unrelated", keywords);
             Assert.IsNull(result.Models.Single(x => x.Keyword == "Global").OwnerId);
         }
 
@@ -465,7 +465,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var controller = InitializeController(settings, User("viewer"));
             var result = await controller.Load("Global", null);
 
-            Assert.IsInstanceOfType(result, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(result);
             Assert.AreEqual("true", controller.Response.Headers["X-MODEL-COPYABLE"].ToString());
         }
 
@@ -504,20 +504,16 @@ namespace WwwSqlDesigner.Controllers.Tests
             _dbContext.SaveChanges();
 
             var owner = InitializeController(settings, User("owner"));
-            Assert.IsInstanceOfType(
-                await owner.GrantAccess("Shared", new AccessGrantRequest("Group", "team-a", "View")),
-                typeof(NoContentResult));
+            Assert.IsInstanceOfType<NoContentResult>(await owner.GrantAccess("Shared", new AccessGrantRequest("Group", "team-a", "View")));
 
             var grants = (JsonResult)await owner.Access("Shared");
             var values = (IEnumerable<AccessGrantResponse>)grants.Value!;
             Assert.AreEqual("team-a", values.Single().TargetId);
 
             var other = InitializeController(settings, User("other"));
-            Assert.IsInstanceOfType(await other.Access("Shared"), typeof(NotFoundResult));
-            Assert.IsInstanceOfType(
-                await other.GrantAccess("Shared", new AccessGrantRequest("User", "other", "View")),
-                typeof(NotFoundResult));
-            Assert.IsInstanceOfType(await owner.RevokeAccess("Shared", "Group", "team-a"), typeof(NoContentResult));
+            Assert.IsInstanceOfType<NotFoundResult>(await other.Access("Shared"));
+            Assert.IsInstanceOfType<NotFoundResult>(await other.GrantAccess("Shared", new AccessGrantRequest("User", "other", "View")));
+            Assert.IsInstanceOfType<NoContentResult>(await owner.RevokeAccess("Shared", "Group", "team-a"));
         }
 
         [TestMethod]
@@ -543,12 +539,12 @@ namespace WwwSqlDesigner.Controllers.Tests
             _dbContext.SaveChanges();
 
             var viewer = InitializeController(settings, User("viewer"));
-            Assert.IsInstanceOfType(await viewer.Load("Shared", null), typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(await viewer.Load("Shared", null));
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(FooBarModelXml));
             viewer.HttpContext.Request.Body = stream;
             viewer.HttpContext.Request.ContentLength = stream.Length;
             var saveResult = await viewer.Save("Shared");
-            Assert.IsInstanceOfType(saveResult, typeof(ContentResult));
+            Assert.IsInstanceOfType<ContentResult>(saveResult);
             Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "owner" && x.Keyword == "Shared"));
             Assert.AreEqual(1, _dbContext.DataModels.Count(x => x.OwnerId == "viewer" && x.Keyword == "Shared"));
         }
@@ -576,8 +572,8 @@ namespace WwwSqlDesigner.Controllers.Tests
             var globalResult = await viewer.Load("Shared", null, "owner-b", globalOwner: true);
 
             var content = (ContentResult)result;
-            StringAssert.Contains(content.Content, "name=\"B\"");
-            StringAssert.Contains(((ContentResult)globalResult).Content, "name=\"Global\"");
+            Assert.Contains("name=\"B\"", content.Content ?? string.Empty);
+            Assert.Contains("name=\"Global\"", ((ContentResult)globalResult).Content ?? string.Empty);
             Assert.AreEqual("true", viewer.Response.Headers["X-MODEL-COPYABLE"].ToString());
         }
 
@@ -612,7 +608,7 @@ namespace WwwSqlDesigner.Controllers.Tests
 
             var result = await InitializeController(settings, roleOnlyUser).Load("RoleOnly", null);
 
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+            Assert.IsInstanceOfType<NotFoundResult>(result);
         }
 
         [TestMethod]
@@ -643,7 +639,7 @@ namespace WwwSqlDesigner.Controllers.Tests
                 "Shared",
                 new AccessGrantRequest("User", "viewer", "Edit"));
 
-            Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
         }
 
         private static KeycloakSettings ConfiguredKeycloak()
@@ -668,7 +664,7 @@ namespace WwwSqlDesigner.Controllers.Tests
         public void ImportTest()
         {
             var result = _controller.Import();
-            Assert.IsInstanceOfType(result, typeof(NotFoundResult));
+            Assert.IsInstanceOfType<NotFoundResult>(result);
         }
         #endregion
     }

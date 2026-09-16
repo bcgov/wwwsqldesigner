@@ -54,15 +54,15 @@ public class EfExportTests
         transform.Transform(model, null, output);
         var generated = output.ToString();
 
-        StringAssert.Contains(generated, "using System;");
-        StringAssert.Contains(generated, "public int Id { get; set; }");
-        StringAssert.Contains(generated, "public Guid External_Id { get; set; }");
-        StringAssert.Contains(generated, "public byte[]? Payload { get; set; }");
-        StringAssert.Contains(generated, "public string? Description_field { get; set; }");
-        StringAssert.Contains(generated, "public DbSet<parent_table> parent_tables");
-        StringAssert.Contains(generated, "HasKey(e => new { e.Id })");
-        StringAssert.Contains(generated, "HasOne<parent_table>().WithMany().HasForeignKey(e => e.Parent_Id)");
-        StringAssert.Contains(generated, "HasPrincipalKey(p => p.External_Id)");
+        Assert.Contains("using System;", generated);
+        Assert.Contains("public int Id { get; set; }", generated);
+        Assert.Contains("public Guid External_Id { get; set; }", generated);
+        Assert.Contains("public byte[]? Payload { get; set; }", generated);
+        Assert.Contains("public string? Description_field { get; set; }", generated);
+        Assert.Contains("public DbSet<parent_table> parent_tables", generated);
+        Assert.Contains("HasKey(e => new { e.Id })", generated);
+        Assert.Contains("HasOne<parent_table>().WithMany().HasForeignKey(e => e.Parent_Id)", generated);
+        Assert.Contains("HasPrincipalKey(p => p.External_Id)", generated);
         Assert.IsFalse(generated.Contains("public  ", StringComparison.Ordinal));
     }
 
@@ -82,9 +82,9 @@ public class EfExportTests
         transform.Transform(model, parameters, output);
         var generated = output.ToString();
 
-        StringAssert.Contains(generated, "namespace Example.Models");
-        StringAssert.Contains(generated, "public class ExampleContext : DbContext");
-        StringAssert.Contains(generated, "ExampleContext(DbContextOptions<ExampleContext> options)");
+        Assert.Contains("namespace Example.Models", generated);
+        Assert.Contains("public class ExampleContext : DbContext", generated);
+        Assert.Contains("ExampleContext(DbContextOptions<ExampleContext> options)", generated);
     }
 
     [TestMethod]
@@ -99,8 +99,8 @@ public class EfExportTests
         transform.Transform(model, null, output);
         var generated = output.ToString();
 
-        StringAssert.Contains(generated, "namespace WwwSqlDesigner.Data");
-        StringAssert.Contains(generated, "public class ApplicationDbContext : DbContext");
+        Assert.Contains("namespace WwwSqlDesigner.Data", generated);
+        Assert.Contains("public class ApplicationDbContext : DbContext", generated);
     }
 
     [TestMethod]
@@ -119,11 +119,11 @@ public class EfExportTests
             </sql>
             """);
 
-        StringAssert.Contains(generated, "public class _2024_Orders_");
-        StringAssert.Contains(generated, "public class _2024_Orders__2");
-        StringAssert.Contains(generated, "public Guid Event_Id { get; set; }");
-        StringAssert.Contains(generated, "public int Line_Item_2 { get; set; }");
-        StringAssert.Contains(generated, "HasKey(e => new { e.Line_Item_2 })");
+        Assert.Contains("public class _2024_Orders_", generated);
+        Assert.Contains("public class _2024_Orders__2", generated);
+        Assert.Contains("public Guid Event_Id { get; set; }", generated);
+        Assert.Contains("public int Line_Item_2 { get; set; }", generated);
+        Assert.Contains("HasKey(e => new { e.Line_Item_2 })", generated);
     }
 
     [TestMethod]
@@ -137,8 +137,8 @@ public class EfExportTests
             </sql>
             """, parameters);
 
-        StringAssert.Contains(generated, "public class ExampleContext_2");
-        StringAssert.Contains(generated, "public class ExampleContext : DbContext");
+        Assert.Contains("public class ExampleContext_2", generated);
+        Assert.Contains("public class ExampleContext : DbContext", generated);
     }
 
     [TestMethod]
@@ -152,10 +152,10 @@ public class EfExportTests
             </sql>
             """);
 
-        StringAssert.Contains(generated, "public class Item_2");
-        StringAssert.Contains(generated, "ToTable(\"Item\", \"sales\").HasComment(\"表\\n");
-        StringAssert.Contains(generated, "Property(e => e.Id).HasComment(\"id \\\"quoted\\\" \\\\ path { public class Fake { } }\")");
-        StringAssert.Contains(generated, "HasOne<Item_2>()");
+        Assert.Contains("public class Item_2", generated);
+        Assert.Contains("ToTable(\"Item\", \"sales\").HasComment(\"表\\n", generated);
+        Assert.Contains("Property(e => e.Id).HasComment(\"id \\\"quoted\\\" \\\\ path { public class Fake { } }\")", generated);
+        Assert.Contains("HasOne<Item_2>()", generated);
     }
 
     [TestMethod]
@@ -167,8 +167,8 @@ public class EfExportTests
         var generated = Transform("<sql><table name=\"Item\" schema=\"dbo\"><row name=\"Id\" null=\"0\"><datatype>int</datatype></row><comment>"
             + SecurityElement.Escape(description) + "</comment></table></sql>");
 
-        StringAssert.Contains(generated, "HasComment(\"");
-        StringAssert.Contains(generated, "A\\\"\\\\\\r\\n\\t");
+        Assert.Contains("HasComment(\"", generated);
+        Assert.Contains("A\\\"\\\\\\r\\n\\t", generated);
     }
 
     [TestMethod]
@@ -184,7 +184,7 @@ public class EfExportTests
               </table>
             </sql>
             """, GeneratedContextParameters());
-        StringAssert.Contains(generated, "\\u0085\\u2028\\u2029");
+        Assert.Contains("\\u0085\\u2028\\u2029", generated);
         Assert.IsFalse(generated.Contains('\u0085'));
         Assert.IsFalse(generated.Contains('\u2028'));
         Assert.IsFalse(generated.Contains('\u2029'));
@@ -242,17 +242,17 @@ public class EfExportTests
             var result = RunDotNet(projectDirectory);
 
             Assert.AreEqual(0, result.ExitCode, $"Generated EF source did not compile/run.{Environment.NewLine}{result.Output}");
-            StringAssert.Contains(result.Output, "MS_Description");
-            StringAssert.Contains(result.Output, "'SCHEMA', N'sales', 'TABLE', N'Order''s Table';");
-            StringAssert.Contains(result.Output, "'SCHEMA', N'sales', 'TABLE', N'Order''s Table', 'COLUMN', N'ValueColumn';");
-            StringAssert.Contains(result.Output, "N'表''s \"table\" \\ path'");
-            StringAssert.Contains(result.Output, "N'列''s \"column\" \\ path'");
-            StringAssert.Contains(result.Output, "NCHAR(13), NCHAR(10)");
-            StringAssert.Contains(result.Output, "N'{ public class Fake { } }\u0085\u2028\u2029'");
-            StringAssert.Contains(result.Output, "N'{ class AlsoFake { } }\u0085\u2028\u2029'");
-            StringAssert.Contains(result.Output, "\u0085");
-            StringAssert.Contains(result.Output, "\u2028");
-            StringAssert.Contains(result.Output, "\u2029");
+            Assert.Contains("MS_Description", result.Output);
+            Assert.Contains("'SCHEMA', N'sales', 'TABLE', N'Order''s Table';", result.Output);
+            Assert.Contains("'SCHEMA', N'sales', 'TABLE', N'Order''s Table', 'COLUMN', N'ValueColumn';", result.Output);
+            Assert.Contains("N'表''s \"table\" \\ path'", result.Output);
+            Assert.Contains("N'列''s \"column\" \\ path'", result.Output);
+            Assert.Contains("NCHAR(13), NCHAR(10)", result.Output);
+            Assert.Contains("N'{ public class Fake { } }\u0085\u2028\u2029'", result.Output);
+            Assert.Contains("N'{ class AlsoFake { } }\u0085\u2028\u2029'", result.Output);
+            Assert.Contains("\u0085", result.Output);
+            Assert.Contains("\u2028", result.Output);
+            Assert.Contains("\u2029", result.Output);
         }
         finally
         {
@@ -298,10 +298,10 @@ public class EfExportTests
         var options = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "options.js"));
         var window = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "window.js"));
 
-        StringAssert.Contains(options, "setCustomValidity");
-        StringAssert.Contains(options, "return false;");
-        StringAssert.Contains(options, "CONFIG.CSHARP_KEYWORDS.includes");
-        StringAssert.Contains(window, "this.callback?.() !== false");
+        Assert.Contains("setCustomValidity", options);
+        Assert.Contains("return false;", options);
+        Assert.Contains("CONFIG.CSHARP_KEYWORDS.includes", options);
+        Assert.Contains("this.callback?.() !== false", window);
     }
 
     [TestMethod]
@@ -314,8 +314,8 @@ public class EfExportTests
             </table></sql>
             """, GeneratedContextParameters());
 
-        StringAssert.Contains(generated, "Property(e => e.PublicId).HasAnnotation(\"DataClassification\", \"Public\")");
-        StringAssert.Contains(generated, "Property(e => e.Secret).HasMaxLength(20).HasComment(\"Note\").HasAnnotation(\"DataClassification\", \"Protected B\")");
+        Assert.Contains("Property(e => e.PublicId).HasAnnotation(\"DataClassification\", \"Public\")", generated);
+        Assert.Contains("Property(e => e.Secret).HasMaxLength(20).HasComment(\"Note\").HasAnnotation(\"DataClassification\", \"Protected B\")", generated);
     }
 
     [TestMethod]
@@ -335,22 +335,22 @@ public class EfExportTests
             </table></sql>
             """);
 
-        StringAssert.Contains(generated, "public decimal Amount { get; set; }");
-        StringAssert.Contains(generated, "public decimal? OptionalAmount { get; set; }");
-        StringAssert.Contains(generated, "public decimal LegacyAmount { get; set; }");
-        StringAssert.Contains(generated, "public string Name { get; set; } = null!;");
-        StringAssert.Contains(generated, "public string? OptionalName { get; set; }");
-        StringAssert.Contains(generated, "public string Code { get; set; } = null!;");
-        StringAssert.Contains(generated, "public byte[] Payload { get; set; } = null!;");
-        StringAssert.Contains(generated, "public byte[]? OptionalPayload { get; set; }");
-        StringAssert.Contains(generated, "public byte[] LegacyImage { get; set; } = null!;");
+        Assert.Contains("public decimal Amount { get; set; }", generated);
+        Assert.Contains("public decimal? OptionalAmount { get; set; }", generated);
+        Assert.Contains("public decimal LegacyAmount { get; set; }", generated);
+        Assert.Contains("public string Name { get; set; } = null!;", generated);
+        Assert.Contains("public string? OptionalName { get; set; }", generated);
+        Assert.Contains("public string Code { get; set; } = null!;", generated);
+        Assert.Contains("public byte[] Payload { get; set; } = null!;", generated);
+        Assert.Contains("public byte[]? OptionalPayload { get; set; }", generated);
+        Assert.Contains("public byte[] LegacyImage { get; set; } = null!;", generated);
         const string amountChain = "Property(e => e.Amount).HasPrecision(18, 4).HasComment(\"Money\").HasAnnotation(\"DataClassification\", \"Protected B\")";
         Assert.AreEqual(1, generated.Split(amountChain, StringSplitOptions.None).Length - 1);
-        StringAssert.Contains(generated, "Property(e => e.OptionalAmount).HasPrecision(9, 0)");
-        StringAssert.Contains(generated, "Property(e => e.LegacyAmount).HasPrecision(7, 2)");
-        StringAssert.Contains(generated, "Property(e => e.Name).HasMaxLength(80)");
-        StringAssert.Contains(generated, "Property(e => e.Code).HasMaxLength(12)");
-        StringAssert.Contains(generated, "Property(e => e.Payload).HasMaxLength(32)");
+        Assert.Contains("Property(e => e.OptionalAmount).HasPrecision(9, 0)", generated);
+        Assert.Contains("Property(e => e.LegacyAmount).HasPrecision(7, 2)", generated);
+        Assert.Contains("Property(e => e.Name).HasMaxLength(80)", generated);
+        Assert.Contains("Property(e => e.Code).HasMaxLength(12)", generated);
+        Assert.Contains("Property(e => e.Payload).HasMaxLength(32)", generated);
         Assert.IsFalse(generated.Contains("HasMaxLength(max)", StringComparison.Ordinal));
         Assert.IsFalse(generated.Contains("Property(e => e.OptionalName)", StringComparison.Ordinal));
         Assert.IsFalse(generated.Contains("Property(e => e.OptionalPayload)", StringComparison.Ordinal));
@@ -370,12 +370,12 @@ public class EfExportTests
             </table></sql>
             """);
 
-        StringAssert.Contains(generated, "Property(e => e.CharValue).HasMaxLength(1)");
-        StringAssert.Contains(generated, "Property(e => e.VarcharValue).HasMaxLength(2)");
-        StringAssert.Contains(generated, "Property(e => e.NcharValue).HasMaxLength(3)");
-        StringAssert.Contains(generated, "Property(e => e.NvarcharValue).HasMaxLength(4)");
-        StringAssert.Contains(generated, "Property(e => e.BinaryValue).HasMaxLength(5)");
-        StringAssert.Contains(generated, "Property(e => e.VarbinaryValue).HasMaxLength(6)");
+        Assert.Contains("Property(e => e.CharValue).HasMaxLength(1)", generated);
+        Assert.Contains("Property(e => e.VarcharValue).HasMaxLength(2)", generated);
+        Assert.Contains("Property(e => e.NcharValue).HasMaxLength(3)", generated);
+        Assert.Contains("Property(e => e.NvarcharValue).HasMaxLength(4)", generated);
+        Assert.Contains("Property(e => e.BinaryValue).HasMaxLength(5)", generated);
+        Assert.Contains("Property(e => e.VarbinaryValue).HasMaxLength(6)", generated);
     }
 
     [TestMethod]
@@ -389,8 +389,8 @@ public class EfExportTests
             </table></sql>
             """, GeneratedContextParameters());
 
-        StringAssert.Contains(generated,
-            "ToTable(\"Item\", \"sales\").HasComment(\"Table note\").HasAnnotation(\"RecordsSchedule\", \" Keep \\\"quoted\\\" \\\\ path\\r\\nO'Brien \")");
+        Assert.Contains("ToTable(\"Item\", \"sales\").HasComment(\"Table note\").HasAnnotation(\"RecordsSchedule\", \" Keep \\\"quoted\\\" \\\\ path\\r\\nO'Brien \")",
+generated);
     }
 
     [TestMethod]
@@ -399,10 +399,10 @@ public class EfExportTests
         var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
         var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"));
 
-        StringAssert.Contains(io, "DTD and entity declarations are not allowed.");
-        StringAssert.Contains(io, "if (!globalThis.DOMParser)");
-        StringAssert.Contains(io, "if (!globalThis.XSLTProcessor || !globalThis.DOMParser)");
-        Assert.IsTrue(io.IndexOf("SQL.IO.prototype.parseXml", StringComparison.Ordinal) < io.IndexOf("SQL.IO.prototype.transformEf", StringComparison.Ordinal));
+        Assert.Contains("DTD and entity declarations are not allowed.", io);
+        Assert.Contains("if (!globalThis.DOMParser)", io);
+        Assert.Contains("if (!globalThis.XSLTProcessor || !globalThis.DOMParser)", io);
+        Assert.IsLessThan(io.IndexOf("SQL.IO.prototype.transformEf", StringComparison.Ordinal), io.IndexOf("SQL.IO.prototype.parseXml", StringComparison.Ordinal));
         Assert.IsFalse(io.Contains("ActiveXObject", StringComparison.Ordinal));
         Assert.IsFalse(io.Contains("Msxml2.DOMDocument", StringComparison.Ordinal));
     }
@@ -414,9 +414,9 @@ public class EfExportTests
         var io = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "io.js"))
             .ReplaceLineEndings("\n");
 
-        StringAssert.Contains(io, "let completed = false;");
-        StringAssert.Contains(io, "const complete = (err, xslDoc) => {");
-        StringAssert.Contains(io, "this.owner.window.hideThrobber();\n            return;");
+        Assert.Contains("let completed = false;", io);
+        Assert.Contains("const complete = (err, xslDoc) => {", io);
+        Assert.Contains("this.owner.window.hideThrobber();\n            return;", io);
     }
 
     [TestMethod]
@@ -426,10 +426,10 @@ public class EfExportTests
         var visual = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "visual.js"));
         var keyManager = File.ReadAllText(Path.Combine(projectRoot, "WwwSqlDesigner", "wwwroot", "js", "keymanager.js"));
 
-        StringAssert.Contains(visual, "this.dom.title.textContent = text;");
+        Assert.Contains("this.dom.title.textContent = text;", visual);
         Assert.IsFalse(visual.Contains("this.dom.title.innerHTML = text;", StringComparison.Ordinal));
-        StringAssert.Contains(keyManager, "this.dom.listlabel.textContent");
-        StringAssert.Contains(keyManager, "o.textContent = row.getTitle();");
+        Assert.Contains("this.dom.listlabel.textContent", keyManager);
+        Assert.Contains("o.textContent = row.getTitle();", keyManager);
     }
 
     [TestMethod]

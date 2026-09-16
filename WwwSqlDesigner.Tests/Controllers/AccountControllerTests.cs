@@ -20,7 +20,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => settings.Validate(isDevelopment: false));
 
-            StringAssert.Contains(exception.Message, "outside the Development environment");
+            Assert.Contains("outside the Development environment", exception.Message);
         }
 
         [TestMethod]
@@ -36,7 +36,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => settings.Validate(isDevelopment: true));
 
-            StringAssert.Contains(exception.Message, "ClientSecret");
+            Assert.Contains("ClientSecret", exception.Message);
         }
 
         [TestMethod]
@@ -55,7 +55,7 @@ namespace WwwSqlDesigner.Controllers.Tests
             var statusResult = result as ObjectResult;
             Assert.IsNotNull(statusResult);
             Assert.AreEqual(StatusCodes.Status502BadGateway, statusResult.StatusCode);
-            StringAssert.Contains(statusResult.Value?.ToString(), "/account/login");
+            Assert.Contains("/account/login", statusResult.Value?.ToString() ?? string.Empty);
         }
 
         [TestMethod]
@@ -72,13 +72,12 @@ namespace WwwSqlDesigner.Controllers.Tests
             var result = controller.Logout() as SignOutResult;
 
             Assert.IsNotNull(result);
-            CollectionAssert.AreEquivalent(
+            Assert.AreSequenceEqual(
                 new[]
                 {
                     "Cookies",
                     OpenIdConnectDefaults.AuthenticationScheme
-                },
-                result.AuthenticationSchemes.ToArray());
+                }, result.AuthenticationSchemes.ToArray(), Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
             Assert.AreEqual("/", result.Properties?.RedirectUri);
         }
 
@@ -90,9 +89,8 @@ namespace WwwSqlDesigner.Controllers.Tests
             var result = controller.Logout() as SignOutResult;
 
             Assert.IsNotNull(result);
-            CollectionAssert.AreEqual(
-                new[] { CookieAuthenticationDefaults.AuthenticationScheme },
-                result.AuthenticationSchemes.ToArray());
+            Assert.AreSequenceEqual(
+                new[] { CookieAuthenticationDefaults.AuthenticationScheme }, result.AuthenticationSchemes.ToArray());
             Assert.AreEqual("/", result.Properties?.RedirectUri);
         }
 
