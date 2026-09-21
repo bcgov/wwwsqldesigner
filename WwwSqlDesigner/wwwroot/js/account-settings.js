@@ -107,7 +107,7 @@
           )
             return;
           try {
-            await request(`/api/v1/tokens/${token.id}/revoke`, {
+            await request(`/api/ui/v1/tokens/${token.id}/revoke`, {
               method: "POST",
             });
             message("Token revoked.");
@@ -140,7 +140,7 @@
     $("application-create-form").hidden = false;
     $("application-select").disabled = false;
     try {
-      renderTokens(await request("/api/v1/tokens"));
+      renderTokens(await request("/api/ui/v1/tokens"));
     } catch (error) {
       $("pat-error").hidden = false;
       $("pat-error").textContent = error.message;
@@ -149,7 +149,7 @@
   const fillApplications = async () => {
     if (!isSignedIn()) return;
     try {
-      const apps = await request("/api/v1/applications");
+      const apps = await request("/api/ui/v1/applications");
       const select = $("application-select");
       select.replaceChildren(new Option("Select an application", ""));
       apps.forEach((app) =>
@@ -176,7 +176,7 @@
       return;
     }
     try {
-      const created = await request("/api/v1/tokens", {
+      const created = await request("/api/ui/v1/tokens", {
         method: "POST",
         body: JSON.stringify({
           name: $("pat-name").value,
@@ -210,7 +210,7 @@
   $("application-create-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      await request("/api/v1/applications", {
+      await request("/api/ui/v1/applications", {
         method: "POST",
         body: JSON.stringify({
           name: $("application-name").value,
@@ -233,7 +233,7 @@
     if (!id) return;
     try {
       const models = await request(
-        `/api/v1/models?applicationId=${encodeURIComponent(id)}`,
+        `/api/ui/v1/models?applicationId=${encodeURIComponent(id)}`,
       );
       for (const model of models)
         for (const variant of model.variants || []) {
@@ -252,7 +252,7 @@
   $("model-create-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      await request("/api/v1/models", {
+      await request("/api/ui/v1/models", {
         method: "POST",
         body: JSON.stringify({
           applicationId: $("application-select").value,
@@ -274,7 +274,7 @@
     if (!option?.value) return;
     try {
       const versions = await request(
-        `/api/v1/models/${option.dataset.modelId}/variants/${option.value}/versions`,
+        `/api/ui/v1/models/${option.dataset.modelId}/variants/${option.value}/versions`,
       );
       versions.forEach((v) =>
         $("version-select").add(
@@ -294,7 +294,7 @@
     if (!version) return;
     try {
       const v = await request(
-        `/api/v1/models/${model}/variants/${variant}/versions/${version}`,
+        `/api/ui/v1/models/${model}/variants/${variant}/versions/${version}`,
       );
       const snapshot = JSON.parse(v.snapshotJson);
       $("version-details").hidden = false;
@@ -304,7 +304,7 @@
       $("version-created-by").textContent = v.createdBy;
       $("version-created").textContent = new Date(v.createdAt).toLocaleString();
       $("exact-export").dataset.url =
-        `/api/v1/models/${model}/variants/${variant}/versions/${version}/export`;
+        `/api/ui/v1/models/${model}/variants/${variant}/versions/${version}/export`;
       $("metadata-form").dataset.version = version;
       $("metadata-form").dataset.model = model;
       $("metadata-form").dataset.checksum = v.contentSha256;
@@ -326,7 +326,7 @@
               );
         }
       }
-      const terms = (await request("/api/v1/vocabularies")).flatMap(
+      const terms = (await request("/api/ui/v1/vocabularies")).flatMap(
         (x) => x.terms || [],
       );
       $("metadata-term").replaceChildren(new Option("Select a term", ""));
@@ -336,7 +336,7 @@
         ),
       );
       const metadata = await request(
-        `/api/v1/models/${model}/variants/${variant}/versions/${version}/metadata`,
+        `/api/ui/v1/models/${model}/variants/${variant}/versions/${version}/metadata`,
       );
       $("metadata-summary").textContent = JSON.stringify(metadata, null, 2);
       $("version-details").focus();
@@ -364,7 +364,7 @@
         },
       ];
       await request(
-        `/api/v1/models/${form.dataset.model}/variants/${$("variant-select").value}/versions/${form.dataset.version}/metadata`,
+        `/api/ui/v1/models/${form.dataset.model}/variants/${$("variant-select").value}/versions/${form.dataset.version}/metadata`,
         {
           method: "POST",
           body: JSON.stringify({
@@ -410,7 +410,7 @@
       return;
     }
     try {
-      const result = await request("/api/v1/models/import/preview", {
+      const result = await request("/api/ui/v1/models/import/preview", {
         method: "POST",
         body: JSON.stringify({
           fileName: file.name,
@@ -432,7 +432,7 @@
     try {
       const form = $("import-form");
       const option = $("variant-select").selectedOptions[0];
-      const result = await request("/api/v1/models/import/publish", {
+      const result = await request("/api/ui/v1/models/import/publish", {
         method: "POST",
         body: JSON.stringify({
           modelId: option.dataset.modelId,

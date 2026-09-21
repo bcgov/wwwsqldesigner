@@ -15,7 +15,7 @@ test("account settings provides token and model management states", async ({
   page,
 }) => {
   await signedIn(page);
-  await page.route("**/api/v1/tokens", (route) =>
+  await page.route("**/api/ui/v1/tokens", (route) =>
     route.fulfill({
       status: route.request().method() === "GET" ? 200 : 201,
       contentType: "application/json",
@@ -30,7 +30,7 @@ test("account settings provides token and model management states", async ({
             }),
     }),
   );
-  await page.route("**/api/v1/applications", (route) =>
+  await page.route("**/api/ui/v1/applications", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
   await page.goto("/#account-settings");
@@ -58,17 +58,17 @@ test("account settings uses request status and preserves exact export format", a
   page,
 }) => {
   await signedIn(page);
-  await page.route("**/api/v1/tokens", (route) =>
+  await page.route("**/api/ui/v1/tokens", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
-  await page.route("**/api/v1/applications", (route) =>
+  await page.route("**/api/ui/v1/applications", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify([{ id: "app", name: "Data", status: "Active" }]),
     }),
   );
-  await page.route("**/api/v1/models?applicationId=app", (route) =>
+  await page.route("**/api/ui/v1/models?applicationId=app", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -82,7 +82,7 @@ test("account settings uses request status and preserves exact export format", a
     }),
   );
   await page.route(
-    "**/api/v1/models/model/variants/variant/versions",
+    "**/api/ui/v1/models/model/variants/variant/versions",
     (route) =>
       route.fulfill({
         status: 200,
@@ -93,7 +93,7 @@ test("account settings uses request status and preserves exact export format", a
       }),
   );
   await page.route(
-    "**/api/v1/models/model/variants/variant/versions/version",
+    "**/api/ui/v1/models/model/variants/variant/versions/version",
     (route) =>
       route.fulfill({
         status: 200,
@@ -107,7 +107,7 @@ test("account settings uses request status and preserves exact export format", a
         }),
       }),
   );
-  await page.route("**/api/v1/vocabularies", (route) =>
+  await page.route("**/api/ui/v1/vocabularies", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
   await page.goto("/#account-settings");

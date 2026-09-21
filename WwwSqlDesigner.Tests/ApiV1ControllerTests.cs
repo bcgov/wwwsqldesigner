@@ -1,14 +1,20 @@
 using System.Security.Claims;
+using System.Reflection;
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Moq;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using WwwSqlDesigner.Controllers;
 using WwwSqlDesigner.Data;
 using WwwSqlDesigner.Services;
@@ -23,31 +29,42 @@ public sealed class ApiV1ControllerTests
 
     public TestContext TestContext { get; set; } = null!;
 
-    private static (ApplicationDbContext Db, ApiV1Controller Api, PatTokenService Tokens) CreateApi(
-        string owner = "owner",
-        bool csrfValid = true,
-        string? bearer = null)
+    private static (ApplicationDbContext Db, CookieApiV1Controller Api, PatTokenService Tokens) CreateApi(
+        string owner = "owner")
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         var db = new ApplicationDbContext(options);
         var tokens = new PatTokenService(db);
-        var antiforgery = new Mock<IAntiforgery>();
-        if (csrfValid)
-            antiforgery.Setup(x => x.ValidateRequestAsync(It.IsAny<HttpContext>())).Returns(Task.CompletedTask);
-        else
-            antiforgery.Setup(x => x.ValidateRequestAsync(It.IsAny<HttpContext>()))
-                .ThrowsAsync(new AntiforgeryValidationException("missing"));
-        var api = new ApiV1Controller(db, tokens, new SchemaExportService(), antiforgery.Object);
+        var api = new CookieApiV1Controller(db, tokens, new SchemaExportService());
         var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Post;
         context.User = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.Name, owner)], "cookie"));
-        if (bearer is not null)
-            context.Request.Headers.Authorization = $"Bearer {bearer}";
         api.ControllerContext = new ControllerContext { HttpContext = context };
         return (db, api, tokens);
+    }
+
+    private static PatApiV1Controller CreatePatApi(
+        ApplicationDbContext db,
+        PatTokenService tokens,
+        string? bearer,
+        string? cookieOwner = null)
+    {
+        var api = new PatApiV1Controller(db, tokens, new SchemaExportService());
+        var context = new DefaultHttpContext
+        {
+            User = string.IsNullOrWhiteSpace(cookieOwner)
+                ? new ClaimsPrincipal()
+                : new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(ClaimTypes.Name, cookieOwner)],
+                    "cookie"))
+        };
+        context.Request.Method = HttpMethods.Post;
+        if (bearer is not null) context.Request.Headers.Authorization = $"Bearer {bearer}";
+        api.ControllerContext = new ControllerContext { HttpContext = context };
+        return api;
     }
 
     [TestMethod]
@@ -114,54 +131,90 @@ public sealed class ApiV1ControllerTests
     }
 
     [TestMethod]
-    public async Task CookieWritesRequireAntiforgeryAndBearerWritesDoNot()
+    public async Task CookieAndPatControllersRejectTheOtherAuthenticationBoundary()
     {
-        var (_, cookieApi, _) = CreateApi(csrfValid: false);
-        var missing = await cookieApi.CreateApplication(new ApplicationRequest("blocked", null, null), TestContext.CancellationToken);
-        Assert.AreEqual(400, ((IStatusCodeActionResult)missing).StatusCode ?? 400);
-
-        var (_, bearerApi, tokens) = CreateApi(csrfValid: false);
+        var (db, cookieApi, tokens) = CreateApi(owner: "");
         var pat = await tokens.CreateAsync("owner", [PatScopes.ApplicationsCreate], TimeSpan.FromDays(7), "automation", TestContext.CancellationToken);
-        bearerApi.HttpContext.Request.Headers.Authorization = $"Bearer {pat.Plaintext}";
-        var created = await bearerApi.CreateApplication(new ApplicationRequest("allowed", null, null), TestContext.CancellationToken);
+        cookieApi.HttpContext.Request.Headers.Authorization = $"Bearer {pat.Plaintext}";
+        Assert.IsInstanceOfType<UnauthorizedResult>(
+            await cookieApi.CreateApplication(
+                new ApplicationRequest("not-cookie-authorized", null, null),
+                TestContext.CancellationToken));
+
+        var cookieOnlyPatApi = CreatePatApi(db, tokens, null, "owner");
+        Assert.IsInstanceOfType<UnauthorizedResult>(
+            await cookieOnlyPatApi.CreateApplication(
+                new ApplicationRequest("not-pat-authorized", null, null),
+                TestContext.CancellationToken));
+
+        var bearerApi = CreatePatApi(db, tokens, pat.Plaintext);
+        var created = await bearerApi.CreateApplication(
+            new ApplicationRequest("allowed", null, null),
+            TestContext.CancellationToken);
         Assert.IsInstanceOfType<CreatedAtActionResult>(created);
 
-        var (_, malformedApi, _) = CreateApi(csrfValid: false, bearer: "not-a-token");
-        var denied = await malformedApi.CreateApplication(new ApplicationRequest("not-allowed", null, null), TestContext.CancellationToken);
-        Assert.IsInstanceOfType<ForbidResult>(denied);
-        _ = bearerApi;
+        var malformedApi = CreatePatApi(db, tokens, "not-a-token");
+        Assert.IsInstanceOfType<ForbidResult>(
+            await malformedApi.CreateApplication(
+                new ApplicationRequest("not-allowed", null, null),
+                TestContext.CancellationToken));
     }
 
     [TestMethod]
-    public async Task EveryCookieModelWriteCategoryRequiresAntiforgery()
+    [DoNotParallelize]
+    public async Task CookieWritesUseGlobalAntiforgeryAndPatRoutesExplicitlyOptOut()
     {
-        static void AssertBadRequest(IActionResult result) =>
-            Assert.AreEqual(400, ((IStatusCodeActionResult)result).StatusCode ?? 400);
+        Assert.IsNull(typeof(CookieApiV1Controller).GetCustomAttribute<IgnoreAntiforgeryTokenAttribute>());
+        Assert.IsNotNull(typeof(PatApiV1Controller).GetCustomAttribute<IgnoreAntiforgeryTokenAttribute>());
+        Assert.AreEqual(
+            "api/ui/v1",
+            typeof(CookieApiV1Controller).GetCustomAttribute<RouteAttribute>()!.Template);
+        Assert.AreEqual(
+            "api/v1",
+            typeof(PatApiV1Controller).GetCustomAttribute<RouteAttribute>()!.Template);
 
-        var (_, modelApi, _) = CreateApi(csrfValid: false);
-        AssertBadRequest(await modelApi.CreateToken(
-            new CreateTokenRequest([PatScopes.ModelsRead], TimeSpan.FromDays(1), "blocked"),
-            TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.RevokeToken(Guid.NewGuid(), TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.CreateModel(new ModelRequest(Guid.NewGuid(), "model", null, "default", "id"), TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.Validate(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            new VersionRequest("{}", "id", null),
-            TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.CreateVersion(Guid.NewGuid(), Guid.NewGuid(), new VersionRequest("{}", "id", null), TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.ImportPreview(new ImportRequest("model.sql", "CREATE TABLE t (id INTEGER);"), TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.ImportPublish(new ImportPublishRequest(Guid.NewGuid(), Guid.NewGuid(), "model.sql", "CREATE TABLE t (id INTEGER);", "id"), TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.Export(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            new ExportRequest("mssql"),
-            TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.SetMetadata(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new MetadataRequest([], "id", "checksum"), TestContext.CancellationToken));
-        AssertBadRequest(await modelApi.ExportArtifact(
-            new ExportArtifactRequest("mssql", "{\"tables\":[]}"),
-            TestContext.CancellationToken));
+        const string secretVariable = "Authentication__Keycloak__ClientSecret";
+        var originalSecret = Environment.GetEnvironmentVariable(secretVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(secretVariable, "test-secret");
+            using var factory = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
+            var filters = factory.Services.GetRequiredService<IOptions<MvcOptions>>().Value.Filters;
+            Assert.Contains(filter => filter is AutoValidateAntiforgeryTokenAttribute, filters);
+
+            var actions = factory.Services
+                .GetRequiredService<IActionDescriptorCollectionProvider>()
+                .ActionDescriptors.Items
+                .OfType<ControllerActionDescriptor>()
+                .ToArray();
+            Assert.IsNotNull(actions.SingleOrDefault(action =>
+                action.ControllerTypeInfo.AsType() == typeof(CookieApiV1Controller)
+                && action.ActionName == nameof(CookieApiV1Controller.CreateToken)));
+            Assert.IsNull(actions.SingleOrDefault(action =>
+                action.ControllerTypeInfo.AsType() == typeof(PatApiV1Controller)
+                && action.ActionName == nameof(CookieApiV1Controller.CreateToken)));
+            Assert.IsNotNull(actions.SingleOrDefault(action =>
+                action.ControllerTypeInfo.AsType() == typeof(CookieApiV1Controller)
+                && action.ActionName == nameof(CookieApiV1Controller.CreateApplication)));
+            Assert.IsNotNull(actions.SingleOrDefault(action =>
+                action.ControllerTypeInfo.AsType() == typeof(PatApiV1Controller)
+                && action.ActionName == nameof(PatApiV1Controller.CreateApplication)));
+
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false
+            });
+            var request = new ApplicationRequest("boundary-test", null, null);
+            var cookieResponse = await client.PostAsJsonAsync("/api/ui/v1/applications", request);
+            Assert.AreEqual(HttpStatusCode.BadRequest, cookieResponse.StatusCode);
+            var patResponse = await client.PostAsJsonAsync("/api/v1/applications", request);
+            Assert.AreEqual(HttpStatusCode.Unauthorized, patResponse.StatusCode);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(secretVariable, originalSecret);
+        }
     }
 
     [TestMethod]

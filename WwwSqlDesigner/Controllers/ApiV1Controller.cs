@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using WwwSqlDesigner.Data;
 using WwwSqlDesigner.Services;
@@ -12,49 +11,18 @@ using WwwSqlDesigner.Services;
 namespace WwwSqlDesigner.Controllers;
 
 [ApiController]
-[Route("api/v1")]
-public sealed class ApiV1Controller : ControllerBase
+public abstract class DataArchitectureControllerBase : ControllerBase
 {
-    private const string AntiforgeryError = "A valid antiforgery token is required.";
     private static readonly string[] EmptyDiagnostics = Array.Empty<string>();
     private static readonly string[] EmptyArtifactDiagnostics = ["Artifact is empty."];
     private static readonly SemaphoreSlim VersionPublicationGate = new(1, 1);
     private readonly ApplicationDbContext _db;
-    private readonly PatTokenService _tokens;
     private readonly SchemaExportService _exports;
-    private readonly IAntiforgery _antiforgery;
-    public ApiV1Controller(ApplicationDbContext db, PatTokenService tokens, SchemaExportService exports, IAntiforgery antiforgery) { _db = db; _tokens = tokens; _exports = exports; _antiforgery = antiforgery; }
-
-    [HttpPost("tokens")]
-    public async Task<IActionResult> CreateToken(CreateTokenRequest request, CancellationToken ct)
+    protected abstract string ApiBasePath { get; }
+    protected DataArchitectureControllerBase(ApplicationDbContext db, SchemaExportService exports)
     {
-        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = AntiforgeryError });
-        var owner = User.Identity?.Name;
-        if (string.IsNullOrWhiteSpace(owner)) return Unauthorized();
-        try { var created = await _tokens.CreateAsync(owner, request.Scopes, request.ExpiresIn, request.Name, ct); return Ok(new { id = created.Token.Id, token = created.Plaintext, prefix = created.Token.Prefix, name = created.Token.Name, expiresAt = created.Token.ExpiresAt, scopes = request.Scopes }); }
-        catch (ArgumentException e) { return BadRequest(new { error = e.Message }); }
-        catch (InvalidOperationException e) { return Conflict(new { error = e.Message }); }
-    }
-
-    [HttpGet("tokens")]
-    public async Task<IActionResult> ListTokens(CancellationToken ct)
-    {
-        var owner = User.Identity?.Name;
-        if (string.IsNullOrWhiteSpace(owner)) return Unauthorized();
-        return Ok(await _db.PersonalAccessTokens.AsNoTracking().Where(x => x.Owner == owner)
-            .OrderByDescending(x => x.CreatedAt).Select(x => new { x.Id, x.Name, x.Prefix, x.ExpiresAt, x.RevokedAt, x.LastUsedAt, x.CreatedAt, x.ScopesJson }).ToListAsync(ct));
-    }
-
-    [HttpPost("tokens/{id:guid}/revoke")]
-    public async Task<IActionResult> RevokeToken(Guid id, CancellationToken ct)
-    {
-        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = AntiforgeryError });
-        var owner = User.Identity?.Name;
-        if (string.IsNullOrWhiteSpace(owner)) return Unauthorized();
-        var token = await _db.PersonalAccessTokens.SingleOrDefaultAsync(x => x.Id == id && x.Owner == owner, ct);
-        if (token is null) return NotFound();
-        token.RevokedAt = DateTime.UtcNow; await _db.SaveChangesAsync(ct);
-        return NoContent();
+        _db = db;
+        _exports = exports;
     }
 
     [HttpGet("models")]
@@ -118,7 +86,7 @@ public sealed class ApiV1Controller : ControllerBase
         if (existing is not null) return Ok(new { modelId = existing.ModelId, modelName = existing.Model!.Name, variantId = existing.Id, variantName = existing.Name, idempotent = true });
         var variant = new ModelVariant { Model = model, Name = variantName, IdempotencyKey = key };
         _db.LogicalModels.Add(model); _db.ModelVariants.Add(variant); await _db.SaveChangesAsync(ct);
-        return Created($"/api/v1/models/{model.Id}", new { modelId = model.Id, modelName = model.Name, variantId = variant.Id, variantName = variant.Name });
+        return Created($"{ApiBasePath}/models/{model.Id}", new { modelId = model.Id, modelName = model.Name, variantId = variant.Id, variantName = variant.Name });
     }
 
     [HttpGet("models/{id:guid}/variants/{variantId:guid}/versions")]
@@ -184,7 +152,7 @@ public sealed class ApiV1Controller : ControllerBase
             _db.ModelVersions.Add(version);
             try { await _db.SaveChangesAsync(ct); if (transaction is not null) await transaction.CommitAsync(ct); }
             catch (DbUpdateException) { return Conflict(new { error = "Version publication conflict.", code = "version_conflict" }); }
-            return Created($"/api/v1/models/{id}/variants/{variantId}/versions/{version.Number}", new { version.Id, version.Number, version.ContentSha256 });
+            return Created($"{ApiBasePath}/models/{id}/variants/{variantId}/versions/{version.Number}", new { version.Id, version.Number, version.ContentSha256 });
         }
         finally { VersionPublicationGate.Release(); }
     }
@@ -342,8 +310,7 @@ public sealed class ApiV1Controller : ControllerBase
     [HttpPost("export")]
     public async Task<IActionResult> ExportArtifact(ExportArtifactRequest request, CancellationToken ct)
     {
-        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = AntiforgeryError });
-        if (!(User.Identity?.IsAuthenticated ?? false)) return Unauthorized();
+        var auth = await Authorize(PatScopes.ModelsExport, ct); if (auth is null) return UnauthorizedOrForbidden();
         CanonicalSchema schema;
         try { schema = SchemaExportService.ReadSnapshot(request.Xml); }
         catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or XmlException) { return BadRequest(new { error = "Artifact could not be parsed.", detail = e.Message }); }
@@ -374,46 +341,8 @@ public sealed class ApiV1Controller : ControllerBase
                 ct);
     }
 
-    private async Task<(string Owner, PersonalAccessToken Token)?> Authorize(string scope, CancellationToken ct)
-    {
-        var header = Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrWhiteSpace(header))
-        {
-            if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                return null;
-            var result = await _tokens.ValidateAsync(header[7..].Trim(), scope, ct);
-            return result is null ? null : (result.Value.Token.Owner, result.Value.Token);
-        }
-
-        if (HttpMethods.IsPost(Request.Method) || HttpMethods.IsPut(Request.Method) ||
-            HttpMethods.IsPatch(Request.Method) || HttpMethods.IsDelete(Request.Method))
-        {
-            try { await _antiforgery.ValidateRequestAsync(HttpContext); }
-            catch (AntiforgeryValidationException)
-            {
-                HttpContext.Items["AntiforgeryFailure"] = true;
-                return null;
-            }
-        }
-
-        var cookieOwner = User.Identity?.Name;
-        return string.IsNullOrWhiteSpace(cookieOwner) ? null : (cookieOwner, new PersonalAccessToken { Owner = cookieOwner, ScopesJson = JsonSerializer.Serialize(new[] { scope }) });
-    }
-    private async Task<bool> RequireCookieAntiforgery()
-    {
-        if (Request.Headers.Authorization.Count > 0) return false;
-        try { await _antiforgery.ValidateRequestAsync(HttpContext); return true; }
-        catch (AntiforgeryValidationException) { return false; }
-    }
-    private IActionResult UnauthorizedOrForbidden()
-    {
-        if (HttpContext.Items.ContainsKey("AntiforgeryFailure"))
-        {
-            return BadRequest(new { error = AntiforgeryError });
-        }
-
-        return Request.Headers.Authorization.Count == 0 ? Unauthorized() : Forbid();
-    }
+    protected abstract Task<(string Owner, PersonalAccessToken Token)?> Authorize(string scope, CancellationToken ct);
+    protected abstract IActionResult UnauthorizedOrForbidden();
     private static ImportResult ParseImport(string fileName, string content) =>
         SchemaImportService.Parse(fileName, content);
     private static string Sha256(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
