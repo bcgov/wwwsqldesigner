@@ -23,7 +23,9 @@ builder.Services.AddScoped<PatTokenService>();
 builder.Services.AddSingleton<SchemaExportService>();
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddControllersWithViews(options =>
-    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()))
+{
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+})
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(options =>
