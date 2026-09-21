@@ -34,8 +34,9 @@ test, so the configured account must be allowed to create and drop databases. Th
 1. Comments per table and column
 1. Optional free-form records schedules per table
 1. Optional column data classifications (Public, Protected A, Protected B, or Protected C)
-1. Creation of SQL DDL scripts based on the data model (full script only, no migrations)
-1. Export of EF Core 8 classes and a DbContext, as C# or a multi-file ZIP, with configurable namespace and context name
+1. Server-side creation of full-schema exports for SQL Server, PostgreSQL, MySQL, SQLite, Oracle, SQLAlchemy, web2py, and EF Core
+1. Provider-specific export of defaults, generated values, primary/unique/index keys, foreign keys, schemas, comments, classifications, and records schedules where the target supports them
+1. Export metadata sidecars containing model/entity/property assignments, resolved target paths, governed vocabulary details, retention disposition, comments, classifications, and records schedules
 1. Portable per-table schemas (defaulting to `dbo`) and table/column descriptions, including schema-qualified SQL Server DDL and EF Core mappings
 1. Save models to a database and load the latest or a selected version by model and owner
 1. The DB connection is based on Entity Framework Core, so supports LocalDB (for development), MSSQL, PostgreSQL, etc.

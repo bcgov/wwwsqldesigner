@@ -320,7 +320,7 @@
 				<xsl:value-of select="concat( ' );', '' )"/>
 			</xsl:for-each>
 		</xsl:for-each>
-<!-- @TODO: While it seems that XML DB model would contain several <relation>-s for FK constraints which use compound keys: one <relation> per column -->
+<!-- Legacy limitation: compound foreign-key constraints are represented as one relation per column. -->
 	</xsl:for-each>
 
 </xsl:template>

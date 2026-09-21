@@ -122,7 +122,7 @@
 		<xsl:text>else:                                               # else use a normal relational database &#xa;</xsl:text>
 		<xsl:text>    dbOBJECT = DAL("sqlite://dbOBJECT.db")&#xa;&#xa;</xsl:text>
 		<!-- doing two pass: first ignore tables with relations as they will raise exception if table referenced still does not exist (not instantiated) -->
-		<!-- this is not bullet proff but should be sufficient for small projects will be in TODO :) -->
+		<!-- Legacy behavior retains designer order and is intended for smaller projects. -->
 		<xsl:for-each select="table">
 			<xsl:if test="not (row/relation)">
 				<xsl:call-template name="tableparser">

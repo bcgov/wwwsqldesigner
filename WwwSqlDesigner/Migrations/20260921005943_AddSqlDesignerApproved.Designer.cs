@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WwwSqlDesigner.Data;
 
@@ -11,9 +12,11 @@ using WwwSqlDesigner.Data;
 namespace WwwSqlDesigner.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921005943_AddSqlDesignerApproved")]
+    partial class AddSqlDesignerApproved
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -320,10 +323,6 @@ namespace WwwSqlDesigner.Migrations
 
                     b.Property<DateTime?>("LastUsedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
 
                     b.Property<string>("Owner")
                         .IsRequired()

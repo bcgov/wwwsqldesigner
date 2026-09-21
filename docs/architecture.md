@@ -55,7 +55,8 @@ WwwSqlDesigner.sln
 |  |- Controllers/                 MVC and account/API boundaries
 |  |- Data/                        EF Core context and model entities
 |  |- Authentication/              Keycloak settings and filters
-|  |- wwwroot/                     Browser UI, XML model IO, dialect adapters
+|  |- ServerExports/               Embedded server-side provider templates
+|  |- wwwroot/                     Browser UI and portable XML model IO
 |  `- Program.cs                   Composition root and middleware
 `- WwwSqlDesigner.Tests/           MSTest, integration, and Playwright tests
 ```
@@ -64,8 +65,10 @@ WwwSqlDesigner.sln
 
 * **Web composition and middleware:** `Program.cs` configures EF Core, authentication, antiforgery, rate limiting, static files, routing, and authorization.
 * **Resource/API boundary:** `Controllers/WwwSqlController.cs` applies owner, group, and grant filters before model access.
+* **Governed data API boundary:** `Controllers/CookieApiV1Controller.cs` serves the cookie-authenticated browser at `/api/ui/v1`, while `Controllers/PatApiV1Controller.cs` serves bearer-only automation at `/api/v1`. Both inherit model operations from `DataArchitectureControllerBase` without sharing authentication authority.
 * **Persistence boundary:** `Data/ApplicationDbContext.cs` maps model versions and access grants to SQL Server.
-* **Browser model boundary:** `wwwroot/js/io.js`, `row.js`, and `portabletypes.js` parse, normalize, render, and export XML model data.
+* **Browser model boundary:** `wwwroot/js/io.js`, `row.js`, and `portabletypes.js` edit and serialize the portable model, then request exports from the server.
+* **Export boundary:** `Services/ServerSchemaServices.cs` reads canonical JSON or portable XML, preserves structural and governance metadata, maps portable types, and invokes embedded server-side templates for every supported target.
 
 ### 3.2 Entry Points & Gateways
 
@@ -73,6 +76,8 @@ WwwSqlDesigner.sln
 | :--- | :--- | :--- |
 | AccountController | MVC/API | `/account/login`, `/account/status`, `/account/logout` |
 | WwwSqlController | REST-like MVC API | `/backend/netcore-ef/list`, `load`, `save`, `csrf`, `access`, and grant routes |
+| CookieApiV1Controller | Browser-internal JSON API | `/api/ui/v1`; cookie identity and antiforgery token required for writes |
+| PatApiV1Controller | Automation JSON API | `/api/v1`; scoped bearer PAT required, with no cookie fallback |
 | Static browser application | Static web assets | `/`, `/index.html`, `/js/*`, `/css/*` |
 | OIDC callbacks | Identity callback | `/signin-oidc` and `/signout-callback-oidc` |
 
@@ -83,6 +88,8 @@ WwwSqlDesigner.sln
 | API Version | Status | Base Path / Header | Sunset Date |
 | :--- | :--- | :--- | :--- |
 | Unversioned | Active | `/backend/netcore-ef` | Not defined |
+| v1 browser API | Active, internal | `/api/ui/v1` | Not defined |
+| v1 automation API | Active | `/api/v1` with `Authorization: Bearer` | Not defined |
 
 ### 4.2 Contract Documentation
 
@@ -110,7 +117,7 @@ Controller and browser tests exercise authorization, XML round trips, exports, a
 | Application processing and validation | .NET `string`; XML reader validation | Exact identity keys use explicit byte-length/index rules | Controller and authorization tests | Verified |
 | Database, indexes, and search | SQL Server string columns and configured collation | Identity comparisons use exact key expressions | EF model configuration and schema tests | Verified for identifiers; linguistic policy unknown |
 | Messages, caches, and integrations | No message bus or cache evidenced | N/A | No integration evidence | Unknown |
-| Files, imports, exports, reports, and printing | UTF-8 XML and browser downloads | Export-specific linguistic behavior not documented | XML export tests | Gap |
+| Files, imports, exports, reports, and printing | UTF-8 XML, server-rendered exports, metadata sidecars, and browser downloads | Provider-specific features are verified against the legacy template contract | XML round-trip and exporter parity tests | Verified |
 | Runtime globalization data and fonts | Browser/runtime defaults | No language-specific policy found | No representative Indigenous-language corpus | Gap |
 
 - **Normalization policy:** Not documented.
@@ -125,13 +132,13 @@ Controller and browser tests exercise authorization, XML round trips, exports, a
 
 | Aspect | Implementation |
 | :--- | :--- |
-| **Authentication Method** | Keycloak OIDC authorization-code flow with PKCE and cookie session |
+| **Authentication Method** | Keycloak OIDC authorization-code flow with PKCE and cookie session for browser routes; SQL Designer PAT bearer authentication for automation routes |
 | **Identity Provider** | Keycloak |
-| **Authorization Model** | Owner, group, global-model, and explicit grant checks |
-| **Token Format** | OIDC tokens held by server-side authentication middleware |
-| **Token Storage** | HttpOnly secure cookie configuration through ASP.NET Core |
+| **Authorization Model** | Owner, group, global-model, and explicit grant checks; PAT operations additionally require an application/model scope |
+| **Token Format** | OIDC tokens held by server-side authentication middleware; opaque `sqd_` PATs returned once at creation |
+| **Token Storage** | HttpOnly secure cookie configuration through ASP.NET Core; PATs stored as SHA-256 hashes |
 
-State-changing routes use antiforgery validation. Model writes are explicitly capped at 1 MiB, require strict UTF-8 decoding, and are rate-limited per authenticated identity or client address after routing and authentication select the endpoint policy. Client-side type hints use `textContent`, and portable facets reject XML markup characters before exporter-specific semantic validation.
+ASP.NET Core globally applies `AutoValidateAntiforgeryTokenAttribute` to unsafe HTTP methods. The browser-internal `/api/ui/v1` controller relies on that framework validation and authorizes only the cookie identity. The `/api/v1` controller explicitly ignores antiforgery because it authorizes only a caller-supplied bearer PAT and never falls back to cookie authority. PAT lifecycle endpoints are available only through the cookie controller. Model writes are explicitly capped at 1 MiB, require strict UTF-8 decoding, and are rate-limited per authenticated identity or client address after routing and authentication select the endpoint policy. Client-side type hints use `textContent`, and portable facets reject XML markup characters before exporter-specific semantic validation.
 
 ### 6.2 Cryptographic Controls
 
