@@ -598,8 +598,9 @@ SQL.IO.prototype.getExportTarget = function () {
 };
 
 SQL.IO.prototype.showStatus = function (diagnostics) {
-    this.dom.status.hidden = false;
-    this.dom.status.textContent = (diagnostics || []).join(" ");
+    const messages = diagnostics || [];
+    this.dom.status.hidden = messages.length === 0;
+    this.dom.status.textContent = messages.join(" ");
 };
 
 SQL.IO.prototype.serversave = function (e, keyword) {

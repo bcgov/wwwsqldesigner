@@ -4,6 +4,7 @@ namespace WwwSqlDesigner.Data
 {
     public class ApplicationDbContext : DbContext
     {
+        private const string ExactIdentityCollation = "Latin1_General_100_BIN2";
         private const string OwnerIdByteLengthColumn = "OwnerIdByteLength";
 
         public ApplicationDbContext() { }
@@ -28,7 +29,7 @@ namespace WwwSqlDesigner.Data
             modelBuilder.Entity<DataModel>(entity =>
             {
                 entity.HasKey(e => e.Id).IsClustered();
-                entity.Property(e => e.OwnerId).UseCollation("Latin1_General_100_BIN2");
+                entity.Property(e => e.OwnerId).UseCollation(ExactIdentityCollation);
                 entity.Property<int?>(OwnerIdByteLengthColumn)
                     .HasComputedColumnSql("DATALENGTH([OwnerId])", stored: true);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("getdate()");
@@ -45,8 +46,8 @@ namespace WwwSqlDesigner.Data
             modelBuilder.Entity<DataModelAccessGrant>(entity =>
             {
                 entity.HasKey(e => e.Id).IsClustered();
-                entity.Property(e => e.OwnerId).UseCollation("Latin1_General_100_BIN2");
-                entity.Property(e => e.TargetId).UseCollation("Latin1_General_100_BIN2");
+                entity.Property(e => e.OwnerId).UseCollation(ExactIdentityCollation);
+                entity.Property(e => e.TargetId).UseCollation(ExactIdentityCollation);
                 entity.Property<int>(OwnerIdByteLengthColumn)
                     .HasComputedColumnSql("DATALENGTH([OwnerId])", stored: true);
                 entity.Property<int>("TargetIdByteLength")
@@ -71,11 +72,13 @@ namespace WwwSqlDesigner.Data
             modelBuilder.Entity<ApplicationRecord>(entity =>
             {
                 entity.HasKey(x => x.Id);
+                entity.Property(x => x.Owner).UseCollation(ExactIdentityCollation);
                 entity.HasIndex(x => new { x.Owner, x.Name }).IsUnique();
             });
             modelBuilder.Entity<LogicalModel>(entity =>
             {
                 entity.HasKey(x => x.Id);
+                entity.Property(x => x.Owner).UseCollation(ExactIdentityCollation);
                 entity.HasIndex(x => new { x.ApplicationId, x.Name }).IsUnique();
                 entity.HasOne(x => x.Application).WithMany().HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
             });
@@ -115,6 +118,7 @@ namespace WwwSqlDesigner.Data
             modelBuilder.Entity<PersonalAccessToken>(entity =>
             {
                 entity.HasKey(x => x.Id);
+                entity.Property(x => x.Owner).UseCollation(ExactIdentityCollation);
                 entity.HasIndex(x => x.TokenHash).IsUnique();
                 entity.HasIndex(x => new { x.Owner, x.RevokedAt, x.ExpiresAt });
             });

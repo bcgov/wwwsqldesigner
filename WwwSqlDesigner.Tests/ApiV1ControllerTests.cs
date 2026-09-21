@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Moq;
 using WwwSqlDesigner.Controllers;
 using WwwSqlDesigner.Data;
@@ -16,6 +18,9 @@ namespace WwwSqlDesigner.Tests;
 [TestClass]
 public sealed class ApiV1ControllerTests
 {
+    private static readonly string[] DataModelIdentityProperties =
+        ["OwnerId", "Keyword", "Version", "OwnerIdByteLength"];
+
     public TestContext TestContext { get; set; } = null!;
 
     private static (ApplicationDbContext Db, ApiV1Controller Api, PatTokenService Tokens) CreateApi(
@@ -86,6 +91,29 @@ public sealed class ApiV1ControllerTests
     }
 
     [TestMethod]
+    public async Task TokenCreationEnforcesTheActiveTokenLimit()
+    {
+        var (_, _, tokens) = CreateApi();
+        for (var index = 0; index < 10; index++)
+        {
+            await tokens.CreateAsync(
+                "owner",
+                [PatScopes.ModelsRead],
+                TimeSpan.FromDays(1),
+                $"token-{index}",
+                TestContext.CancellationToken);
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tokens.CreateAsync(
+                "owner",
+                [PatScopes.ModelsRead],
+                TimeSpan.FromDays(1),
+                "token-over-limit",
+                TestContext.CancellationToken));
+    }
+
+    [TestMethod]
     public async Task CookieWritesRequireAntiforgeryAndBearerWritesDoNot()
     {
         var (_, cookieApi, _) = CreateApi(csrfValid: false);
@@ -111,11 +139,52 @@ public sealed class ApiV1ControllerTests
             Assert.AreEqual(400, ((IStatusCodeActionResult)result).StatusCode ?? 400);
 
         var (_, modelApi, _) = CreateApi(csrfValid: false);
+        AssertBadRequest(await modelApi.CreateToken(
+            new CreateTokenRequest([PatScopes.ModelsRead], TimeSpan.FromDays(1), "blocked"),
+            TestContext.CancellationToken));
+        AssertBadRequest(await modelApi.RevokeToken(Guid.NewGuid(), TestContext.CancellationToken));
         AssertBadRequest(await modelApi.CreateModel(new ModelRequest(Guid.NewGuid(), "model", null, "default", "id"), TestContext.CancellationToken));
+        AssertBadRequest(await modelApi.Validate(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new VersionRequest("{}", "id", null),
+            TestContext.CancellationToken));
         AssertBadRequest(await modelApi.CreateVersion(Guid.NewGuid(), Guid.NewGuid(), new VersionRequest("{}", "id", null), TestContext.CancellationToken));
         AssertBadRequest(await modelApi.ImportPreview(new ImportRequest("model.sql", "CREATE TABLE t (id INTEGER);"), TestContext.CancellationToken));
         AssertBadRequest(await modelApi.ImportPublish(new ImportPublishRequest(Guid.NewGuid(), Guid.NewGuid(), "model.sql", "CREATE TABLE t (id INTEGER);", "id"), TestContext.CancellationToken));
+        AssertBadRequest(await modelApi.Export(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new ExportRequest("mssql"),
+            TestContext.CancellationToken));
         AssertBadRequest(await modelApi.SetMetadata(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new MetadataRequest([], "id", "checksum"), TestContext.CancellationToken));
+        AssertBadRequest(await modelApi.ExportArtifact(
+            new ExportArtifactRequest("mssql", "{\"tables\":[]}"),
+            TestContext.CancellationToken));
+    }
+
+    [TestMethod]
+    public void SqlDesignerOwnerComparisonsAreCaseSensitive()
+    {
+        var (db, _, _) = CreateApi();
+        var model = db.GetService<IDesignTimeModel>().Model;
+        foreach (var entityType in new[]
+        {
+            typeof(ApplicationRecord),
+            typeof(LogicalModel),
+            typeof(PersonalAccessToken)
+        })
+        {
+            var owner = model.FindEntityType(entityType)!.FindProperty("Owner")!;
+            Assert.AreEqual("Latin1_General_100_BIN2", owner.GetCollation(), entityType.Name);
+        }
+
+        var dataModel = model.FindEntityType(typeof(DataModel))!;
+        var identityIndex = dataModel.GetIndexes().Single(index =>
+            index.Properties.Select(property => property.Name).SequenceEqual(
+                DataModelIdentityProperties));
+        Assert.IsNull(identityIndex.GetFilter());
     }
 
     [TestMethod]

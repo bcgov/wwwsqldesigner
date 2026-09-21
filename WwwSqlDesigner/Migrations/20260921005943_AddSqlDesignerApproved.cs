@@ -19,7 +19,7 @@ namespace WwwSqlDesigner.Migrations
                     Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
                     Status = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    Owner = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false)
+                    Owner = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false, collation: "Latin1_General_100_BIN2")
                 },
                 constraints: table =>
                 {
@@ -31,7 +31,7 @@ namespace WwwSqlDesigner.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Owner = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    Owner = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false, collation: "Latin1_General_100_BIN2"),
                     Prefix = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
                     TokenHash = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                     ScopesJson = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
@@ -67,7 +67,7 @@ namespace WwwSqlDesigner.Migrations
                     ApplicationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
-                    Owner = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false)
+                    Owner = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false, collation: "Latin1_General_100_BIN2")
                 },
                 constraints: table =>
                 {

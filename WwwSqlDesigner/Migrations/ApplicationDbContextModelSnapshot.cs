@@ -41,7 +41,8 @@ namespace WwwSqlDesigner.Migrations
                     b.Property<string>("Owner")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
+                        .HasColumnType("nvarchar(256)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -96,7 +97,8 @@ namespace WwwSqlDesigner.Migrations
                     SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"));
 
                     b.HasIndex("OwnerId", "Keyword", "Version", "OwnerIdByteLength")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter(null);
 
                     SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("OwnerId", "Keyword", "Version", "OwnerIdByteLength"), false);
 
@@ -185,7 +187,8 @@ namespace WwwSqlDesigner.Migrations
                     b.Property<string>("Owner")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
+                        .HasColumnType("nvarchar(256)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.HasKey("Id");
 
@@ -325,7 +328,8 @@ namespace WwwSqlDesigner.Migrations
                     b.Property<string>("Owner")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
+                        .HasColumnType("nvarchar(256)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("Prefix")
                         .IsRequired()

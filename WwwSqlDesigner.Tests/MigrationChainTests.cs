@@ -25,6 +25,19 @@ public sealed class MigrationChainTests
         Assert.IsEmpty(compatibility);
     }
 
+    [TestMethod]
+    public void SqlDesignerOwnerColumnsUseExactIdentityCollation()
+    {
+        var operations = RunUp(typeof(AddSqlDesignerApproved));
+        foreach (var tableName in new[] { "Applications", "LogicalModels", "PersonalAccessTokens" })
+        {
+            var table = Assert.ContainsSingle(
+                operations.OfType<CreateTableOperation>().Where(x => x.Name == tableName));
+            var owner = Assert.ContainsSingle(table.Columns.Where(x => x.Name == "Owner"));
+            Assert.AreEqual("Latin1_General_100_BIN2", owner.Collation, tableName);
+        }
+    }
+
     private static List<MigrationOperation> RunUp(Type migrationType)
     {
         var migration = (Migration)Activator.CreateInstance(migrationType)!;

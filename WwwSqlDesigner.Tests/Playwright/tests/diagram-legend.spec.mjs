@@ -76,6 +76,7 @@ test("adds timestamps when an older model is first saved", async ({ page }) => {
       new DOMParser().parseFromString("<sql />", "text/xml").documentElement,
     );
   });
+  await expect(page.locator("#iostatus")).toBeHidden();
   await page.locator("#saveload").click();
   await page.locator('[data-source="xml"]').click();
   await page.locator("#serverloadname").fill("first-save");

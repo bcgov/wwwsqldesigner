@@ -28,6 +28,24 @@
     status.textContent = text;
     status.className = error ? "error" : "";
   };
+  const exportExtensions = {
+    "ef-core": "cs",
+    mssql: "sql",
+    postgresql: "sql",
+    mysql: "sql",
+    sqlite: "sql",
+    oracle: "sql",
+    sqlalchemy: "py",
+    web2py: "py",
+  };
+  const download = (content, fileName, type) => {
+    const blob = new Blob([content], { type });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
   const showSettings = () => {
     settings.removeAttribute("hidden");
     settings.style.display = "";
@@ -368,13 +386,18 @@
         method: "POST",
         body: JSON.stringify({ format: $("export-format").value }),
       });
-      const blob = new Blob([result.content], { type: "text/plain" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `sql-designer-export.${$("export-format").value}`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-      message("Exact server export downloaded.");
+      const format = $("export-format").value;
+      download(
+        result.content,
+        `sql-designer-export.${exportExtensions[format]}`,
+        "text/plain",
+      );
+      download(
+        result.sidecar,
+        "sql-designer-export.metadata.json",
+        "application/json",
+      );
+      message("Exact server export and metadata sidecar downloaded.");
     } catch (error) {
       message(error.message, true);
     }

@@ -130,12 +130,30 @@ test("account settings uses request status and preserves exact export format", a
     "web2py",
   ]);
   await page.locator("#export-format").selectOption("postgresql");
+  await page.route("**/export", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        content: "CREATE TABLE example (id integer);",
+        sidecar: '{"tables":[]}',
+      }),
+    }),
+  );
   const exportRequest = page.waitForRequest(
     (request) =>
       request.url().includes("/export") && request.method() === "POST",
   );
+  const downloadNames = [];
+  page.on("download", (download) =>
+    downloadNames.push(download.suggestedFilename()),
+  );
   await page.getByRole("button", { name: "Export this exact version" }).click();
   expect((await exportRequest).postDataJSON().format).toBe("postgresql");
+  await expect.poll(() => downloadNames).toEqual([
+    "sql-designer-export.sql",
+    "sql-designer-export.metadata.json",
+  ]);
 });
 
 test("legacy browser transformer and JSZip are not loaded", async ({

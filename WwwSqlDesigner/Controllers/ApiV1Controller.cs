@@ -15,6 +15,7 @@ namespace WwwSqlDesigner.Controllers;
 [Route("api/v1")]
 public sealed class ApiV1Controller : ControllerBase
 {
+    private const string AntiforgeryError = "A valid antiforgery token is required.";
     private static readonly string[] EmptyDiagnostics = Array.Empty<string>();
     private static readonly string[] EmptyArtifactDiagnostics = ["Artifact is empty."];
     private static readonly SemaphoreSlim VersionPublicationGate = new(1, 1);
@@ -27,7 +28,7 @@ public sealed class ApiV1Controller : ControllerBase
     [HttpPost("tokens")]
     public async Task<IActionResult> CreateToken(CreateTokenRequest request, CancellationToken ct)
     {
-        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = "A valid antiforgery token is required." });
+        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = AntiforgeryError });
         var owner = User.Identity?.Name;
         if (string.IsNullOrWhiteSpace(owner)) return Unauthorized();
         try { var created = await _tokens.CreateAsync(owner, request.Scopes, request.ExpiresIn, request.Name, ct); return Ok(new { id = created.Token.Id, token = created.Plaintext, prefix = created.Token.Prefix, name = created.Token.Name, expiresAt = created.Token.ExpiresAt, scopes = request.Scopes }); }
@@ -47,7 +48,7 @@ public sealed class ApiV1Controller : ControllerBase
     [HttpPost("tokens/{id:guid}/revoke")]
     public async Task<IActionResult> RevokeToken(Guid id, CancellationToken ct)
     {
-        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = "A valid antiforgery token is required." });
+        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = AntiforgeryError });
         var owner = User.Identity?.Name;
         if (string.IsNullOrWhiteSpace(owner)) return Unauthorized();
         var token = await _db.PersonalAccessTokens.SingleOrDefaultAsync(x => x.Id == id && x.Owner == owner, ct);
@@ -341,6 +342,7 @@ public sealed class ApiV1Controller : ControllerBase
     [HttpPost("export")]
     public async Task<IActionResult> ExportArtifact(ExportArtifactRequest request, CancellationToken ct)
     {
+        if (!await RequireCookieAntiforgery()) return BadRequest(new { error = AntiforgeryError });
         if (!(User.Identity?.IsAuthenticated ?? false)) return Unauthorized();
         CanonicalSchema schema;
         try { schema = SchemaExportService.ReadSnapshot(request.Xml); }
@@ -407,7 +409,7 @@ public sealed class ApiV1Controller : ControllerBase
     {
         if (HttpContext.Items.ContainsKey("AntiforgeryFailure"))
         {
-            return BadRequest(new { error = "A valid antiforgery token is required." });
+            return BadRequest(new { error = AntiforgeryError });
         }
 
         return Request.Headers.Authorization.Count == 0 ? Unauthorized() : Forbid();

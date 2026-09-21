@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace WwwSqlDesigner.Data;
@@ -32,13 +33,18 @@ public sealed class PatTokenService
         var requested = scopes.Distinct(StringComparer.Ordinal).ToArray();
         if (requested.Any(x => !typeof(PatScopes).GetFields().Any(f => string.Equals((string)f.GetValue(null)!, x, StringComparison.Ordinal))))
             throw new ArgumentException("Unknown scope.", nameof(scopes));
-        if (await _db.PersonalAccessTokens.CountAsync(x => x.Owner == owner && x.RevokedAt == null && x.ExpiresAt > DateTime.UtcNow, ct) >= MaxActiveTokens)
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
+            : null;
+        var now = DateTime.UtcNow;
+        if (await _db.PersonalAccessTokens.CountAsync(x => x.Owner == owner && x.RevokedAt == null && x.ExpiresAt > now, ct) >= MaxActiveTokens)
             throw new InvalidOperationException("Maximum active token count reached.");
         var secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var plaintext = "sqd_" + secret;
-        var token = new PersonalAccessToken { Owner = owner, Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim(), Prefix = plaintext[..12], TokenHash = Hash(plaintext), ScopesJson = JsonSerializer.Serialize(requested), ExpiresAt = DateTime.UtcNow.Add(lifetime) };
+        var token = new PersonalAccessToken { Owner = owner, Name = string.IsNullOrWhiteSpace(name) ? null : name.Trim(), Prefix = plaintext[..12], TokenHash = Hash(plaintext), ScopesJson = JsonSerializer.Serialize(requested), ExpiresAt = now.Add(lifetime) };
         _db.PersonalAccessTokens.Add(token);
         await _db.SaveChangesAsync(ct);
+        if (transaction is not null) await transaction.CommitAsync(ct);
         return new CreatedPat(token, plaintext);
     }
 
