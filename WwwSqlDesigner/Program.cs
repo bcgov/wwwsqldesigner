@@ -6,9 +6,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using System.Threading.RateLimiting;
+using System.Text.Json.Serialization;
 using WwwSqlDesigner.Authentication;
 using WwwSqlDesigner.Controllers;
 using WwwSqlDesigner.Data;
+using WwwSqlDesigner.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,8 +18,11 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
+builder.Services.AddScoped<PatTokenService>();
+builder.Services.AddSingleton<SchemaExportService>();
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(options =>
 {

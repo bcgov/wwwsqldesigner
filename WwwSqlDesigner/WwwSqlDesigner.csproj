@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Migrations\" />
+    <EmbeddedResource Include="ServerExports\**\output.xsl" />
   </ItemGroup>
   <ItemGroup>
     <SonarQubeSetting Include="sonar.javascript.lcov.reportPaths">

@@ -5,8 +5,6 @@ const CONFIG = {
         { id: "mysql", label: "MySQL" },
         { id: "sqlite", label: "SQLite" },
         { id: "oracle", label: "Oracle" },
-        { id: "cubrid", label: "CUBRID" },
-        { id: "vfp9", label: "Visual FoxPro 9" },
         { id: "sqlalchemy", label: "SQLAlchemy" },
         { id: "web2py", label: "web2py" },
         { id: "ef", label: "Entity Framework 8" }

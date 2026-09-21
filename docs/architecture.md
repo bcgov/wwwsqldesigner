@@ -55,7 +55,8 @@ WwwSqlDesigner.sln
 |  |- Controllers/                 MVC and account/API boundaries
 |  |- Data/                        EF Core context and model entities
 |  |- Authentication/              Keycloak settings and filters
-|  |- wwwroot/                     Browser UI, XML model IO, dialect adapters
+|  |- ServerExports/               Embedded server-side provider templates
+|  |- wwwroot/                     Browser UI and portable XML model IO
 |  `- Program.cs                   Composition root and middleware
 `- WwwSqlDesigner.Tests/           MSTest, integration, and Playwright tests
 ```
@@ -65,7 +66,8 @@ WwwSqlDesigner.sln
 * **Web composition and middleware:** `Program.cs` configures EF Core, authentication, antiforgery, rate limiting, static files, routing, and authorization.
 * **Resource/API boundary:** `Controllers/WwwSqlController.cs` applies owner, group, and grant filters before model access.
 * **Persistence boundary:** `Data/ApplicationDbContext.cs` maps model versions and access grants to SQL Server.
-* **Browser model boundary:** `wwwroot/js/io.js`, `row.js`, and `portabletypes.js` parse, normalize, render, and export XML model data.
+* **Browser model boundary:** `wwwroot/js/io.js`, `row.js`, and `portabletypes.js` edit and serialize the portable model, then request exports from the server.
+* **Export boundary:** `Services/ServerSchemaServices.cs` reads canonical JSON or portable XML, preserves structural and governance metadata, maps portable types, and invokes embedded server-side templates for every supported target.
 
 ### 3.2 Entry Points & Gateways
 
@@ -110,7 +112,7 @@ Controller and browser tests exercise authorization, XML round trips, exports, a
 | Application processing and validation | .NET `string`; XML reader validation | Exact identity keys use explicit byte-length/index rules | Controller and authorization tests | Verified |
 | Database, indexes, and search | SQL Server string columns and configured collation | Identity comparisons use exact key expressions | EF model configuration and schema tests | Verified for identifiers; linguistic policy unknown |
 | Messages, caches, and integrations | No message bus or cache evidenced | N/A | No integration evidence | Unknown |
-| Files, imports, exports, reports, and printing | UTF-8 XML and browser downloads | Export-specific linguistic behavior not documented | XML export tests | Gap |
+| Files, imports, exports, reports, and printing | UTF-8 XML, server-rendered exports, metadata sidecars, and browser downloads | Provider-specific features are verified against the legacy template contract | XML round-trip and exporter parity tests | Verified |
 | Runtime globalization data and fonts | Browser/runtime defaults | No language-specific policy found | No representative Indigenous-language corpus | Gap |
 
 - **Normalization policy:** Not documented.

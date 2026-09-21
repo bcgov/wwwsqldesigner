@@ -1,20 +1,33 @@
-<!DOCTYPE html>
+<!doctype html>
 <!--
 	WWW SQL Designer, (C) 2005-2015 Ondrej Zara, ondras@zarovi.cz
 	Version: 2.7
 	See license.txt for licencing information.
 -->
 <html lang="en" xml:lang="en">
-
-<head>
+  <head>
     <title>WWW SQL Designer</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1" />
     <meta charset="utf-8" />
-    <link rel="stylesheet" title="material-inspired" href="styles/material-inspired.css" media="all" />
-    <link rel="alternate stylesheet" title="original" href="styles/original.css" media="all" />
-    <link rel="stylesheet" href="styles/print.css" type="text/css" media="print" />
+    <link
+      rel="stylesheet"
+      title="material-inspired"
+      href="styles/material-inspired.css"
+      media="all"
+    />
+    <link
+      rel="alternate stylesheet"
+      title="original"
+      href="styles/original.css"
+      media="all"
+    />
+    <link
+      rel="stylesheet"
+      href="styles/print.css"
+      type="text/css"
+      media="print"
+    />
     <script src="js/jquery-3.7.1.min.js"></script>
-    <script src="js/jszip-3.10.1.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/globals.js"></script>
     <script src="js/visual.js"></script>
@@ -35,373 +48,685 @@
     <script src="js/window.js"></script>
     <script src="js/options.js"></script>
     <script src="js/wwwsqldesigner.js"></script>
-</head>
+  </head>
 
-<body>
+  <body>
     <div id="area"></div>
 
     <div id="controls">
-        <div id="bar">
-            <div id="toggle"></div>
-            <div id="account-controls">
-                <form method="get" action="/account/login" id="signin-form" hidden>
-                    <input type="hidden" name="returnUrl" value="/" />
-                    <input type="submit" id="signin-link" value="Sign in" />
-                </form>
-                <form method="post" action="/account/logout" id="logout-form" hidden>
-                    <input type="hidden" name="returnUrl" value="/" />
-                    <input type="hidden" name="__RequestVerificationToken" id="logout-antiforgery-token" />
-                    <input type="submit" value="Sign out" />
-                </form>
-            </div>
-            <input type="button" id="saveload" />
-
-            <hr />
-
-            <input type="button" id="addtable" />
-            <input type="button" id="edittable" />
-            <input type="button" id="tablekeys" />
-            <input type="button" id="removetable" />
-            <input type="button" id="aligntables" />
-            <input type="button" id="cleartables" />
-
-            <hr />
-
-            <input type="button" id="addrow" />
-            <input type="button" id="editrow" />
-            <input type="button" id="uprow" class="small" /><input type="button" id="downrow" class="small" />
-            <input type="button" id="foreigncreate" />
-            <input type="button" id="foreignconnect" />
-            <input type="button" id="foreigndisconnect" />
-            <input type="button" id="removerow" />
-
-            <hr />
-
-            <input type="button" id="options" />
-
+      <div id="bar">
+        <div id="toggle"></div>
+        <div id="account-controls">
+          <form method="get" action="/account/login" id="signin-form" hidden>
+            <input type="hidden" name="returnUrl" value="/" />
+            <input type="submit" id="signin-link" value="Sign in" />
+          </form>
+          <a href="#account-settings" id="account-settings-link" hidden
+            >Account and settings</a
+          >
+          <form method="post" action="/account/logout" id="logout-form" hidden>
+            <input type="hidden" name="returnUrl" value="/" />
+            <input
+              type="hidden"
+              name="__RequestVerificationToken"
+              id="logout-antiforgery-token"
+            />
+            <input type="submit" value="Sign out" />
+          </form>
         </div>
-
-        <div id="rubberband"></div>
-
-        <div id="maptools">
-            <div id="minimap"></div>
-            <details id="legendtools">
-                <summary id="maptoggle" aria-label="Diagram details"></summary>
-                <div id="maptoolcontent"></div>
-            </details>
-        </div>
-
-        <div id="background"></div>
-
-        <div id="window">
-            <div id="windowpanel">
-                <div id="windowtitle">
-                    <img id="throbber" src="images/throbber.gif" alt="" title="" />
-                </div>
-                <div id="windowcontent"></div>
-                <div id="windowbuttons">
-                    <input type="button" id="windowok" />
-                    <input type="button" id="windowcancel" />
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- #controls -->
-
-    <div id="optionspanel">
-        <table aria-label="Options" role="presentation">
-            <tbody>
-                <tr>
-                    <td>* <label id="language" for="optionlocale"></label></td>
-                    <td>
-                        <select id="optionlocale">
-                            <option></option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td><label id="efnamespace" for="optionefnamespace">EF namespace</label></td>
-                    <td><input type="text" size="32" id="optionefnamespace" /></td>
-                </tr>
-                <tr>
-                    <td><label id="efcontext" for="optionefcontext">EF context name</label></td>
-                    <td><input type="text" size="32" id="optionefcontext" /></td>
-                </tr>
-                <tr>
-                    <td>
-                        <label id="snap" for="optionsnap"></label>
-                    </td>
-                    <td>
-                        <input type="text" size="4" id="optionsnap" />
-                        <span class="small" id="optionsnapnotice"></span>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <label id="pattern" for="optionpattern"></label>
-                    </td>
-                    <td>
-                        <input type="text" size="6" id="optionpattern" />
-                        <span class="small" id="optionpatternnotice"></span>
-                    </td>
-                </tr>
-                <tr>
-                    <td>* <label id="style" for="optionstyle"></label></td>
-                    <td>
-                        <select id="optionstyle">
-                            <option></option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <label id="hide" for="optionhide"></label>
-                    </td>
-                    <td>
-                        <input type="checkbox" id="optionhide" />
-                    </td>
-                </tr>
-                <tr>
-                    <td>* <label id="vector" for="optionvector"></label></td>
-                    <td>
-                        <input type="checkbox" id="optionvector" />
-                    </td>
-                </tr>
-                <tr>
-                    <td>* <label id="showsize" for="optionshowsize"></label></td>
-                    <td>
-                        <input type="checkbox" id="optionshowsize" />
-                    </td>
-                </tr>
-                <tr>
-                    <td>* <label id="showtype" for="optionshowtype"></label></td>
-                    <td>
-                        <input type="checkbox" id="optionshowtype" />
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <input type="button" id="saveload" />
 
         <hr />
 
-        * <span class="small" id="optionsnotice"></span>
+        <input type="button" id="addtable" />
+        <input type="button" id="edittable" />
+        <input type="button" id="tablekeys" />
+        <input type="button" id="removetable" />
+        <input type="button" id="aligntables" />
+        <input type="button" id="cleartables" />
+
+        <hr />
+
+        <input type="button" id="addrow" />
+        <input type="button" id="editrow" />
+        <input type="button" id="uprow" class="small" /><input
+          type="button"
+          id="downrow"
+          class="small"
+        />
+        <input type="button" id="foreigncreate" />
+        <input type="button" id="foreignconnect" />
+        <input type="button" id="foreigndisconnect" />
+        <input type="button" id="removerow" />
+
+        <hr />
+
+        <input type="button" id="options" />
+      </div>
+
+      <div id="rubberband"></div>
+
+      <div id="maptools">
+        <div id="minimap"></div>
+        <details id="legendtools">
+          <summary id="maptoggle" aria-label="Diagram details"></summary>
+          <div id="maptoolcontent"></div>
+        </details>
+      </div>
+
+      <div id="background"></div>
+
+      <div id="window">
+        <div id="windowpanel">
+          <div id="windowtitle">
+            <img id="throbber" src="images/throbber.gif" alt="" title="" />
+          </div>
+          <div id="windowcontent"></div>
+          <div id="windowbuttons">
+            <input type="button" id="windowok" />
+            <input type="button" id="windowcancel" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- #controls -->
+
+    <main
+      id="account-settings"
+      class="account-settings"
+      hidden
+      tabindex="-1"
+      aria-labelledby="account-settings-title"
+    >
+      <h1 id="account-settings-title">Account and settings</h1>
+      <p>
+        <button type="button" id="return-to-designer">
+          Return to designer
+        </button>
+      </p>
+      <p id="account-settings-status" role="status" aria-live="polite"></p>
+      <section aria-labelledby="pat-title">
+        <h2 id="pat-title">Personal access tokens</h2>
+        <p>
+          Tokens are shown only to you. The plaintext is displayed once,
+          immediately after creation, and is never stored in this page or the
+          URL.
+        </p>
+        <p id="pat-sign-in" hidden>
+          You must
+          <a href="/account/login?returnUrl=/#account-settings">sign in</a> to
+          manage personal access tokens.
+        </p>
+        <form id="pat-create-form" hidden>
+          <fieldset>
+            <legend>Create a token</legend>
+            <label for="pat-name">Name (optional)</label>
+            <input id="pat-name" maxlength="120" autocomplete="off" />
+            <span id="pat-name-help"
+              >Use a name that identifies the integration, not a secret.</span
+            >
+            <label for="pat-expiry">Expires in (1 to 90 days)</label>
+            <input
+              id="pat-expiry"
+              type="number"
+              min="1"
+              max="90"
+              value="30"
+              required
+              aria-describedby="pat-expiry-help"
+            />
+            <span id="pat-expiry-help"
+              >Choose the shortest period that supports the task.</span
+            >
+            <fieldset>
+              <legend>Least-privilege scopes</legend>
+              <label
+                ><input
+                  type="checkbox"
+                  name="pat-scope"
+                  value="applications:read"
+                  checked
+                />
+                View applications</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="pat-scope"
+                  value="models:read"
+                  checked
+                />
+                View models and versions</label
+              >
+              <label
+                ><input type="checkbox" name="pat-scope" value="models:write" />
+                Publish model versions</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="pat-scope"
+                  value="models:import"
+                />
+                Import artifacts</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="pat-scope"
+                  value="models:export"
+                />
+                Export models</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="pat-scope"
+                  value="applications:create"
+                />
+                Create applications</label
+              >
+              <label
+                ><input
+                  type="checkbox"
+                  name="pat-scope"
+                  value="vocabularies:read"
+                />
+                View vocabulary terms</label
+              >
+            </fieldset>
+            <button type="submit">Create token</button>
+          </fieldset>
+        </form>
+        <div id="pat-once" hidden class="warning" role="alert">
+          <h3>Copy this token now</h3>
+          <p>
+            For your security, the plaintext will not be shown again. Do not
+            share it or save it in source code, logs, URLs, or browser storage.
+          </p>
+          <input
+            id="pat-plaintext"
+            type="text"
+            readonly
+            autocomplete="off"
+            aria-label="New personal access token"
+          />
+          <button type="button" id="pat-copy">Copy token</button>
+        </div>
+        <div id="pat-error" class="error" role="alert" hidden></div>
+        <table id="pat-table">
+          <caption>
+            Personal access token metadata
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Name / prefix</th>
+              <th scope="col">Scopes</th>
+              <th scope="col">Created</th>
+              <th scope="col">Expiry</th>
+              <th scope="col">Last used</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="visually-hidden">Action</span></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section aria-labelledby="models-title">
+        <h2 id="models-title">Canonical data models</h2>
+        <p id="models-status" role="status" aria-live="polite"></p>
+        <p id="models-sign-in" hidden>
+          You must
+          <a href="/account/login?returnUrl=/#account-settings">sign in</a> to
+          manage applications and models.
+        </p>
+        <form id="application-create-form">
+          <fieldset>
+            <legend>Create an application</legend>
+            <label for="application-name">Name</label
+            ><input id="application-name" required maxlength="200" /><label
+              for="application-description"
+              >Description</label
+            ><textarea id="application-description" maxlength="4000"></textarea
+            ><button type="submit">Create application</button>
+          </fieldset>
+        </form>
+        <label for="application-select">Application</label
+        ><select id="application-select">
+          <option value="">Select an application</option>
+        </select>
+        <form id="model-create-form" hidden>
+          <fieldset>
+            <legend>Create a logical model</legend>
+            <label for="model-name">Name</label
+            ><input id="model-name" required maxlength="200" /><label
+              for="variant-name"
+              >First variant</label
+            ><input id="variant-name" value="default" maxlength="120" /><button
+              type="submit"
+            >
+              Create model
+            </button>
+          </fieldset>
+        </form>
+        <label for="variant-select">Variant</label
+        ><select id="variant-select" disabled>
+          <option value="">Select a variant</option>
+        </select>
+        <label for="version-select">Version</label
+        ><select id="version-select" disabled>
+          <option value="">Select a version</option>
+        </select>
+        <div id="version-details" class="metadata-panel" hidden>
+          <h3>Version provenance</h3>
+          <dl>
+            <dt>Exact version</dt>
+            <dd id="version-number"></dd>
+            <dt>Checksum</dt>
+            <dd id="version-checksum"></dd>
+            <dt>Created by</dt>
+            <dd id="version-created-by"></dd>
+            <dt>Created</dt>
+            <dd id="version-created"></dd>
+          </dl>
+          <label for="export-format">Export format</label
+          ><select id="export-format">
+            <option value="ef-core">EF Core</option>
+            <option value="mssql">MSSQL</option>
+            <option value="postgresql">PostgreSQL</option>
+            <option value="mysql">MySQL</option>
+            <option value="sqlite">SQLite</option>
+            <option value="oracle">Oracle</option>
+            <option value="sqlalchemy">SQLAlchemy</option>
+            <option value="web2py">web2py</option></select
+          ><button type="button" id="exact-export">
+            Export this exact version
+          </button>
+        </div>
+        <form id="metadata-form" hidden>
+          <fieldset>
+            <legend>Metadata assignments</legend>
+            <p>
+              Assignments use generic model, entity, and property targets.
+              Effective values include inherited assignments.
+            </p>
+            <label for="metadata-target-type">Target type</label
+            ><select id="metadata-target-type">
+              <option>Model</option>
+              <option>Entity</option>
+              <option>Property</option></select
+            ><label for="metadata-target-id">Target</label
+            ><select id="metadata-target-id" required>
+              <option value="">Select a target</option></select
+            ><label for="metadata-term">Vocabulary term</label
+            ><select id="metadata-term" required>
+              <option value="">Load vocabulary terms</option></select
+            ><label for="metadata-retention"
+              >Retention disposition (optional)</label
+            ><input id="metadata-retention" maxlength="32" /><button
+              type="submit"
+            >
+              Publish metadata as a new version
+            </button>
+            <pre id="metadata-summary" role="status" aria-live="polite"></pre>
+          </fieldset>
+        </form>
+        <form id="import-form">
+          <fieldset>
+            <legend>Import preview and publish</legend>
+            <label for="import-file"
+              >EF C#, MSSQL, PostgreSQL, MySQL, or Oracle artifact</label
+            ><input
+              id="import-file"
+              type="file"
+              accept=".cs,.sql,.ddl,.txt"
+            /><button type="submit">Preview import</button
+            ><button type="button" id="import-publish" disabled>
+              Publish preview as a new version
+            </button>
+            <div id="import-status" role="status" aria-live="polite"></div>
+          </fieldset>
+        </form>
+      </section>
+    </main>
+
+    <div id="optionspanel">
+      <table aria-label="Options" role="presentation">
+        <tbody>
+          <tr>
+            <td>* <label id="language" for="optionlocale"></label></td>
+            <td>
+              <select id="optionlocale">
+                <option></option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="efnamespace" for="optionefnamespace"
+                >EF namespace</label
+              >
+            </td>
+            <td><input type="text" size="32" id="optionefnamespace" /></td>
+          </tr>
+          <tr>
+            <td>
+              <label id="efcontext" for="optionefcontext"
+                >EF context name</label
+              >
+            </td>
+            <td><input type="text" size="32" id="optionefcontext" /></td>
+          </tr>
+          <tr>
+            <td>
+              <label id="snap" for="optionsnap"></label>
+            </td>
+            <td>
+              <input type="text" size="4" id="optionsnap" />
+              <span class="small" id="optionsnapnotice"></span>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="pattern" for="optionpattern"></label>
+            </td>
+            <td>
+              <input type="text" size="6" id="optionpattern" />
+              <span class="small" id="optionpatternnotice"></span>
+            </td>
+          </tr>
+          <tr>
+            <td>* <label id="style" for="optionstyle"></label></td>
+            <td>
+              <select id="optionstyle">
+                <option></option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="hide" for="optionhide"></label>
+            </td>
+            <td>
+              <input type="checkbox" id="optionhide" />
+            </td>
+          </tr>
+          <tr>
+            <td>* <label id="vector" for="optionvector"></label></td>
+            <td>
+              <input type="checkbox" id="optionvector" />
+            </td>
+          </tr>
+          <tr>
+            <td>* <label id="showsize" for="optionshowsize"></label></td>
+            <td>
+              <input type="checkbox" id="optionshowsize" />
+            </td>
+          </tr>
+          <tr>
+            <td>* <label id="showtype" for="optionshowtype"></label></td>
+            <td>
+              <input type="checkbox" id="optionshowtype" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <hr />
+
+      * <span class="small" id="optionsnotice"></span>
     </div>
 
     <div id="loadsavepanel">
-        <div class="io-columns">
-            <div class="io-column">
-            <fieldset id="iopanel">
+      <div class="io-columns">
+        <div class="io-column">
+          <fieldset id="iopanel">
             <div class="io-form-group">
-                <div id="iosourcebuttons" class="io-form-row" role="group" aria-label="Storage source">
-                    <button type="button" class="io-source-button" data-source="browser"></button>
-                    <button type="button" class="io-source-button" data-source="xml"></button>
-                    <button type="button" class="io-source-button" data-source="server"></button>
-                </div>
+              <div
+                id="iosourcebuttons"
+                class="io-form-row"
+                role="group"
+                aria-label="Storage source"
+              >
+                <button
+                  type="button"
+                  class="io-source-button"
+                  data-source="browser"
+                ></button>
+                <button
+                  type="button"
+                  class="io-source-button"
+                  data-source="xml"
+                ></button>
+                <button
+                  type="button"
+                  class="io-source-button"
+                  data-source="server"
+                ></button>
+              </div>
             </div>
             <select id="iotype" aria-hidden="true" tabindex="-1">
-                <option value="browser">Client</option>
-                <option value="xml">File</option>
-                <option value="server">Server</option>
+              <option value="browser">Client</option>
+              <option value="xml">File</option>
+              <option value="server">Server</option>
             </select>
             <input type="hidden" id="backend" value="netcore-ef" />
             <div class="io-form-group" id="server-save-row">
-                <div class="io-label-row">
-                    <label for="serverloadname" id="servermodellabel"></label>
-                </div>
-                <div class="io-form-row">
-                    <input type="text" id="serverloadname" autocomplete="off" />
-                </div>
-                <div class="io-form-row">
-                    <input type="button" id="iosave" value="Save" />
-                </div>
+              <div class="io-label-row">
+                <label for="serverloadname" id="servermodellabel"></label>
+              </div>
+              <div class="io-form-row">
+                <input type="text" id="serverloadname" autocomplete="off" />
+              </div>
+              <div class="io-form-row">
+                <input type="button" id="iosave" value="Save" />
+              </div>
             </div>
             <div class="io-form-group" id="server-load-row">
-                <div class="io-label-row">
-                    <label for="serverloadmodel" id="serverloadmodellabel"></label>
-                    <button type="button" id="serverlist"></button>
-                </div>
-                <div class="io-form-row">
-                    <select id="serverloadmodel"><option value=""></option></select>
-                </div>
-                <div class="io-label-row">
-                    <label for="serverowner" id="serverownerlabel"></label>
-                </div>
-                <div class="io-form-row">
-                    <select id="serverowner"><option value=""></option></select>
-                </div>
-                <div class="io-label-row">
-                    <label for="serverloadversion" id="serverversionlabel"></label>
-                </div>
-                <div class="io-form-row">
-                    <select id="serverloadversion"><option value=""></option></select>
-                </div>
-                <div class="io-form-row">
-                    <input type="button" id="ioload" value="Load" />
-                </div>
+              <div class="io-label-row">
+                <label for="serverloadmodel" id="serverloadmodellabel"></label>
+                <button type="button" id="serverlist"></button>
+              </div>
+              <div class="io-form-row">
+                <select id="serverloadmodel">
+                  <option value=""></option>
+                </select>
+              </div>
+              <div class="io-label-row">
+                <label for="serverowner" id="serverownerlabel"></label>
+              </div>
+              <div class="io-form-row">
+                <select id="serverowner">
+                  <option value=""></option>
+                </select>
+              </div>
+              <div class="io-label-row">
+                <label for="serverloadversion" id="serverversionlabel"></label>
+              </div>
+              <div class="io-form-row">
+                <select id="serverloadversion">
+                  <option value=""></option>
+                </select>
+              </div>
+              <div class="io-form-row">
+                <input type="button" id="ioload" value="Load" />
+              </div>
             </div>
-            </fieldset>
-            </div>
-            <div class="io-column">
-            <fieldset id="ioshare">
-                <div class="io-form-group">
-                    <div class="io-label-row">
-                        <label for="servergrantid" id="serveridlabel"></label>
-                        <button type="button" id="servercopyid"></button>
-                    </div>
-                    <div class="io-form-row">
-                        <input type="text" id="servergrantid" autocomplete="off" />
-                    </div>
-                    <div class="io-label-row">
-                        <label for="servergrantgroup" id="servergrouplabel"></label>
-                    </div>
-                    <div class="io-form-row">
-                        <select id="servergrantgroup"><option value=""></option></select>
-                    </div>
-                    <div class="io-form-row">
-                        <input type="button" id="servershare" disabled />
-                    </div>
-                </div>
-                <div class="io-form-group">
-                    <div class="io-label-row">
-                        <label for="serverknownuser">User</label>
-                    </div>
-                    <div class="io-form-row">
-                        <select id="serverknownuser"><option value=""></option></select>
-                    </div>
-                    <div class="io-label-row">
-                        <label for="serverknowngroup">Group</label>
-                    </div>
-                    <div class="io-form-row">
-                        <select id="serverknowngroup"><option value=""></option></select>
-                    </div>
-                    <div class="io-form-row">
-                        <input type="button" id="serverunshare" disabled />
-                    </div>
-                </div>
-            </fieldset>
-            </div>
-            <div class="io-column">
-                <div class="io-form-group">
-                    <div class="io-label-row">
-                        <label for="exporttarget" id="exporttargetlabel">Format</label>
-                    </div>
-                    <div class="io-form-row">
-                        <select id="exporttarget"></select>
-                    </div>
-                    <div class="io-form-row">
-                        <input type="button" id="clientsql" />
-                    </div>
-                    <div id="iostatus" role="status" aria-live="polite" hidden></div>
-                </div>
-                <div class="io-form-group" id="server-import-group">
-                    <div class="io-label-row">
-                        <label for="serverimportdatabase" id="serverimportdatabaselabel"></label>
-                    </div>
-                    <div class="io-form-row">
-                        <input type="text" id="serverimportdatabase" />
-                    </div>
-                    <div class="io-form-row">
-                        <input type="button" id="serverimport" />
-                    </div>
-                </div>
-            </div>
+          </fieldset>
         </div>
+        <div class="io-column">
+          <fieldset id="ioshare">
+            <div class="io-form-group">
+              <div class="io-label-row">
+                <label for="servergrantid" id="serveridlabel"></label>
+                <button type="button" id="servercopyid"></button>
+              </div>
+              <div class="io-form-row">
+                <input type="text" id="servergrantid" autocomplete="off" />
+              </div>
+              <div class="io-label-row">
+                <label for="servergrantgroup" id="servergrouplabel"></label>
+              </div>
+              <div class="io-form-row">
+                <select id="servergrantgroup">
+                  <option value=""></option>
+                </select>
+              </div>
+              <div class="io-form-row">
+                <input type="button" id="servershare" disabled />
+              </div>
+            </div>
+            <div class="io-form-group">
+              <div class="io-label-row">
+                <label for="serverknownuser">User</label>
+              </div>
+              <div class="io-form-row">
+                <select id="serverknownuser">
+                  <option value=""></option>
+                </select>
+              </div>
+              <div class="io-label-row">
+                <label for="serverknowngroup">Group</label>
+              </div>
+              <div class="io-form-row">
+                <select id="serverknowngroup">
+                  <option value=""></option>
+                </select>
+              </div>
+              <div class="io-form-row">
+                <input type="button" id="serverunshare" disabled />
+              </div>
+            </div>
+          </fieldset>
+        </div>
+        <div class="io-column">
+          <div class="io-form-group">
+            <div class="io-label-row">
+              <label for="exporttarget" id="exporttargetlabel">Format</label>
+            </div>
+            <div class="io-form-row">
+              <select id="exporttarget"></select>
+            </div>
+            <div class="io-form-row">
+              <input type="button" id="clientsql" />
+            </div>
+            <div id="iostatus" role="status" aria-live="polite" hidden></div>
+          </div>
+          <div class="io-form-group" id="server-import-group">
+            <div class="io-label-row">
+              <label
+                for="serverimportdatabase"
+                id="serverimportdatabaselabel"
+              ></label>
+            </div>
+            <div class="io-form-row">
+              <input type="text" id="serverimportdatabase" />
+            </div>
+            <div class="io-form-row">
+              <input type="button" id="serverimport" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="keys">
-        <fieldset>
-            <legend id="keyslistlabel"></legend>
-            <select id="keyslist">
-                <option></option>
-            </select>
-            <input type="button" id="keyadd" />
-            <input type="button" id="keyremove" />
-        </fieldset>
-        <fieldset>
-            <legend id="keyedit"></legend>
-            <table aria-label="Keylist" role="presentation">
-                <tbody>
-                    <tr>
-                        <td>
-                            <label for="keytype" id="keytypelabel"></label>
-                            <select id="keytype">
-                                <option></option>
-                            </select>
-                        </td>
-                        <td></td>
-                        <td>
-                            <label for="keyname" id="keynamelabel"></label>
-                            <input type="text" id="keyname" size="10" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="3">
-                            <hr />
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <label for="keyfields" id="keyfieldslabel"></label><br />
-                            <select id="keyfields" size="5" multiple="multiple">
-                                <option></option>
-                            </select>
-                        </td>
-                        <td>
-                            <input type="button" id="keyleft" value="&lt;&lt;" /><br />
-                            <input type="button" id="keyright" value="&gt;&gt;" /><br />
-                        </td>
-                        <td>
-                            <label for="keyavail" id="keyavaillabel"></label><br />
-                            <select id="keyavail" size="5" multiple="multiple">
-                                <option></option>
-                            </select>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </fieldset>
+      <fieldset>
+        <legend id="keyslistlabel"></legend>
+        <select id="keyslist">
+          <option></option>
+        </select>
+        <input type="button" id="keyadd" />
+        <input type="button" id="keyremove" />
+      </fieldset>
+      <fieldset>
+        <legend id="keyedit"></legend>
+        <table aria-label="Keylist" role="presentation">
+          <tbody>
+            <tr>
+              <td>
+                <label for="keytype" id="keytypelabel"></label>
+                <select id="keytype">
+                  <option></option>
+                </select>
+              </td>
+              <td></td>
+              <td>
+                <label for="keyname" id="keynamelabel"></label>
+                <input type="text" id="keyname" size="10" />
+              </td>
+            </tr>
+            <tr>
+              <td colspan="3">
+                <hr />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label for="keyfields" id="keyfieldslabel"></label><br />
+                <select id="keyfields" size="5" multiple="multiple">
+                  <option></option>
+                </select>
+              </td>
+              <td>
+                <input type="button" id="keyleft" value="&lt;&lt;" /><br />
+                <input type="button" id="keyright" value="&gt;&gt;" /><br />
+              </td>
+              <td>
+                <label for="keyavail" id="keyavaillabel"></label><br />
+                <select id="keyavail" size="5" multiple="multiple">
+                  <option></option>
+                </select>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </fieldset>
     </div>
 
     <div id="table">
-        <table aria-label="Tables" role="presentation">
-            <tbody>
-                <tr>
-                    <td>
-                        <label id="tablenamelabel" for="tablename"></label>
-                    </td>
-                    <td>
-                        <input id="tablename" type="text" />
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <label id="tableschemalabel" for="tableschema"></label>
-                    </td>
-                    <td>
-                        <input id="tableschema" type="text" />
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <label id="tablecommentlabel" for="tablecomment"></label>
-                    </td>
-                    <td>
-                        <textarea rows="5" cols="40" id="tablecomment"></textarea>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <label id="tablerecordsschedulelabel" for="tablerecordsschedule"></label>
-                    </td>
-                    <td>
-                        <textarea rows="5" cols="40" id="tablerecordsschedule"></textarea>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+      <table aria-label="Tables" role="presentation">
+        <tbody>
+          <tr>
+            <td>
+              <label id="tablenamelabel" for="tablename"></label>
+            </td>
+            <td>
+              <input id="tablename" type="text" />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="tableschemalabel" for="tableschema"></label>
+            </td>
+            <td>
+              <input id="tableschema" type="text" />
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="tablecommentlabel" for="tablecomment"></label>
+            </td>
+            <td>
+              <textarea rows="5" cols="40" id="tablecomment"></textarea>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label
+                id="tablerecordsschedulelabel"
+                for="tablerecordsschedule"
+              ></label>
+            </td>
+            <td>
+              <textarea rows="5" cols="40" id="tablerecordsschedule"></textarea>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <script src="js/bootstrap.js"></script>
-</body>
-
+    <script src="js/account-settings.js"></script>
+  </body>
 </html>

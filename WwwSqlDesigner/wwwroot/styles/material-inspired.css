@@ -221,6 +221,36 @@ label, input, select {
     display: none !important;
 }
 
+.account-settings {
+    box-sizing: border-box;
+    max-width: 1100px;
+    margin: 1rem auto;
+    padding: 1rem;
+    background: #fff;
+    color: #1f1f1f;
+    overflow-wrap: anywhere;
+}
+.account-settings section {
+    border-top: 1px solid #8e8e8e;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+}
+.account-settings fieldset { display: grid; gap: .5rem; margin: 1rem 0; }
+.account-settings input, .account-settings select, .account-settings textarea { max-width: 100%; box-sizing: border-box; }
+.account-settings button, .account-settings input, .account-settings select { min-height: 2.5rem; }
+.account-settings table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; }
+.account-settings th, .account-settings td { border: 1px solid #8e8e8e; padding: .5rem; text-align: left; vertical-align: top; }
+.account-settings .warning { border-left: .4rem solid #f5b335; padding: .75rem; margin: 1rem 0; }
+.account-settings .error { color: #b20d2f; font-weight: 600; }
+.metadata-panel { border: 1px solid #8e8e8e; padding: .75rem; margin-top: 1rem; }
+.metadata-panel dt { font-weight: 700; }
+.metadata-panel dd { margin: 0 0 .5rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 700px) {
+    .account-settings { margin: 0; padding: .75rem; }
+    .account-settings table { font-size: .9rem; }
+}
+
 #bar input:hover {
     background-color: #de2665;
     color: #fff;
