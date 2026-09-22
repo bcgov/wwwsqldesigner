@@ -1,6 +1,7 @@
 .vs
 *.user
 *.suo
+appsettings.Development.json
 
 [Bb]in/
 [Oo]bj/
