@@ -1,0 +1,50 @@
+name: Deploy to OpenShift Gold
+on:
+  push:
+    branches: [ main ]
+
+env:
+  OC_NAMESPACE_DEV: "d34563-dev"
+  IMAGE_NAME: "ghcr.io/${{ github.repository_owner }}/wwwsqldesigner"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set lower case IMAGE_NAME
+        run: |
+          echo "IMAGE_NAME=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/wwwsqldesigner" >> $GITHUB_ENV
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy-dev:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Authenticate and set context
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: https://api.gold.devops.gov.bc.ca:6443
+          openshift_token: ${{ secrets.OC_SA_TOKEN_DEV }}
+          namespace: ${{ env.OC_NAMESPACE_DEV }}
+          
+      - name: Deploy to Dev
+        run: |
+          oc process -f .openshift/template.yaml \
+            -p IMAGE_REGISTRY=ghcr.io \
+            -p IMAGE_NAMESPACE=${{ github.repository_owner }} \
+            -p IMAGE_TAG=${{ github.sha }} \
+            -p ENVIRONMENT=Development | oc apply -f -
