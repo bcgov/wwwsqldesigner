@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -173,48 +174,67 @@ public sealed class ApiV1ControllerTests
             "api/v1",
             typeof(PatApiV1Controller).GetCustomAttribute<RouteAttribute>()!.Template);
 
-        const string secretVariable = "Authentication__Keycloak__ClientSecret";
-        var originalSecret = Environment.GetEnvironmentVariable(secretVariable);
-        try
-        {
-            Environment.SetEnvironmentVariable(secretVariable, "test-secret");
-            using var factory = new WebApplicationFactory<Program>()
-                .WithWebHostBuilder(builder => builder.UseEnvironment("Development"));
-            var filters = factory.Services.GetRequiredService<IOptions<MvcOptions>>().Value.Filters;
-            Assert.Contains(filter => filter is AutoValidateAntiforgeryTokenAttribute, filters);
-
-            var actions = factory.Services
-                .GetRequiredService<IActionDescriptorCollectionProvider>()
-                .ActionDescriptors.Items
-                .OfType<ControllerActionDescriptor>()
-                .ToArray();
-            Assert.IsNotNull(actions.SingleOrDefault(action =>
-                action.ControllerTypeInfo.AsType() == typeof(CookieApiV1Controller)
-                && action.ActionName == nameof(CookieApiV1Controller.CreateToken)));
-            Assert.IsNull(actions.SingleOrDefault(action =>
-                action.ControllerTypeInfo.AsType() == typeof(PatApiV1Controller)
-                && action.ActionName == nameof(CookieApiV1Controller.CreateToken)));
-            Assert.IsNotNull(actions.SingleOrDefault(action =>
-                action.ControllerTypeInfo.AsType() == typeof(CookieApiV1Controller)
-                && action.ActionName == nameof(CookieApiV1Controller.CreateApplication)));
-            Assert.IsNotNull(actions.SingleOrDefault(action =>
-                action.ControllerTypeInfo.AsType() == typeof(PatApiV1Controller)
-                && action.ActionName == nameof(PatApiV1Controller.CreateApplication)));
-
-            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
             {
-                AllowAutoRedirect = false
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Authentication:Keycloak:Enabled", "true");
+                builder.UseSetting("Authentication:Keycloak:Authority", "https://example.test/realms/test");
+                builder.UseSetting("Authentication:Keycloak:ClientId", "client");
+                builder.UseSetting("Authentication:Keycloak:ClientSecret", "secret");
+                builder.UseSetting(
+                    "ConnectionStrings:DefaultConnection",
+                    "Server=(localdb)\\MSSQLLocalDB;Database=WwwSqlDesignerTests;Integrated Security=True");
+                builder.ConfigureAppConfiguration((_, configuration) =>
+                {
+                    configuration.Sources.Clear();
+                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["Authentication:Keycloak:Enabled"] = "true",
+                        ["Authentication:Keycloak:Authority"] = "https://example.test/realms/test",
+                        ["Authentication:Keycloak:ClientId"] = "client",
+                        ["Authentication:Keycloak:ClientSecret"] = "secret",
+                        ["ConnectionStrings:DefaultConnection"] =
+                            "Server=(localdb)\\MSSQLLocalDB;Database=WwwSqlDesignerTests;Integrated Security=True"
+                    });
+                });
             });
-            var request = new ApplicationRequest("boundary-test", null, null);
-            var cookieResponse = await client.PostAsJsonAsync("/api/ui/v1/applications", request);
-            Assert.AreEqual(HttpStatusCode.BadRequest, cookieResponse.StatusCode);
-            var patResponse = await client.PostAsJsonAsync("/api/v1/applications", request);
-            Assert.AreEqual(HttpStatusCode.Unauthorized, patResponse.StatusCode);
-        }
-        finally
+        var filters = factory.Services.GetRequiredService<IOptions<MvcOptions>>().Value.Filters;
+        Assert.Contains(filter => filter is AutoValidateAntiforgeryTokenAttribute, filters);
+
+        var actions = factory.Services
+            .GetRequiredService<IActionDescriptorCollectionProvider>()
+            .ActionDescriptors.Items
+            .OfType<ControllerActionDescriptor>()
+            .ToArray();
+        Assert.IsNotNull(actions.SingleOrDefault(action =>
+            action.ControllerTypeInfo.AsType() == typeof(CookieApiV1Controller)
+            && action.ActionName == nameof(CookieApiV1Controller.CreateToken)));
+        Assert.IsNull(actions.SingleOrDefault(action =>
+            action.ControllerTypeInfo.AsType() == typeof(PatApiV1Controller)
+            && action.ActionName == nameof(CookieApiV1Controller.CreateToken)));
+        Assert.IsNotNull(actions.SingleOrDefault(action =>
+            action.ControllerTypeInfo.AsType() == typeof(CookieApiV1Controller)
+            && action.ActionName == nameof(CookieApiV1Controller.CreateApplication)));
+        Assert.IsNotNull(actions.SingleOrDefault(action =>
+            action.ControllerTypeInfo.AsType() == typeof(PatApiV1Controller)
+            && action.ActionName == nameof(PatApiV1Controller.CreateApplication)));
+
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            Environment.SetEnvironmentVariable(secretVariable, originalSecret);
-        }
+            AllowAutoRedirect = false
+        });
+        var request = new ApplicationRequest("boundary-test", null, null);
+        var cookieResponse = await client.PostAsJsonAsync(
+            "/api/ui/v1/applications",
+            request,
+            TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.BadRequest, cookieResponse.StatusCode);
+        var patResponse = await client.PostAsJsonAsync(
+            "/api/v1/applications",
+            request,
+            TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, patResponse.StatusCode);
     }
 
     [TestMethod]
